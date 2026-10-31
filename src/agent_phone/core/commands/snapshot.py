@@ -1,5 +1,5 @@
 """`agent-phone snapshot [--compact|--skeleton|--full] [--settle [--timeout-ms N]]
-[--window N] [--root <ref>]`"""
+[--surface active|dialog|keyboard|shade|all | --window N | --root <ref>]`"""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from agent_phone.core.outcome import ErrorCode, Outcome, Read, Refusal, Refused
 from agent_phone.core.screen import WindowId
 from agent_phone.core.snapshot.capture import capture
 from agent_phone.core.snapshot.snapshot import RefToken, SettleState
+from agent_phone.core.snapshot.surface import Pick
 from agent_phone.core.snapshot.view import Mode
 from agent_phone.core.wait.observe import SETTLE_DEADLINE_S, observe
 from agent_phone.core.wait.predicate import Settled
@@ -21,6 +22,7 @@ SETTLE_TIMEOUT_MS = int(SETTLE_DEADLINE_S * 1000)
 class SnapshotCommand:
     mode: Mode = Mode.COMPACT
     settle: bool = False
+    pick: Pick = Pick.ACTIVE
     window: WindowId | None = None
     root: RefToken | None = None
     timeout_ms: int = SETTLE_TIMEOUT_MS
@@ -34,10 +36,10 @@ def run(ctx: Context, cmd: SnapshotCommand) -> Outcome:
         if cmd.root is not None:
             raise Refusal(ErrorCode.NOT_SUPPORTED, "snapshot --root is not built yet.")
         if cmd.settle:
-            seen = observe(ctx, (Settled(),), ctx.clock.now() + cmd.timeout_ms / 1000)
+            seen = observe(ctx, (Settled(cmd.pick, cmd.window),), ctx.clock.now() + cmd.timeout_ms / 1000)
             screen, settled = seen.screen, seen.settled
         else:
             screen, settled = ctx.phone.read(), SettleState.UNCHECKED
-        return Read(capture(ctx, screen, cmd.mode, settled, cmd.window))
+        return Read(capture(ctx, screen, cmd.mode, settled, cmd.window, None, cmd.pick))
     except Refusal as refusal:
         return Refused.of(refusal)

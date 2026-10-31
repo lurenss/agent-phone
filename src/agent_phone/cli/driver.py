@@ -39,7 +39,9 @@ from agent_phone.core.policy.rules import Effect, Policy, merge, parse_policy
 from agent_phone.core.query import Query
 from agent_phone.core.refs.resolve import Target
 from agent_phone.core.refs.store import DeviceLock, SnapshotStore
+from agent_phone.core.screen import WindowId
 from agent_phone.core.snapshot.snapshot import RefToken, Snapshot
+from agent_phone.core.snapshot.surface import Pick
 from agent_phone.core.snapshot.view import Mode
 from agent_phone.core.wait.clock import Clock, SystemClock
 from agent_phone.core.wait.predicate import Predicate
@@ -89,8 +91,10 @@ class Driver:
         settle: bool = False,
         root: RefToken | None = None,
         timeout_ms: int = SETTLE_TIMEOUT_MS,
+        pick: Pick = Pick.ACTIVE,
+        window: WindowId | None = None,
     ) -> Snapshot:
-        outcome = self.run(SnapshotCommand(mode, settle, None, root, timeout_ms))
+        outcome = self.run(SnapshotCommand(mode, settle, pick, window, root, timeout_ms))
         if isinstance(outcome, Read) and isinstance(outcome.payload, Snapshot):
             return outcome.payload
         raise PhoneError(outcome)

@@ -12,7 +12,7 @@ from agent_phone.core.refs.fingerprint import fingerprints
 from agent_phone.core.screen import NodeId, Screen, WindowId
 from agent_phone.core.snapshot.budget import fit
 from agent_phone.core.snapshot.snapshot import SettleState, Snapshot
-from agent_phone.core.snapshot.surface import select_surface
+from agent_phone.core.snapshot.surface import Pick, select_surface
 from agent_phone.core.snapshot.view import Mode, build_view
 
 
@@ -23,8 +23,9 @@ def capture(
     settled: SettleState = SettleState.UNCHECKED,
     window: WindowId | None = None,
     root: NodeId | None = None,
+    pick: Pick = Pick.ACTIVE,
 ) -> Snapshot:
-    surface = select_surface(screen, window, root)
+    surface = select_surface(screen, window, root, pick)
     id = ctx.store.new_id(ctx.info.identity.serial)
     built = build_view(surface, mode)
     view = fit(built, id)

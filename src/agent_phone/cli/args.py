@@ -13,6 +13,8 @@ from agent_phone.core.commands.server import ServerAction, ServerCommand
 from agent_phone.core.commands.snapshot import SETTLE_TIMEOUT_MS, SnapshotCommand
 from agent_phone.core.device import Serial
 from agent_phone.core.outcome import ErrorCode, Refusal
+from agent_phone.core.screen import WindowId
+from agent_phone.core.snapshot.surface import Pick
 from agent_phone.core.snapshot.view import Mode
 
 Command = DevicesCommand | ServerCommand | SnapshotCommand
@@ -30,9 +32,9 @@ class Parser(argparse.ArgumentParser):
         raise Refusal(ErrorCode.INVALID_ARGS, f"{message}. Run agent-phone --help for the commands.")
 
 
-def milliseconds(text: str) -> int:
+def whole_number(text: str) -> int:
     if not text.isdigit():
-        raise argparse.ArgumentTypeError(f"{text!r} is not a whole number of milliseconds")
+        raise argparse.ArgumentTypeError(f"{text!r} is not a whole number")
     return int(text)
 
 
@@ -64,9 +66,23 @@ def build() -> Parser:
         action="store_true",
         help="read until two reads in a row print the same lines, and say whether they did",
     )
+    where = snapshot.add_mutually_exclusive_group()
+    where.add_argument(
+        "--surface",
+        choices=[pick.value for pick in Pick],
+        default=Pick.ACTIVE.value,
+        help="which window to describe: the active one (default), a dialog, the keyboard, "
+        "the full-screen system window (notification shade), or every window",
+    )
+    where.add_argument(
+        "--window",
+        type=whole_number,
+        metavar="N",
+        help="describe the window that `others` lists under this id, which is its place in the dump",
+    )
     snapshot.add_argument(
         "--timeout-ms",
-        type=milliseconds,
+        type=whole_number,
         default=SETTLE_TIMEOUT_MS,
         metavar="N",
         help=f"how long --settle may take before it gives up (default {SETTLE_TIMEOUT_MS})",
@@ -86,7 +102,11 @@ def parse_args(argv: Sequence[str]) -> Invocation:
             command: Command = DevicesCommand()
         case "snapshot":
             command = SnapshotCommand(
-                mode=Mode(parsed.mode), settle=parsed.settle, timeout_ms=parsed.timeout_ms
+                mode=Mode(parsed.mode),
+                settle=parsed.settle,
+                pick=Pick(parsed.surface),
+                window=None if parsed.window is None else WindowId(parsed.window),
+                timeout_ms=parsed.timeout_ms,
             )
         case "server":
             command = ServerCommand(ServerAction(parsed.action))

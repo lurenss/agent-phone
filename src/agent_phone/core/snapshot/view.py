@@ -36,8 +36,8 @@ from agent_phone.core.role import (
     role_of,
     shows_surface,
 )
-from agent_phone.core.screen import Flag, Node, NodeId, Screen
-from agent_phone.core.snapshot.surface import Surface
+from agent_phone.core.screen import Flag, Node, NodeId, Screen, Window
+from agent_phone.core.snapshot.surface import Pick, Surface
 
 
 class Mode(Enum):
@@ -103,9 +103,10 @@ def ref_numbers(surface: Surface) -> Mapping[NodeId, int]:
     (`role.is_actionable`) and not a wrapper that folds into the one consumer inside it."""
     screen = surface.screen
     numbers: dict[NodeId, int] = {}
-    for node in screen.subtree(surface.window.root):
-        if is_actionable(node.attrs, role_of(node.attrs)) and not is_wrapper(screen, node):
-            numbers[node.id] = len(numbers) + 1
+    for window in surface.windows:
+        for node in screen.subtree(window.root):
+            if is_actionable(node.attrs, role_of(node.attrs)) and not is_wrapper(screen, node):
+                numbers[node.id] = len(numbers) + 1
     return numbers
 
 
@@ -158,17 +159,46 @@ def compact_entries(surface: Surface, numbers: Mapping[NodeId, int]) -> list[tup
         for child in node.children:
             visit(child, *below)
 
-    visit(surface.root, 0, False, "")
+    if surface.pick is Pick.ALL:
+        for window in surface.windows:
+            entries.append((window_line(window), window.root))
+            visit(window.root, 1, False, "")
+    else:
+        visit(surface.root, 0, False, "")
     return entries
 
 
 def full_entries(surface: Surface, numbers: Mapping[NodeId, int]) -> list[tuple[Line, NodeId]]:
     screen = surface.screen
-    top = screen.node(surface.root).depth
-    return [
-        (line_of(screen, node, role_of(node.attrs), node.depth - top, numbers.get(node.id)), node.id)
-        for node in screen.subtree(surface.root)
-    ]
+    entries: list[tuple[Line, NodeId]] = []
+    for root in surface.roots:
+        top = screen.node(root).depth
+        if surface.pick is Pick.ALL:
+            entries.append((window_line(screen.window_of(root)), root))
+            top -= 1
+        entries.extend(
+            (line_of(screen, node, role_of(node.attrs), node.depth - top, numbers.get(node.id)), node.id)
+            for node in screen.subtree(root)
+        )
+    return entries
+
+
+def window_line(window: Window) -> Line:
+    """The line that opens a window's part of an all-windows tree: its package, its kind as the
+    detail, `focused` on the active window, and its bounds."""
+    return Line(
+        ref=None,
+        depth=0,
+        role=Role.GROUP,
+        name=window.package,
+        detail=window.kind.value,
+        value="",
+        id_hint="",
+        states=frozenset({State.FOCUSED} if window.active else ()),
+        bounds=window.bounds,
+        rows=None,
+        folded=0,
+    )
 
 
 def line_of(screen: Screen, node: Node, role: Role, depth: int, ref: int | None) -> Line:

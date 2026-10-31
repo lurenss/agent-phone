@@ -10,11 +10,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from agent_phone.core.device import Package
+from agent_phone.core.outcome import Refusal
 from agent_phone.core.query import Query
-from agent_phone.core.screen import Screen
+from agent_phone.core.screen import Screen, WindowId
 from agent_phone.core.snapshot.budget import render
 from agent_phone.core.snapshot.snapshot import RefToken, SnapshotId
-from agent_phone.core.snapshot.surface import select_surface
+from agent_phone.core.snapshot.surface import Pick, select_surface
 from agent_phone.core.snapshot.view import Mode, build_view
 
 
@@ -35,8 +36,13 @@ class Foreground:
 
 @dataclass(frozen=True, slots=True)
 class Settled:
-    """Two consecutive reads print the same compact lines. Comparing printed lines, not the raw
-    tree, ignores churn the agent cannot see, such as a progress bar's bounds."""
+    """Two consecutive reads print the same compact lines of the surface that `pick` and
+    `window` name. Comparing printed lines, not the raw tree, ignores churn the agent cannot
+    see, such as a progress bar's bounds. A read with no such surface is not settled, so
+    `Settled(Pick.DIALOG)` also waits for a dialog to appear."""
+
+    pick: Pick = Pick.ACTIVE
+    window: WindowId | None = None
 
 
 Predicate = Present | Gone | Foreground | Settled
@@ -56,12 +62,19 @@ def holds(predicate: Predicate, previous: Screen | None, current: Screen) -> boo
     # Gone(RefToken) resolves the ref's fingerprint with refs.resolve.locate and holds on
     # STALE_REF(GONE); Foreground compares the active window's package.
     if isinstance(predicate, Settled):
-        return previous is not None and printed_lines(previous) == printed_lines(current)
+        if previous is None:
+            return False
+        before, now = (printed_lines(screen, predicate) for screen in (previous, current))
+        return before is not None and before == now
     raise NotImplementedError
 
 
-def printed_lines(screen: Screen) -> tuple[str, ...]:
-    return render(build_view(select_surface(screen), Mode.COMPACT), SETTLE_ID)
+def printed_lines(screen: Screen, settled: Settled) -> tuple[str, ...] | None:
+    try:
+        surface = select_surface(screen, settled.window, None, settled.pick)
+    except Refusal:
+        return None
+    return render(build_view(surface, Mode.COMPACT), SETTLE_ID)
 
 
 def describe(predicate: Predicate) -> str:
