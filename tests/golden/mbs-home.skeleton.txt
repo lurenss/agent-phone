@@ -1,0 +1,6 @@
+@t0000:e1 list (3 rows) (+15) [0,63,1080,1784]
+@t0000:e14 button "Home" [42,1782,189,1920]
+@t0000:e15 button "Posts & Stories" [260,1793,407,1909]
+@t0000:e16 button "Create new post" [477,1752,603,1878]
+@t0000:e17 button "Messages and comments" "redacted-3, redacted-4" [674,1793,821,1909]
+@t0000:e18 button "More" [891,1793,1038,1909]

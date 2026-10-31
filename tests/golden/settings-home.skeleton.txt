@@ -1,0 +1,4 @@
+text "Settings" [63,33,277,114]
+@t0000:e1 button "Search" [1648,0,1775,147]
+@t0000:e2 button "Samsung account profile" [1775,0,1920,147]
+@t0000:e3 list #dashboard_container (4 rows) (+4) [0,179,1920,1080]
