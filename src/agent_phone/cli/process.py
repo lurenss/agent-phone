@@ -61,7 +61,7 @@ def execute(
                 settings=settings,
                 clock=clock,
                 command=invocation.name,
-                ref=command.root,
+                ref=command.scope.root,
             ) as driver:
                 return driver.run(command), driver.serial
         case ServerCommand() as command:

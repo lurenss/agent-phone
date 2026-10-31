@@ -10,10 +10,11 @@ from typing import NoReturn
 
 from agent_phone.core.commands.devices import DevicesCommand
 from agent_phone.core.commands.server import ServerAction, ServerCommand
-from agent_phone.core.commands.snapshot import SETTLE_TIMEOUT_MS, SnapshotCommand
+from agent_phone.core.commands.snapshot import SnapshotCommand
 from agent_phone.core.device import Serial
 from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.screen import WindowId
+from agent_phone.core.snapshot.scope import SETTLE_TIMEOUT_MS, Scope
 from agent_phone.core.snapshot.snapshot import RefToken
 from agent_phone.core.snapshot.surface import Pick
 from agent_phone.core.snapshot.view import Mode
@@ -111,9 +112,11 @@ def parse_args(argv: Sequence[str]) -> Invocation:
             command = SnapshotCommand(
                 mode=Mode(parsed.mode),
                 settle=parsed.settle,
-                pick=Pick(parsed.surface),
-                window=None if parsed.window is None else WindowId(parsed.window),
-                root=parsed.root,
+                scope=Scope(
+                    Pick(parsed.surface),
+                    None if parsed.window is None else WindowId(parsed.window),
+                    parsed.root,
+                ),
                 timeout_ms=parsed.timeout_ms,
             )
         case "server":

@@ -30,7 +30,7 @@ from agent_phone.cli.settings import Settings
 from agent_phone.core.act.intent import Direction
 from agent_phone.core.act.ledger import Ledger
 from agent_phone.core.commands import snapshot
-from agent_phone.core.commands.snapshot import SETTLE_TIMEOUT_MS, SnapshotCommand
+from agent_phone.core.commands.snapshot import SnapshotCommand
 from agent_phone.core.context import Context
 from agent_phone.core.device import Serial, select_device
 from agent_phone.core.outcome import Acted, ErrorCode, Outcome, Read, Refusal, Refused
@@ -40,6 +40,7 @@ from agent_phone.core.query import Query
 from agent_phone.core.refs.resolve import Target
 from agent_phone.core.refs.store import DeviceLock, SnapshotStore
 from agent_phone.core.screen import WindowId
+from agent_phone.core.snapshot.scope import SETTLE_TIMEOUT_MS, Scope
 from agent_phone.core.snapshot.snapshot import RefToken, Snapshot
 from agent_phone.core.snapshot.surface import Pick
 from agent_phone.core.snapshot.view import Mode
@@ -94,7 +95,7 @@ class Driver:
         pick: Pick = Pick.ACTIVE,
         window: WindowId | None = None,
     ) -> Snapshot:
-        outcome = self.run(SnapshotCommand(mode, settle, pick, window, root, timeout_ms))
+        outcome = self.run(SnapshotCommand(mode, settle, Scope(pick, window, root), timeout_ms))
         if isinstance(outcome, Read) and isinstance(outcome.payload, Snapshot):
             return outcome.payload
         raise PhoneError(outcome)
