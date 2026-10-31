@@ -1,0 +1,33 @@
+[project]
+name = "agent-phone"
+version = "0.1.0"
+description = "Drive an Android phone from an AI agent through compact accessibility snapshots and refs."
+requires-python = ">=3.12"
+dependencies = ["uiautomator2==3.7.1"]
+
+[project.scripts]
+agent-phone = "agent_phone.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.15"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 110
+extend-exclude = ["tests/fixtures"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "TID251"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"time.sleep".msg = "A fixed sleep is a race. Wait on a screen condition with agent_phone's wait functions."
+
+[tool.ruff.lint.per-file-ignores]
+"probes/**" = ["TID251"]
+"src/agent_phone/core/wait/**" = ["TID251"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
