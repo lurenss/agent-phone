@@ -6,7 +6,7 @@ Each row records one measurement on the real phone, what it showed, and what it 
 
 | Column | Meaning |
 | --- | --- |
-| `id` | Stable row id. `A<area>-<n>`. Area 1 is the old adb path, 2 is the uiautomator2 server, 3 is server lifetime, 4 is snapshot size. |
+| `id` | Stable row id. `A<area>-<n>`. Area 1 is the old adb path, 2 is the uiautomator2 server, 3 is server lifetime and device facts, 4 is snapshot size. |
 | `probe` | The script that produced the row, run from the repo root. |
 | `observed` | What the phone did, with the run count and range. |
 | `verdict` | `CONFIRMS` or `CONTRADICTS` an assumption the design made before measuring, `NEW-EDGE` for behavior nobody assumed, `DEFERRED` for a question a later unit must answer. |
@@ -49,3 +49,5 @@ The high load inflates Java process startup most, so the gap between area 1 and 
 | A3-5 | none yet | While the server runs, accessibility is on, and apps can detect it. Inferred from how UiAutomation registers, not observed. | DEFERRED | The server stops after 15 idle minutes. Unit 2 verifies that it is gone. |
 | A4-1 | `probes/android/compare_backends.py` | A snapshot with every actionable element, every element with visible text, and bounds is 6.0 KB of 72 KB raw on the Instagram feed and 4.0 KB of 46.7 KB raw on Business Suite home. 1 dump each. | NEW-EDGE | The snapshot size budget is 8 KB. |
 | A4-2 | none yet | AOSP `UiObject.click()` injects a touch at the element's center instead of the accessibility click action. Not checked inside `u2.jar`. | DEFERRED | Unit 4 checks it. Until then a click reports `delivered_unverified`. |
+| A2-6 | source read of `uiautomator2/core.py` 3.7.1 | `Device.jsonrpc_call` catches `HTTPError` and `UiAutomationNotConnectedError`, restarts the server, and sends the same call again. `_do_dump_hierarchy` also carries `@retry`. A tap whose response was lost would be sent twice. | NEW-EDGE | The adapter speaks JSON-RPC itself and sends every input exactly once. It does not import the uiautomator2 package at run time. |
+| A3-6 | `adb shell cat /proc/sys/kernel/random/boot_id` and `settings get secure default_input_method` | On API 28 the shell user reads the boot id (a UUID), the default keyboard (`com.sec.android.inputmethod/.SamsungKeypad`) and the locale (`en-US`) without root. 1 observation. | CONFIRMS | Device identity is serial plus boot id. The keyboard window is the one whose package is the default input method. |

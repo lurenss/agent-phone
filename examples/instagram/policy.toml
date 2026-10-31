@@ -1,0 +1,21 @@
+# Instagram knowledge as data. The ids below are placeholders until a probe of the composer
+# records the real ones in FINDINGS.md; the rule shapes are the point.
+
+[[commit]]
+id = "ig.composer-share"
+effect = "publish"
+packages = ["com.instagram.android"]
+words = ["share"]
+reason = "Share on the reel composer posts now. The default reads 'share' too; this rule documents the screen."
+
+[[exempt]]
+id = "ig.feed-share-icon"
+packages = ["com.instagram.android"]
+labels = ["com.instagram.android:id/row_feed_button_share"]
+reason = "The feed's paper plane opens the share sheet; the sheet's Send commits."
+
+[[deny]]
+id = "ig.no-live"
+packages = ["com.instagram.android"]
+words = ["go live"]
+reason = "These accounts never start a live broadcast, with or without --commit."

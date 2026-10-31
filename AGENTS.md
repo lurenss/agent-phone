@@ -29,7 +29,9 @@ Probes touch the real phone. Read the phone safety rules below before you run on
 ```
 src/agent_phone/core/       platform-neutral domain types and command logic, one folder per concept
 src/agent_phone/adapters/   backends; each one translates one automation stack into core types
-src/agent_phone/cli/        argument parsing, dispatch, batch; the only place an adapter is wired to core
+src/agent_phone/cli/        argument parsing and the Driver; the only place an adapter is wired to core
+src/agent_phone/policy/     the built-in policy rules, shipped as package data
+examples/                   consumers built on the public API, with their own policy files
 skills/                     agent-facing usage docs, shipped in the package
 probes/android/             phone measurements, their captures, and FINDINGS.md
 docs/                       the plan, the JSON contract, and lessons from past bugs
@@ -42,7 +44,9 @@ tests/                      behavior tests and redacted golden fixtures
 
 **Commands.** A command lives in `core/commands/<name>.py`, named after the command. The CLI dispatches with one `match` over the parsed command. There is no command registry.
 
-**Backends.** The adapter interface is a `Protocol` in core. A second backend, such as a custom `app_process` server, is a new folder under `adapters/` and changes no command.
+**Design.** `docs/design/core-types.md` explains the types and the reasons behind them. Read it before you change a type in `core/`.
+
+**Backends.** The adapter interface is the `Phone` protocol in `core/phone.py`. A second backend, such as a custom `app_process` server, is a new folder under `adapters/` and changes no command.
 
 ## Coding standards
 

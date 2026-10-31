@@ -1,0 +1,14 @@
+# Business Suite knowledge the default policy cannot have. Loaded only by this consumer.
+
+[[exempt]]
+id = "mbs.schedule-for-later"
+packages = ["com.facebook.pages.app"]
+labels = ["Schedule for later"]
+reason = "Opens the date and time dialog. Nothing is scheduled before SCHEDULE and Schedule reel."
+
+[[commit]]
+id = "mbs.share-reel"
+effect = "publish"
+packages = ["com.facebook.pages.app"]
+words = ["share reel"]
+reason = "Posts the reel now. The default already reads 'share'; this rule names the button the dry run must never send."

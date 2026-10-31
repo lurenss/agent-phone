@@ -1,0 +1,16 @@
+# Lorenzo's Samsung J7 profile. Copied to ~/.agent-phone/profiles/ on that Mac.
+
+[device]
+serial = "0a1b2c3d4e5f6a7b"
+name = "j7"
+policy_files = ["../instagram/policy.toml"]
+
+[[protected]]
+package = "hev.sockstun"
+labels = ["SocksTun"]
+reason = "Always-on lockdown VPN: a dead tunnel takes the phone offline."
+
+[[deny]]
+id = "j7.vpn-lockdown"
+words = ["airplane mode", "mobile data", "vpn"]
+reason = "Always-on lockdown VPN: turning off the network or the VPN takes the phone offline."

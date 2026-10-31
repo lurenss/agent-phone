@@ -1,0 +1,82 @@
+# Built-in policy. Shipped as package data, loaded by cli/driver.py, parsed by
+# core/policy/rules.py. It names no app: only words, framework ids, keys and URI schemes.
+# Words are phrases; a phrase matches a run of consecutive words in one label. A leading ^
+# anchors it to the label's first word: "Post" commits, "More actions for this post" does not.
+
+languages = ["en", "it"]
+
+[[commit]]
+id = "default.publish"
+effect = "publish"
+words = ["share", "^post", "publish", "upload", "go live", "repost",
+         "condividi", "pubblica", "carica"]
+reason = "Makes content visible to others."
+
+[[commit]]
+id = "default.schedule"
+effect = "schedule"
+words = ["schedule", "programma", "pianifica"]
+reason = "Queues a post or message for later."
+
+[[commit]]
+id = "default.send"
+effect = "send"
+words = ["send", "reply", "comment", "invia", "rispondi", "commenta"]
+reason = "Delivers a message to someone."
+
+[[commit]]
+id = "default.delete"
+effect = "delete"
+words = ["delete", "remove", "discard", "erase", "clear all", "clear data", "clear storage",
+         "uninstall", "elimina", "rimuovi", "scarta", "cancella", "disinstalla"]
+reason = "Destroys data."
+
+[[commit]]
+id = "default.purchase"
+effect = "purchase"
+words = ["buy", "pay", "purchase", "subscribe", "donate", "boost", "promote", "place order",
+         "acquista", "paga", "abbonati", "sponsorizza"]
+reason = "Spends money."
+
+[[commit]]
+id = "default.social"
+effect = "social"
+words = ["follow", "unfollow", "block", "report", "segui", "blocca", "segnala"]
+reason = "Changes who the account is connected to, visibly."
+
+[[commit]]
+id = "default.system"
+effect = "system"
+words = ["airplane mode", "mobile data", "vpn", "force stop", "disable", "factory", "reset",
+         "power off", "restart", "usb debugging", "developer options",
+         "modalità aereo", "dati mobili", "arresto forzato", "disattiva", "ripristina", "spegni", "riavvia"]
+reason = "Changes device state that can cut off the device or the agent."
+
+[[commit]]
+id = "default.confirm"
+effect = "confirm"
+words = ["confirm", "submit", "conferma"]
+reason = "Confirms an action whose effect the label does not say."
+
+[[commit]]
+id = "default.key.enter"
+effect = "send"
+keys = ["enter"]
+reason = "Enter submits many fields."
+
+[[commit]]
+id = "default.uri.contact"
+effect = "send"
+uri_schemes = ["tel", "sms", "smsto", "mms", "mailto"]
+reason = "Opens a call or a prefilled message."
+
+[[ignore]]
+id = "default.preference-summary"
+node_ids = ["android:id/summary"]
+reason = "A preference summary lists what its screen contains (\"Block, Allow, Do not disturb\")."
+
+[[inherit]]
+id = "default.affirmative"
+words = ["ok", "okay", "yes", "done", "continue", "accept", "agree", "allow", "apply", "got it",
+         "sì", "fatto", "continua", "accetta", "consenti", "applica"]
+reason = "A neutral button does what its dialog says."
