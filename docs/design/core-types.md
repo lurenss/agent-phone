@@ -100,8 +100,9 @@ from agent_phone import Effect, Gone, Match, Present, Q, Role, open_phone
 
 POLICY = Path(__file__).with_name("policy.toml")
 
+
 def schedule_reel(serial: str | None, caption: str, at: PhoneTime, dry_run: bool) -> str:
-    with open_phone(serial, policies=[POLICY]) as phone:     # holds the device lock for the run
+    with open_phone(serial, policies=[POLICY]) as phone:  # holds the device lock for the run
         phone.launch("com.facebook.pages.app", wait_for=Present(Q("Create new post")))
         sheet = phone.click(Q("Create new post"), wait_for=Present(Q("Create new content"))).after
         reel = sheet.pick(Q("Reel", role=Role.BUTTON), below=Q("Create new content"))
@@ -134,9 +135,12 @@ A `Driver` method returns the outcome when it succeeds and raises `PhoneError(ou
 
 ```python
 def test_settings_home_golden():
-    screen = parse_hierarchy(read("tests/fixtures/dumps/settings-home.xml"), Size(1080, 1920), ime_package=None)
+    screen = parse_hierarchy(
+        read("tests/fixtures/dumps/settings-home.xml"), Size(1080, 1920), ime_package=None
+    )
     view = fit(build_view(select_surface(screen), Mode.COMPACT), SnapshotId("t0000"))
     assert render(view, SnapshotId("t0000")) == golden("settings-home.compact")
+
 
 def test_dry_run_sends_nothing_but_discard():
     fake = FakePhone.from_script("tests/fixtures/flows/mbs-dry-run")
