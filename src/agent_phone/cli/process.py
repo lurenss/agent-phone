@@ -17,6 +17,7 @@ from agent_phone.cli.driver import PhoneError, device_lock, open_phone
 from agent_phone.cli.settings import Settings
 from agent_phone.core.commands import devices, server
 from agent_phone.core.commands.devices import DevicesCommand
+from agent_phone.core.commands.find import FindCommand
 from agent_phone.core.commands.server import ServerCommand
 from agent_phone.core.commands.snapshot import SnapshotCommand
 from agent_phone.core.device import Serial, select_device
@@ -54,7 +55,7 @@ def execute(
     match invocation.command:
         case DevicesCommand():
             return devices.run(hub, profiles=()), None
-        case SnapshotCommand() as command:
+        case SnapshotCommand() | FindCommand() as command:
             with open_phone(
                 invocation.serial,
                 hub=hub,

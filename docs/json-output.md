@@ -61,9 +61,9 @@ The exit code is 0 when `ok` is true, 1 for an error envelope, and 2 when the ar
 | `SNAPSHOT_NOT_FOUND` | No stored snapshot has that id. It was never taken here, it is older than the newest 64 of its device, or it was written in a form this version cannot read. |
 | `STALE_REF` | The ref cannot be trusted. `details.reason` is `spent` (input was sent after its snapshot), `rebooted` (the snapshot is from an earlier boot) or `gone` (its element is no longer on screen). |
 | `OBSERVE_FIRST` | Input was sent after the device's latest snapshot, so a query or an input without a target needs a new snapshot first. |
-| `AMBIGUOUS_TARGET` | More than one live element matches. `details.candidates` lists their refs. |
+| `AMBIGUOUS_TARGET` | More than one live element matches. `details.candidates` lists their refs when the target was a query. A ref that now matches several elements lists `details.matches`, their number. |
 | `NOT_FOUND` | No element matches the query, or the snapshot has no ref with that number. |
-| `NO_SURFACE` | No window has input focus, for example when the screen is off. |
+| `NO_SURFACE` | The window asked for is not on screen. No window has input focus (the screen is off), or `--surface` finds none, or `--window` is not an id of this read. The message lists the windows that are. |
 | `NOT_ACTIONABLE` | The element cannot take this input, for example because it is disabled. |
 | `UNSTABLE` | The element moved between two reads. |
 | `OCCLUDED` | Another window covers the point the input would land on. |
@@ -113,6 +113,25 @@ The exit code is 0 when `ok` is true, 1 for an error envelope, and 2 when the ar
 | `idle_limit_s` | int or null | The idle limit the running watchdog was started with, in seconds. The default is 900. `AGENT_PHONE_IDLE_S` sets it for the next start. |
 | `idle_for_s` | int or null | Seconds since a command last used the server. Null when no server runs. |
 
+## Find payload
+
+`agent-phone find` searches the lines a compact snapshot prints. It lists every match, up to `--limit`, and records them as a snapshot of their own, which owns their refs. `--count` records nothing and prints only `count`.
+
+| Key | Type | Present | Meaning |
+| --- | --- | --- | --- |
+| `count` | int | always | Every match on the surface, including those the list leaves out. |
+| `id` | string | without `--count` | The snapshot the find recorded. A match's ref is `@<id>:e<N>`, with the number it has in a snapshot of the whole window. |
+| `app` | string | without `--count` | The package of the window that was searched. |
+| `window` | string | without `--count` | That window's kind. See [Window kinds](#window-kinds). |
+| `truncated` | int | without `--count` | The matches that `--limit` or the 8 KB budget left out of `matches`. |
+| `matches` | array of strings | without `--count` | The matching lines in tree order, each as [a tree line](#tree-lines) at depth 0. A match with no ref is text with no action target. |
+
+```json
+{"v":1,"ok":true,"command":"find","device":"0a1b2c3d4e5f6a7b","data":{
+ "count":1,"id":"p4n8c","app":"com.android.settings","window":"application","truncated":0,
+ "matches":["@p4n8c:e4 button \"Connections\" \"Wi-Fi, Bluetooth, Data usage, Airplane m…\" focused [0,179,1920,394]"]}}
+```
+
 ## Snapshot payload
 
 `snapshot`, `wait` and the `after` of an input all carry the same object.
@@ -151,6 +170,8 @@ The Settings home fixture (`tests/fixtures/dumps/settings-home.xml`), in landsca
 ```
 
 ### Tree lines
+
+With `--surface all`, a line at depth 0 opens each window: `group "<package>" "<window kind>"`, then `focused` for the active window and the window's bounds. The window's own lines follow, indented one level, and the ref numbers run on across windows.
 
 A line holds these parts in this order, separated by one space. Only the role is always present.
 

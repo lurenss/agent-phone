@@ -5,6 +5,7 @@ import json
 import re
 
 import pytest
+from fakes import FakeHub, invoke
 from support import GOLDEN, ROOT, fixture_screen, snapshot_of
 
 from agent_phone.core.device import (
@@ -104,3 +105,24 @@ def test_the_devices_table_lists_exactly_the_keys_a_row_can_carry():
 
 def test_the_server_table_lists_exactly_the_keys_a_status_carries():
     assert set(payload_data(ServerStatus(True, True, 900, 3))) == set(first_column("## Server payload"))
+
+
+def test_the_example_find_is_what_the_code_prints_for_its_fixture(tmp_path):
+    example = next(block for block in json_blocks() if block["command"] == "find")
+    assert set(example["data"]) == set(first_column("## Find payload"))
+    hub = FakeHub(
+        [Connected(Serial(example["device"]), "SM_J730F", True)], screens=[fixture_screen("settings-home")]
+    )
+    code, wire = invoke(["find", "--name", "connections"], hub, tmp_path)
+    printed = json.dumps(wire, ensure_ascii=False).replace(wire["data"]["id"], example["data"]["id"])
+    assert code == 0 and json.loads(printed) == example
+
+
+def test_the_find_table_lists_exactly_the_keys_a_find_carries(tmp_path):
+    hub = FakeHub(
+        [Connected(Serial("0a1b2c3d4e5f6a7b"), "SM_J730F", True)], screens=[fixture_screen("settings-home")]
+    )
+    _, wire = invoke(["find", "--name", "connections"], hub, tmp_path)
+    assert set(wire["data"]) == set(first_column("## Find payload"))
+    _, counted = invoke(["find", "--name", "connections", "--count"], hub, tmp_path)
+    assert set(counted["data"]) == {"count"}

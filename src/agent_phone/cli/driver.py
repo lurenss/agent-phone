@@ -29,7 +29,8 @@ from agent_phone.adapters.uiautomator2.phone import U2Hub
 from agent_phone.cli.settings import Settings
 from agent_phone.core.act.intent import Direction
 from agent_phone.core.act.ledger import Ledger
-from agent_phone.core.commands import snapshot
+from agent_phone.core.commands import find, snapshot
+from agent_phone.core.commands.find import DEFAULT_LIMIT, FindCommand, Found
 from agent_phone.core.commands.snapshot import SnapshotCommand
 from agent_phone.core.context import Context
 from agent_phone.core.device import Serial, select_device
@@ -80,11 +81,13 @@ class Driver:
     def serial(self) -> Serial:
         return self._ctx.info.identity.serial
 
-    def run(self, command: SnapshotCommand) -> Outcome:
+    def run(self, command: SnapshotCommand | FindCommand) -> Outcome:
         """The one dispatch over command dataclasses, for `main()` and for the typed methods."""
         match command:
             case SnapshotCommand():
                 return snapshot.run(self._ctx, command)
+            case FindCommand():
+                return find.run(self._ctx, command)
 
     def snapshot(
         self,
@@ -98,6 +101,35 @@ class Driver:
         outcome = self.run(SnapshotCommand(mode, settle, Scope(pick, window, root), timeout_ms))
         if isinstance(outcome, Read) and isinstance(outcome.payload, Snapshot):
             return outcome.payload
+        raise PhoneError(outcome)
+
+    def find(
+        self,
+        query: Query,
+        *,
+        limit: int = DEFAULT_LIMIT,
+        pick: Pick = Pick.ACTIVE,
+        window: WindowId | None = None,
+        root: RefToken | None = None,
+    ) -> Found:
+        """Every match on the surface is counted and up to `limit` are listed, as lines of a new
+        snapshot that owns their refs."""
+        outcome = self.run(FindCommand(query, limit, False, Scope(pick, window, root)))
+        if isinstance(outcome, Read) and isinstance(outcome.payload, Found):
+            return outcome.payload
+        raise PhoneError(outcome)
+
+    def count(
+        self,
+        query: Query,
+        *,
+        pick: Pick = Pick.ACTIVE,
+        window: WindowId | None = None,
+        root: RefToken | None = None,
+    ) -> int:
+        outcome = self.run(FindCommand(query, DEFAULT_LIMIT, True, Scope(pick, window, root)))
+        if isinstance(outcome, Read) and isinstance(outcome.payload, Found):
+            return outcome.payload.count
         raise PhoneError(outcome)
 
     def click(

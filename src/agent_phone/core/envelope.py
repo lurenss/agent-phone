@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 
+from agent_phone.core.commands.find import Found
 from agent_phone.core.device import DeviceList, Listed, Serial
 from agent_phone.core.outcome import Acted, Disposition, ErrorCode, Outcome, Read, Refused, Value
 from agent_phone.core.phone import ServerStatus
@@ -61,6 +62,8 @@ def payload_data(payload: object) -> dict[str, object]:
     match payload:
         case Snapshot():
             return snapshot_data(payload)
+        case Found():
+            return found_data(payload)
         case DeviceList():
             return {"devices": [device_data(row) for row in payload.devices]}
         case ServerStatus():
@@ -99,6 +102,22 @@ def snapshot_data(snapshot: Snapshot) -> dict[str, object]:
         "truncated": snapshot.truncated,
         "tree": [render_line(line, snapshot.id) for line in snapshot.lines],
     }
+
+
+def found_data(found: Found) -> dict[str, object]:
+    """Only a count when nothing was recorded. Otherwise the snapshot that owns the refs of the
+    listed matches, and the matches as the lines a snapshot prints."""
+    data: dict[str, object] = {"count": found.count}
+    if found.snapshot is not None:
+        snapshot = found.snapshot
+        data |= {
+            "id": snapshot.id,
+            "app": snapshot.package,
+            "window": snapshot.window_kind.value,
+            "truncated": snapshot.truncated,
+            "matches": [render_line(line, snapshot.id) for line in snapshot.lines],
+        }
+    return data
 
 
 def device_data(row: Listed) -> dict[str, object]:

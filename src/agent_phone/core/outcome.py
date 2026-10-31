@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from agent_phone.core.act.intent import ActionReport
+    from agent_phone.core.commands.find import Found
     from agent_phone.core.device import DeviceList
     from agent_phone.core.phone import ServerStatus
     from agent_phone.core.snapshot.snapshot import Snapshot
@@ -130,7 +131,7 @@ class Value:
 
 @dataclass(frozen=True, slots=True)
 class Read:
-    payload: Snapshot | Value | DeviceList | ServerStatus | tuple[object, ...]
+    payload: Snapshot | Found | Value | DeviceList | ServerStatus | tuple[object, ...]
 
 
 Outcome = Refused | Acted | Read

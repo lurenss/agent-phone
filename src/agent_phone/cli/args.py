@@ -9,17 +9,20 @@ from dataclasses import dataclass
 from typing import NoReturn
 
 from agent_phone.core.commands.devices import DevicesCommand
+from agent_phone.core.commands.find import DEFAULT_LIMIT, FindCommand
 from agent_phone.core.commands.server import ServerAction, ServerCommand
 from agent_phone.core.commands.snapshot import SnapshotCommand
 from agent_phone.core.device import Serial
 from agent_phone.core.outcome import ErrorCode, Refusal
+from agent_phone.core.query import Match, Query
+from agent_phone.core.role import Role
 from agent_phone.core.screen import WindowId
 from agent_phone.core.snapshot.scope import SETTLE_TIMEOUT_MS, Scope
 from agent_phone.core.snapshot.snapshot import RefToken
 from agent_phone.core.snapshot.surface import Pick
 from agent_phone.core.snapshot.view import Mode
 
-Command = DevicesCommand | ServerCommand | SnapshotCommand
+Command = DevicesCommand | ServerCommand | SnapshotCommand | FindCommand
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +43,13 @@ def whole_number(text: str) -> int:
     return int(text)
 
 
+def positive_number(text: str) -> int:
+    number = whole_number(text)
+    if number < 1:
+        raise argparse.ArgumentTypeError(f"{text!r} is not at least 1")
+    return number
+
+
 def build() -> Parser:
     """`-d` is accepted before the command and after it, because callers put it in both places."""
     device = dict(metavar="SERIAL", help="the adb serial; needed when several devices are ready")
@@ -52,6 +62,47 @@ def build() -> Parser:
     parser.add_argument("-d", "--device", **device)
     commands = parser.add_subparsers(dest="command", metavar="command", required=True, parser_class=Parser)
     commands.add_parser("devices", parents=[after], help="list every device with the facts read from it")
+    add_snapshot(commands, after)
+    add_find(commands, after)
+    server = commands.add_parser("server", help="control the on-device server that reads the screen")
+    actions = server.add_subparsers(dest="action", metavar="action", required=True, parser_class=Parser)
+    actions.add_parser("start", parents=[after], help="start the server, or confirm it runs")
+    actions.add_parser("stop", parents=[after], help="stop the server so another tool can use the device")
+    actions.add_parser("status", parents=[after], help="say whether the server runs and how long it is idle")
+    return parser
+
+
+def add_scope(parser: Parser, what: str) -> None:
+    """The three ways to say which part of the screen a command reads. They answer one question,
+    so at most one of them may be given."""
+    where = parser.add_mutually_exclusive_group()
+    where.add_argument(
+        "--surface",
+        choices=[pick.value for pick in Pick],
+        default=Pick.ACTIVE.value,
+        help=f"which window {what}: the active one (default), a dialog, the keyboard, "
+        "the full-screen system window (notification shade), or every window",
+    )
+    where.add_argument(
+        "--window",
+        type=whole_number,
+        metavar="N",
+        help=f"{what} the window that `others` lists under this id, which is its place in the dump",
+    )
+    where.add_argument(
+        "--root",
+        type=RefToken.parse,
+        metavar="REF",
+        help=f"{what} only the subtree under this ref, and keep the ref numbers",
+    )
+
+
+def scope_of(parsed: argparse.Namespace) -> Scope:
+    window = None if parsed.window is None else WindowId(parsed.window)
+    return Scope(Pick(parsed.surface), window, parsed.root)
+
+
+def add_snapshot(commands: argparse._SubParsersAction, after: Parser) -> None:
     snapshot = commands.add_parser(
         "snapshot", parents=[after], help="read the active window as compact lines with refs"
     )
@@ -68,26 +119,6 @@ def build() -> Parser:
         action="store_true",
         help="read until two reads in a row print the same lines, and say whether they did",
     )
-    where = snapshot.add_mutually_exclusive_group()
-    where.add_argument(
-        "--surface",
-        choices=[pick.value for pick in Pick],
-        default=Pick.ACTIVE.value,
-        help="which window to describe: the active one (default), a dialog, the keyboard, "
-        "the full-screen system window (notification shade), or every window",
-    )
-    where.add_argument(
-        "--window",
-        type=whole_number,
-        metavar="N",
-        help="describe the window that `others` lists under this id, which is its place in the dump",
-    )
-    where.add_argument(
-        "--root",
-        type=RefToken.parse,
-        metavar="REF",
-        help="describe only the subtree under this ref, as a new snapshot, and keep the ref numbers",
-    )
     snapshot.add_argument(
         "--timeout-ms",
         type=whole_number,
@@ -95,12 +126,46 @@ def build() -> Parser:
         metavar="N",
         help=f"how long --settle may take before it gives up (default {SETTLE_TIMEOUT_MS})",
     )
-    server = commands.add_parser("server", help="control the on-device server that reads the screen")
-    actions = server.add_subparsers(dest="action", metavar="action", required=True, parser_class=Parser)
-    actions.add_parser("start", parents=[after], help="start the server, or confirm it runs")
-    actions.add_parser("stop", parents=[after], help="stop the server so another tool can use the device")
-    actions.add_parser("status", parents=[after], help="say whether the server runs and how long it is idle")
-    return parser
+    add_scope(snapshot, "to describe")
+
+
+def add_find(commands: argparse._SubParsersAction, after: Parser) -> None:
+    find = commands.add_parser(
+        "find",
+        parents=[after],
+        help="list the lines of a snapshot that match, with their refs",
+        description="Search what a snapshot prints. Give at least one of --role, --name, --text, "
+        "--value and --id. Every match is listed with the ref it has in the snapshot this records.",
+    )
+    find.add_argument("--role", choices=[role.value for role in Role], help="the element's role")
+    find.add_argument("--name", help="the name the snapshot prints for the element")
+    find.add_argument("--text", help="any word the element shows, its name or its detail")
+    find.add_argument("--value", help="the text typed into a field or slider")
+    find.add_argument("--id", help="the resource-id, in full or its entry name after the slash")
+    find.add_argument(
+        "--exact", action="store_true", help="compare name, text and value whole instead of as a part"
+    )
+    size = find.add_mutually_exclusive_group()
+    size.add_argument(
+        "--limit",
+        type=positive_number,
+        default=DEFAULT_LIMIT,
+        metavar="N",
+        help=f"list at most N matches (default {DEFAULT_LIMIT}); the count still says how many there are",
+    )
+    size.add_argument("--count", action="store_true", help="print only how many match, and record nothing")
+    add_scope(find, "to search")
+
+
+def query_of(parsed: argparse.Namespace) -> Query:
+    return Query(
+        name=parsed.name,
+        match=Match.EXACT if parsed.exact else Match.CONTAINS,
+        role=None if parsed.role is None else Role(parsed.role),
+        resource_id=parsed.id,
+        text=parsed.text,
+        value=parsed.value,
+    )
 
 
 def parse_args(argv: Sequence[str]) -> Invocation:
@@ -112,13 +177,11 @@ def parse_args(argv: Sequence[str]) -> Invocation:
             command = SnapshotCommand(
                 mode=Mode(parsed.mode),
                 settle=parsed.settle,
-                scope=Scope(
-                    Pick(parsed.surface),
-                    None if parsed.window is None else WindowId(parsed.window),
-                    parsed.root,
-                ),
+                scope=scope_of(parsed),
                 timeout_ms=parsed.timeout_ms,
             )
+        case "find":
+            command = FindCommand(query_of(parsed), parsed.limit, parsed.count, scope_of(parsed))
         case "server":
             command = ServerCommand(ServerAction(parsed.action))
     return Invocation(parsed.command, Serial(parsed.device) if parsed.device else None, command)

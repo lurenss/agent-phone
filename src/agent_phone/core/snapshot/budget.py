@@ -70,12 +70,18 @@ def fit(view: View, snapshot: SnapshotId, budget: int = BUDGET_BYTES - ENVELOPE_
         if encoded_size(render(candidate, snapshot)) <= budget:
             return candidate
         last = candidate
-    rendered = render(last, snapshot)
+    return cut_to_budget(last, snapshot, budget)
+
+
+def cut_to_budget(view: View, snapshot: SnapshotId, budget: int = BUDGET_BYTES - ENVELOPE_RESERVE) -> View:
+    """Drop lines from the end until the rest fits, and change nothing else. A list of search
+    matches uses this alone, because folding or trimming a match would hide what was asked for."""
+    rendered = render(view, snapshot)
     keep = len(rendered)
     while keep and encoded_size(rendered[:keep]) > budget:
         keep -= 1
-    lines, nodes = last.lines[:keep], last.nodes[:keep]
-    return View(last.surface, last.mode, lines, nodes, refs_of(lines, nodes))
+    lines, nodes = view.lines[:keep], view.nodes[:keep]
+    return View(view.surface, view.mode, lines, nodes, refs_of(lines, nodes))
 
 
 def degradations(view: View) -> Iterator[View]:

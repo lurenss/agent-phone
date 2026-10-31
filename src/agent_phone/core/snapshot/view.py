@@ -281,5 +281,18 @@ def skeleton(view: View, through_pages: bool = True) -> View:
     return View(view.surface, Mode.SKELETON, tuple(lines), tuple(nodes), refs_of(lines, nodes))
 
 
+def is_window_line(surface: Surface, line: Line) -> bool:
+    """True for the line that opens a window in an all-windows tree. Every other line of that
+    tree is indented under one, so the lines at depth 0 are exactly the window lines."""
+    return surface.pick is Pick.ALL and line.depth == 0
+
+
+def pick_lines(view: View, indexes: Sequence[int]) -> View:
+    """The lines at `indexes`, flat, as a view of their own. Refs keep their numbers."""
+    lines = tuple(replace(view.lines[i], depth=0) for i in indexes)
+    nodes = tuple(view.nodes[i] for i in indexes)
+    return View(view.surface, view.mode, lines, nodes, refs_of(lines, nodes))
+
+
 def refs_of(lines: Sequence[Line], nodes: Sequence[NodeId]) -> Mapping[int, NodeId]:
     return {line.ref: node for line, node in zip(lines, nodes, strict=True) if line.ref is not None}
