@@ -1,0 +1,4 @@
+{"check": "detached_start", "pid": 4872, "ping_after_s": 1.3, "server": true, "watchdog": true}
+{"check": "touched_server_survives", "seconds": 15, "server": true, "watchdog": true}
+{"check": "idle_server_stops", "limit_s": 6, "gone_after_s": 6.8, "measured_from_last_touch": true, "server": false, "watchdog": false, "waited_s": 7.0}
+{"check": "cleanup", "server_left": false}

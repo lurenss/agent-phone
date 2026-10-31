@@ -1,0 +1,8 @@
+{"check": "pgrep_plain_pattern", "adb_exit": 0, "stdout": ["5220", "done"]}
+{"check": "pgrep_bracket_pattern", "adb_exit": 0, "stdout": ["rc=1"]}
+{"check": "pkill_plain_pattern", "adb_exit": 143, "stdout": []}
+{"check": "pkill_no_signal", "adb_exit": 0, "stdout": ["rc=1"]}
+{"check": "pkill_signal_-9", "adb_exit": 137, "stdout": []}
+{"check": "pkill_signal_-KILL", "adb_exit": 137, "stdout": []}
+{"check": "sigterm_to_watchdog", "pkill": ["rc=0"], "gone_after_s": 9.4, "waited_s": 15}
+{"check": "kill_9_watchdog", "watchdog_left": false}

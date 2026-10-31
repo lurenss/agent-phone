@@ -1,0 +1,4 @@
+{"check": "facts_round_trip", "variant": "sequential", "runs": 12, "median_ms": 225, "min_ms": 215, "max_ms": 232, "lines": 8}
+{"check": "facts_round_trip", "variant": "parallel", "runs": 12, "median_ms": 116, "min_ms": 102, "max_ms": 153, "lines": 9}
+{"check": "noop_shell", "median_ms": 32}
+{"check": "locale_props", "persist_sys_locale": "en-US", "ro_product_locale": "en-GB"}
