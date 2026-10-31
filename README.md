@@ -11,12 +11,21 @@ Measured on a Samsung J7 (Android 9), reading the screen with `adb shell uiautom
 ## Use
 
 ```bash
-agent-phone devices            # every device, with its facts
-agent-phone snapshot           # the active window as compact lines with refs
-agent-phone server stop        # free the phone for another tool, such as an old uiautomator dump
+agent-phone devices                      # every device, with its facts
+agent-phone snapshot                     # the active window as compact lines with refs
+agent-phone snapshot --skeleton          # the outline: collections fold their rows into a count
+agent-phone snapshot --root @k3x9q:e3    # one subtree, as a new snapshot, with the same ref numbers
+agent-phone snapshot --settle            # read until two reads in a row agree, and say whether they did
+agent-phone snapshot --surface dialog    # a dialog, the keyboard, the shade, or every window
+agent-phone find --name Wi-Fi --role button   # every match, with its ref
+agent-phone get @k3x9q:e4 --property bounds   # one property of a ref, read live
+agent-phone is @k3x9q:e4 --property enabled   # one boolean of a ref, read live
+agent-phone server stop                  # free the phone for another tool, such as an old uiautomator dump
 ```
 
-Each command prints one JSON object, described in `docs/json-output.md`. `-d <serial>` picks a device when several are ready. The server on the phone starts when a command needs it and stops after 15 idle minutes. Input commands, `--settle` and `--root` are not built yet. `AGENT_PHONE_HOME`, `AGENT_PHONE_IDLE_S`, `AGENT_PHONE_LOCK_WAIT_S` and `ADB` configure the state folder, the idle limit, how long a command waits for another process to let go of the device, and the adb binary.
+Each command prints one JSON object, described in `docs/json-output.md`. `-d <serial>` picks a device when several are ready, and a ref names its own device. The server on the phone starts when a command needs it and stops after 15 idle minutes. Input commands are not built yet. `AGENT_PHONE_HOME`, `AGENT_PHONE_IDLE_S`, `AGENT_PHONE_LOCK_WAIT_S` and `ADB` configure the state folder, the idle limit, how long a command waits for another process to let go of the device, and the adb binary.
+
+Right after something changes the screen, such as `adb shell am start`, take the next snapshot with `--settle`. A plain snapshot reads once and can show the middle of a transition (`A2-5`).
 
 ## Develop
 

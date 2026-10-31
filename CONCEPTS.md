@@ -10,7 +10,7 @@ One read of every window on the device (`Screen`, `core/screen.py`). Its nodes s
 
 ### Window
 
-One window in the read (`Window`): an app, the status bar, the keyboard, a dialog or the notification shade. It has a kind (`WindowKind`), an `active` flag for the window with input focus, and a `layer` when the backend knows the stacking order. The uiautomator2 backend reports the first window of its dump as active and cannot read layers.
+One window in the read (`Window`): an app, the status bar, the keyboard, a dialog or the notification shade. It has a kind (`WindowKind`), an `active` flag for the window with input focus, and a `layer` when the backend knows the stacking order. The uiautomator2 backend cannot read layers or focus. It reports as active the first window of its dump that is not a strip or the keyboard (`A2-7`, `A2-8`).
 
 ### Node
 
@@ -19,6 +19,10 @@ One element of the accessibility tree (`Node`). Its `Attrs` hold what the backen
 ### Role
 
 What an element is for, from a closed list (`Role`, `core/role.py`). `role_of` reads flags before class, because Compose and web content arrive as plain `android.view.View`. A clickable view is a `button`, an editable one is a `field`.
+
+### Strip
+
+A system window along one edge of the display: as wide as the display along its top or bottom, or as tall as it down a side, and no more than 8% thick the other way (`is_strip`, `adapters/uiautomator2/parse.py`). The status bar and the navigation bar are strips. A strip is never the active window. A server that has seen no screen change since it started lists the status bar before the app, and skipping strips finds the app anyway (`A2-8`).
 
 ### Touch consumer
 
@@ -36,6 +40,10 @@ Every label string an element owns, each with the field and the node it came fro
 
 What a snapshot line says about an element (`shown_values`). The name is its first naming label and the detail is the rest. A touch consumer takes them from its label surface, so a Button with empty text is named by the text inside it. Every other node, collections included, uses only its own fields. The value is a field's or a slider's own text. It is never a name, and a secret field never prints it.
 
+### Match
+
+A line of a compact view that satisfies a `Query` (`core/query.py`). `find` lists every match with the ref it has in the snapshot it records, and `get` and `is` read one property of a ref on the live screen. A query matches the display name, any word the element shows, the text typed in a field, its role and its resource-id. A secret field has no value a query can read.
+
 ### Stable name
 
 The part of the name that identifies an element (`stable_name`). It leaves out values that change as the user types or drags.
@@ -52,7 +60,7 @@ A list, pager or scroll view (`COLLECTIONS`). A row is one child of a collection
 
 ### Snapshot surface
 
-The window a snapshot describes, and what it notes about the rest (`snapshot.surface.Surface`, `select_surface`): whether a keyboard is up, whether the window is a dialog that does not cover the display, and one entry for every other window. It is the active window unless the caller names another one or a drill-down root.
+The window a snapshot describes, and what it notes about the rest (`snapshot.surface.Surface`, `select_surface`): whether a keyboard is up, whether the window is a dialog that does not cover the display, and one entry for every other window. It is the active window unless the caller names another one, with a `Pick` (`dialog`, `keyboard`, `shade` or `all`), a window id from `others`, or a drill-down root. A surface that is not on screen is `NO_SURFACE`.
 
 ### View and line
 
@@ -60,7 +68,15 @@ Which nodes a snapshot shows and what each line says (`View`, `Line`, `core/snap
 
 ### Mode
 
-How much a view shows (`Mode`). `compact` shows every actionable element and every text that no actionable element owns. `skeleton` hides what is inside collections and counts it. `full` prints every node.
+How much a view shows (`Mode`). `compact` shows every actionable element and every text that no actionable element owns. `skeleton` hides what is inside collections and counts it, except that it looks through pages. `full` prints every node.
+
+### Page
+
+A pager or list that holds one row (`is_page`). It selects nothing, so the skeleton looks through it and folds the first collection that has several rows. The Instagram feed is a pager over a list over the feed list, and without this rule the skeleton hid the whole feed (`A4-1`). A scroll view is never a page, because it holds one child by construction. Budget fitting still folds a page as its last step.
+
+### Scope
+
+What a read looks at (`Scope`, `core/snapshot/scope.py`): a `Pick`, or a window id, or a drill-down root ref. At most one of the three is set. `look` reads the screen for a scope, once or until it settles, and finds the root ref again on that read. `snapshot` and `find` share it.
 
 ### Snapshot
 
@@ -76,7 +92,7 @@ The 8 KB limit on a snapshot's printed tree (`A4-1`, `core/snapshot/budget.py`).
 
 ### Settle state
 
-Whether the screen had stopped changing when it was read (`SettleState`). The uiautomator2 dump does not wait for animations (`A2-5`).
+Whether the screen had stopped changing when it was read (`SettleState`). `settled` means two reads in a row printed the same compact lines of the surface that was asked for. The uiautomator2 dump does not wait for animations (`A2-5`), so a plain snapshot is `unchecked`.
 
 ## Refs and identity
 

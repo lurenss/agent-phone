@@ -304,7 +304,256 @@ def freshness(rounds=10):
         send(device, "key", "KEYCODE_HOME")
 
 
-COMMANDS = {"windows": windows, "freshness": freshness}
+SCREENS = (
+    ("stock Settings", "action", "android.settings.SETTINGS", "com.android.settings", False),
+    (
+        "system dialog",
+        "action",
+        "android.bluetooth.adapter.action.REQUEST_ENABLE",
+        "com.android.settings",
+        True,
+    ),
+    ("Instagram feed", "app", INSTAGRAM, INSTAGRAM, False),
+    ("Business Suite home", "app", "com.facebook.pages.app", "com.facebook.pages.app", False),
+)
+"""Label, the kind of input that shows it, the input, the package it should show, and whether it
+is a dialog. The dialog opens over whatever is in front, which is Settings when this order runs."""
+
+
+def show(device, kind, value):
+    send(device, kind, value)
+    if value.endswith("REQUEST_ENABLE"):
+        return wait_until(lambda: DIALOG_ACTIVITY in (focus(device) or ""), 10)
+    return foreground(device, value if kind == "app" else "com.android.settings")
+
+
+def settled_screen(package, dialog):
+    """`snapshot --settle` until it says settled for the package that should be showing."""
+    for attempt in range(1, 11):
+        ms, code, size, wire = cli("snapshot", "--settle")
+        data = wire["data"] if wire and wire["ok"] else {}
+        if data.get("settled") == "settled" and data.get("app") == package and data.get("dialog") == dialog:
+            return attempt, round(ms)
+        time.sleep(1)
+    return None, None
+
+
+def bench_screen(label, package, dialog):
+    errors, wrong, sizes, lines, times, apps = 0, 0, [], [], [], set()
+    for _ in range(20):
+        ms, code, size, wire = cli("snapshot")
+        ok = bool(wire and wire["ok"] and code == 0)
+        errors += not ok
+        times.append(ms)
+        sizes.append(size)
+        data = wire["data"] if ok else {}
+        apps.add(data.get("app"))
+        wrong += not (data.get("app") == package and data.get("dialog") == dialog)
+        lines.append(len(data.get("tree", [])))
+    settle_times, settled = [], 0
+    for _ in range(10):
+        ms, code, size, wire = cli("snapshot", "--settle")
+        settle_times.append(ms)
+        settled += bool(wire and wire["ok"] and wire["data"]["settled"] == "settled")
+    emit(
+        check="warm_snapshot",
+        screen=label,
+        errors=errors,
+        wrong_screen=wrong,
+        apps=sorted(a or "" for a in apps),
+        bytes=[min(sizes), max(sizes)],
+        under_8_kb=max(sizes) < 8 * 1024,
+        tree_lines=[min(lines), max(lines)],
+        **summary(times),
+    )
+    emit(check="warm_settle", screen=label, settled=settled, **summary(settle_times))
+
+
+def bench():
+    """Done-when 1 of docs/plan.md: `snapshot` as a CLI process, 20 runs on each of four settled
+    screens, from a plain shell. Each run must succeed, show the screen that was asked for, and
+    print under 8 KB."""
+    device = serial()
+    emit(
+        check="host_load",
+        loadavg=os.getloadavg(),
+        cores=os.cpu_count(),
+        phone_uptime=shell(device, "uptime").strip(),
+    )
+    try:
+        cli("server", "stop")
+        for label, kind, value, package, dialog in SCREENS:
+            if not show(device, kind, value):
+                emit(check="screen_not_shown", screen=label)
+                continue
+            attempts, settle_ms = settled_screen(package, dialog)
+            emit(check="settled", screen=label, attempts=attempts, ms=settle_ms)
+            if attempts is None:
+                continue
+            bench_screen(label, package, dialog)
+            if dialog:
+                if DIALOG_ACTIVITY in (focus(device) or ""):
+                    send(device, "key", "KEYCODE_BACK")
+                wait_until(lambda: DIALOG_ACTIVITY not in (focus(device) or ""), 10)
+            if label == "Instagram feed":
+                emit(check="phases_fresh_process", screen=label, **phases_of_a_cli_run())
+    finally:
+        cli("server", "stop")
+        send(device, "key", "KEYCODE_HOME")
+
+
+def phases_of_a_cli_run():
+    """Where one warm CLI run spends its time, from unit 2's timers, on the screen showing now."""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("unit2_probe", Path(__file__).with_name("unit2_probe.py"))
+    unit2 = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(unit2)
+    return unit2.phases_fresh(unit2.fresh_env(), repeats=7)
+
+
+def check(name, ok, **facts):
+    emit(check=name, ok=bool(ok), **facts)
+    return bool(ok)
+
+
+def data_of(*args):
+    ms, code, size, wire = cli(*args)
+    return wire, (wire or {}).get("data", {}), size
+
+
+def settings_commands(device):
+    """find, get, is and --root on stock Settings, whose content is the system's own."""
+    show(device, "action", "android.settings.SETTINGS")
+    settled_screen("com.android.settings", False)
+    wire, found, _ = data_of("find", "--name", "connections", "--exact")
+    check(
+        "find_one_tile",
+        found.get("count") == 1 and len(found.get("matches", [])) == 1,
+        count=found.get("count"),
+    )
+    ref = found["matches"][0].split()[0]
+    printed = found["matches"][0].rsplit(" [", 1)[1].rstrip("]")
+    wire, bounds, _ = data_of("get", ref, "--property", "bounds")
+    check("get_bounds_equal_the_printed_bounds", ",".join(map(str, bounds.get("value", []))) == printed)
+    wire, text, _ = data_of("get", ref)
+    check("get_text_starts_with_the_name", str(text.get("value", "")).startswith("Connections"))
+    wire, visible, _ = data_of("is", ref)
+    wire, enabled, _ = data_of("is", ref, "--property", "enabled")
+    wire, checked, _ = data_of("is", ref, "--property", "checked")
+    check(
+        "is_visible_enabled_not_checked",
+        (visible.get("value"), enabled.get("value"), checked.get("value")) == (True, True, False),
+    )
+    wire, whole, whole_size = data_of("snapshot")
+    wire, skeleton, skeleton_size = data_of("snapshot", "--skeleton")
+    lists = [line for line in skeleton.get("tree", []) if "(+" in line]
+    check(
+        "skeleton_folds_the_tile_list",
+        lists and skeleton_size < whole_size,
+        whole_bytes=whole_size,
+        skeleton_bytes=skeleton_size,
+        folded_collections=len(lists),
+    )
+    list_ref = lists[0].split()[0].replace(skeleton["id"], whole["id"])
+    wire, drilled, drilled_size = data_of("snapshot", "--root", list_ref)
+    numbers = [
+        line.split()[0].split(":")[1] for line in drilled.get("tree", []) if line.lstrip().startswith("@")
+    ]
+    check(
+        "root_drills_with_the_same_numbers",
+        drilled.get("id") not in (None, whole["id"])
+        and numbers[0] == list_ref.split(":")[1]
+        and len(drilled["tree"]) > 1,
+        lines=len(drilled.get("tree", [])),
+    )
+    wire, rows, _ = data_of("find", "--role", "button", "--root", list_ref, "--count")
+    wire, everywhere, _ = data_of("find", "--role", "button", "--count")
+    check(
+        "find_root_narrows",
+        0 < rows.get("count", 0) <= everywhere.get("count", 0),
+        in_root=rows.get("count"),
+        all=everywhere.get("count"),
+    )
+    wire, nothing, _ = data_of("find", "--name", "no such element on this screen", "--count")
+    check("find_nothing_is_zero_not_an_error", wire["ok"] and nothing.get("count") == 0)
+    wire, stale, _ = data_of("get", "@zzzzz:e1")
+    check("get_unknown_snapshot_is_refused", not wire["ok"] and wire["error"]["code"] == "SNAPSHOT_NOT_FOUND")
+
+
+def instagram_commands(device):
+    """The skeleton fix and the surface flags on the Instagram feed. Only counts and shapes are
+    recorded, because the feed shows private content."""
+    show(device, "app", INSTAGRAM)
+    settled_screen(INSTAGRAM, False)
+    wire, whole, whole_size = data_of("snapshot")
+    wire, skeleton, skeleton_size = data_of("snapshot", "--skeleton")
+    tree = skeleton.get("tree", [])
+    folded = [line for line in tree if "(+" in line]
+    check(
+        "skeleton_shows_the_pages_and_folds_the_feed_list",
+        len(tree) < len(whole["tree"]) and folded and not tree[0].endswith(")") and "(+" not in tree[0],
+        whole_lines=len(whole["tree"]),
+        skeleton_lines=len(tree),
+        folded_lines=len(folded),
+        first_line_role=tree[0].split()[1] if tree else None,
+        whole_bytes=whole_size,
+        skeleton_bytes=skeleton_size,
+    )
+    for flag, code in (("dialog", "NO_SURFACE"), ("keyboard", "NO_SURFACE")):
+        wire, _, _ = data_of("snapshot", "--surface", flag)
+        check(f"surface_{flag}_is_not_on_the_feed", not wire["ok"] and wire["error"]["code"] == code)
+    wire, everything, size = data_of("snapshot", "--surface", "all")
+    heads = [line for line in everything.get("tree", []) if line.startswith("group ")]
+    check(
+        "surface_all_names_every_window", len(heads) == 2 and size < 8 * 1024, windows=len(heads), bytes=size
+    )
+    wire, strip, _ = data_of("snapshot", "--window", "1")
+    check("window_one_is_the_status_bar", strip.get("app") == "com.android.systemui")
+    wire, count, _ = data_of("find", "--role", "button", "--count")
+    check("find_counts_buttons", wire["ok"] and count.get("count", 0) > 0, count=count.get("count"))
+
+
+def dialog_commands(device):
+    """The surface flags on the system's Bluetooth enable dialog, which only asks."""
+    show(device, "action", "android.bluetooth.adapter.action.REQUEST_ENABLE")
+    try:
+        settled_screen("com.android.settings", True)
+        wire, dialog, _ = data_of("snapshot", "--surface", "dialog")
+        names = [line.split('"')[1] for line in dialog.get("tree", []) if line.lstrip().startswith("@")]
+        check(
+            "surface_dialog_is_the_dialog",
+            dialog.get("dialog") is True and names == ["Deny", "Allow"],
+            buttons=names,
+        )
+        wire, found, _ = data_of("find", "--text", "bluetooth", "--surface", "dialog", "--count")
+        check("find_in_the_dialog", found.get("count") == 1, count=found.get("count"))
+        wire, deny, _ = data_of("find", "--name", "deny", "--exact", "--surface", "dialog")
+        ref = deny["matches"][0].split()[0]
+        wire, enabled, _ = data_of("is", ref, "--property", "enabled")
+        check("is_enabled_on_a_dialog_button", enabled.get("value") is True)
+        wire, everything, _ = data_of("snapshot", "--surface", "all")
+        check("surface_all_over_a_dialog", sum(line.startswith("group ") for line in everything["tree"]) == 2)
+    finally:
+        if DIALOG_ACTIVITY in (focus(device) or ""):
+            send(device, "key", "KEYCODE_BACK")
+        wait_until(lambda: DIALOG_ACTIVITY not in (focus(device) or ""), 10)
+
+
+def commands():
+    """The new reading commands on live screens, from a plain shell."""
+    device = serial()
+    try:
+        cli("server", "stop")
+        settings_commands(device)
+        instagram_commands(device)
+        dialog_commands(device)
+    finally:
+        cli("server", "stop")
+        send(device, "key", "KEYCODE_HOME")
+
+
+COMMANDS = {"windows": windows, "freshness": freshness, "bench": bench, "commands": commands}
 
 if __name__ == "__main__":
     try:
