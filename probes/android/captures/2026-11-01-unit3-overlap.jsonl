@@ -1,0 +1,6 @@
+{"check": "host_load", "loadavg": [3.4931640625, 3.64794921875, 3.64599609375], "cores": 12}
+{"check": "first_read_ab", "screen": "Instagram feed", "variant": "serial", "errors": 0, "wrong_screen": 0, "runs": 20, "median_ms": 350, "min_ms": 325, "max_ms": 504}
+{"check": "first_read_ab", "screen": "Instagram feed", "variant": "overlap", "errors": 0, "wrong_screen": 0, "runs": 20, "median_ms": 282, "min_ms": 254, "max_ms": 341}
+{"check": "first_read_ab", "screen": "Business Suite home", "variant": "serial", "errors": 0, "wrong_screen": 0, "runs": 20, "median_ms": 381, "min_ms": 339, "max_ms": 483}
+{"check": "first_read_ab", "screen": "Business Suite home", "variant": "overlap", "errors": 0, "wrong_screen": 0, "runs": 20, "median_ms": 317, "min_ms": 275, "max_ms": 358}
+{"check": "inputs_sent", "inputs": ["app com.instagram.android", "app com.facebook.pages.app", "key KEYCODE_HOME"]}

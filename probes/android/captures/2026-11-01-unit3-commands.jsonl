@@ -1,0 +1,20 @@
+{"check": "find_one_tile", "ok": true, "count": 1}
+{"check": "get_bounds_equal_the_printed_bounds", "ok": true}
+{"check": "get_text_starts_with_the_name", "ok": true}
+{"check": "is_visible_enabled_not_checked", "ok": true}
+{"check": "skeleton_folds_the_tile_list", "ok": true, "whole_bytes": 1267, "skeleton_bytes": 575, "folded_collections": 1}
+{"check": "root_drills_with_the_same_numbers", "ok": true, "lines": 8}
+{"check": "find_root_narrows", "ok": true, "in_root": 7, "all": 9}
+{"check": "find_nothing_is_zero_not_an_error", "ok": true}
+{"check": "get_unknown_snapshot_is_refused", "ok": true}
+{"check": "skeleton_shows_the_pages_and_folds_the_feed_list", "ok": true, "whole_lines": 20, "skeleton_lines": 14, "folded_lines": 1, "first_line_role": "pager", "whole_bytes": 1608, "skeleton_bytes": 1094}
+{"check": "surface_dialog_is_not_on_the_feed", "ok": true}
+{"check": "surface_keyboard_is_not_on_the_feed", "ok": true}
+{"check": "surface_all_names_every_window", "ok": true, "windows": 2, "bytes": 2473}
+{"check": "window_id_from_others_describes_that_window", "ok": true, "status_bar_id": 0}
+{"check": "find_counts_buttons", "ok": true, "count": 16}
+{"check": "surface_dialog_is_the_dialog", "ok": true, "buttons": ["Deny", "Allow"]}
+{"check": "find_in_the_dialog", "ok": true, "count": 1}
+{"check": "is_enabled_on_a_dialog_button", "ok": true}
+{"check": "surface_all_over_a_dialog", "ok": true}
+{"check": "inputs_sent", "inputs": ["action android.settings.SETTINGS", "app com.instagram.android", "action android.bluetooth.adapter.action.REQUEST_ENABLE", "key KEYCODE_BACK", "key KEYCODE_HOME"]}
