@@ -40,7 +40,11 @@ class Capability(Enum):
 
 @dataclass(frozen=True, slots=True)
 class DeviceInfo:
-    """Facts read from the device once per process. Nothing here is assumed from the J7."""
+    """Facts read from the device once per process. Nothing here is assumed from the J7.
+
+    `default_ime` is the package of the default keyboard, which names the keyboard window in a
+    dump. `locale` is the language tag of the user's locale, such as `en-US`.
+    """
 
     identity: DeviceIdentity
     model: str
@@ -49,6 +53,7 @@ class DeviceInfo:
     display: Size
     density_dpi: int
     locale: str
+    default_ime: Package | None
     capabilities: frozenset[Capability]
 
 

@@ -1,0 +1,9 @@
+boot=8d3f6c1e-0b5a-4c2e-9f1d-2a7b3c4d5e6f
+size=Physical size: 1080x1920
+ime=com.sec.android.inputmethod/.SamsungKeypad
+density=Physical density: 420
+[persist.sys.locale]: [en-US]
+[ro.build.version.sdk]: [28]
+[ro.product.cpu.abi]: [armeabi-v7a]
+[ro.product.locale]: [en-GB]
+[ro.product.model]: [SM-J730F]
