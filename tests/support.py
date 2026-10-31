@@ -4,9 +4,15 @@ from pathlib import Path
 from xml.sax.saxutils import quoteattr
 
 from agent_phone.adapters.uiautomator2.parse import parse_hierarchy
+from agent_phone.core.device import DeviceIdentity
 from agent_phone.core.geometry import Size
+from agent_phone.core.refs.fingerprint import fingerprints
 from agent_phone.core.role import consumes_touch
-from agent_phone.core.screen import Node, Screen
+from agent_phone.core.screen import Node, NodeId, Screen
+from agent_phone.core.snapshot.budget import fit
+from agent_phone.core.snapshot.snapshot import SettleState, Snapshot, SnapshotId
+from agent_phone.core.snapshot.surface import select_surface
+from agent_phone.core.snapshot.view import Mode, View, build_view
 
 ROOT = Path(__file__).resolve().parents[1]
 DUMPS = ROOT / "tests" / "fixtures" / "dumps"
@@ -21,6 +27,32 @@ def fixture_xml(name: str) -> str:
 
 def fixture_screen(name: str) -> Screen:
     return parse_hierarchy(fixture_xml(name), J7, ime_package=None)
+
+
+def compact(screen: Screen, root: NodeId | None = None) -> View:
+    return build_view(select_surface(screen, root=root), Mode.COMPACT)
+
+
+def snapshot_of(screen: Screen, id: SnapshotId, device: DeviceIdentity, epoch: int = 0) -> Snapshot:
+    """What `capture` will record for this screen, built without a device or a ledger."""
+    surface = select_surface(screen)
+    view = fit(build_view(surface, Mode.COMPACT), id)
+    return Snapshot(
+        id=id,
+        device=device,
+        epoch=epoch,
+        package=surface.window.package,
+        window_kind=surface.window.kind,
+        mode=view.mode,
+        settled=SettleState.UNCHECKED,
+        keyboard=surface.keyboard,
+        dialog=surface.dialog,
+        others=surface.others,
+        toasts=screen.toasts,
+        lines=view.lines,
+        fingerprints=fingerprints(view),
+        truncated=0,
+    )
 
 
 def labelled(screen: Screen, value: str) -> Node:

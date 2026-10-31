@@ -12,12 +12,14 @@ that made it.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, NewType
 
 from agent_phone.core.device import DeviceIdentity, Package
+from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.query import Query
 from agent_phone.core.screen import WindowKind
 from agent_phone.core.snapshot.surface import OtherWindow
@@ -28,6 +30,11 @@ if TYPE_CHECKING:
 
 SnapshotId = NewType("SnapshotId", str)
 
+ID_ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz"
+"""Crockford base32 in lower case: no i, l, o or u, so an id read aloud or retyped stays one id."""
+ID_LENGTH = 5
+REF = re.compile(rf"@([{ID_ALPHABET}]{{{ID_LENGTH}}}):e([1-9][0-9]*)")
+
 
 @dataclass(frozen=True, slots=True)
 class RefToken:
@@ -37,7 +44,13 @@ class RefToken:
     @staticmethod
     def parse(text: str) -> RefToken:
         """Raise `Refusal(INVALID_ARGS)` for anything but `@<5 base32>:e<positive int>`."""
-        raise NotImplementedError
+        match = REF.fullmatch(text)
+        if match is None:
+            raise Refusal(
+                ErrorCode.INVALID_ARGS,
+                f"{text!r} is not a ref. Copy one such as @k3x9q:e12 from a snapshot, snapshot id included.",
+            )
+        return RefToken(SnapshotId(match[1]), int(match[2]))
 
     def __str__(self) -> str:
         return f"@{self.snapshot}:e{self.number}"

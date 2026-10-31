@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum
 
@@ -126,6 +127,12 @@ def shown_values(screen: Screen, node: Node, role: Role) -> tuple[str, ...]:
     """The naming values a snapshot line shows for the node, in name order, cleaned and
     without repeats. The first is the name, the rest are the detail."""
     labels = surface_of(screen, node).labels if shows_surface(node.attrs, role) else own_labels(node)
+    return naming_values(screen, labels)
+
+
+def naming_values(screen: Screen, labels: Sequence[Label]) -> tuple[str, ...]:
+    """The cleaned naming values of `labels`, in order, without repeats and without values
+    the user changes or must not see."""
     shown: list[str] = []
     for label in labels:
         if label.naming and not is_value(screen, label):

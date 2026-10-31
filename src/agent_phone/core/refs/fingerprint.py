@@ -21,13 +21,15 @@ unchanged screen.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Mapping
 from dataclasses import dataclass
 
 from agent_phone.core.device import Package
 from agent_phone.core.geometry import Rect
-from agent_phone.core.role import Role
-from agent_phone.core.screen import Node, Screen, WindowKind
+from agent_phone.core.labels import naming_values, own_labels, stable_name
+from agent_phone.core.role import COLLECTIONS, Role, role_of
+from agent_phone.core.screen import Node, NodeId, Screen, WindowKind
 from agent_phone.core.snapshot.view import View
 
 RowKey = tuple[str, ...]
@@ -64,18 +66,67 @@ class Fingerprint:
 
 
 def row_key(screen: Screen, node: Node) -> RowKey | None:
-    # TODO: find the nearest ancestor whose role is in COLLECTIONS; the row is its child that
-    # contains `node`. Return the first ROW_LABELS stable names in the row's subtree in
-    # pre-order, or None when there is no collection ancestor.
-    raise NotImplementedError
+    """The first ROW_LABELS distinct stable labels of the row that holds `node`, in pre-order.
+    The row is the child of the nearest collection ancestor that contains `node`; None when
+    no ancestor is a collection. Each member contributes its own fields only, so a label
+    counts once however many layouts sit around it."""
+    row = node
+    for ancestor in screen.ancestors(node.id):
+        if role_of(ancestor.attrs) in COLLECTIONS:
+            break
+        row = ancestor
+    else:
+        return None
+    labels: list[str] = []
+    for member in screen.subtree(row.id):
+        for value in naming_values(screen, own_labels(member)):
+            if value not in labels:
+                labels.append(value)
+                if len(labels) == ROW_LABELS:
+                    return tuple(labels)
+    return tuple(labels)
 
 
 def key_of(screen: Screen, node: Node) -> Key:
-    raise NotImplementedError
+    attrs = node.attrs
+    role = role_of(attrs)
+    return Key(
+        package=Package(attrs.package),
+        window_kind=screen.window_of(node.id).kind,
+        role=role,
+        class_name=attrs.class_name,
+        resource_id=attrs.resource_id,
+        name=stable_name(screen, node, role),
+        row=row_key(screen, node),
+    )
 
 
 def fingerprints(view: View) -> Mapping[int, Fingerprint]:
-    # TODO: key every node of the surface window once (not only the printed ones, because a
-    # live twin need not have been printed); group by key; for each printed ref whose group has
-    # more than one node, attach Twin(ordinal in pre-order, bounds of the whole group).
-    raise NotImplementedError
+    """Every node of the screen is keyed, not only the printed ones, because a live twin need
+    not have been printed, and resolution searches every window of the stored package."""
+    screen = view.surface.screen
+    keys = [key_of(screen, node) for node in screen.nodes]
+    groups: dict[Key, list[NodeId]] = defaultdict(list)
+    for node, key in zip(screen.nodes, keys, strict=True):
+        groups[key].append(node.id)
+    printed: dict[int, Fingerprint] = {}
+    for ref, id in view.refs.items():
+        node = screen.node(id)
+        group = groups[keys[id]]
+        twin = None
+        if len(group) > 1:
+            twin = Twin(group.index(id), tuple(screen.node(member).attrs.bounds for member in group))
+        printed[ref] = Fingerprint(
+            keys[id], node.attrs.native_id, twin, node.attrs.bounds, path_of(screen, node)
+        )
+    return printed
+
+
+def path_of(screen: Screen, node: Node) -> tuple[int, ...]:
+    """Child indexes from the window root down to `node`."""
+    path: list[int] = []
+    while node.parent is not None:
+        parent = screen.node(node.parent)
+        path.append(parent.children.index(node.id))
+        node = parent
+    return tuple(reversed(path))
