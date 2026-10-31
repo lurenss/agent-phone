@@ -1,20 +1,25 @@
 import io
 import json
+from pathlib import Path
 
 import pytest
 from fakes import EMULATOR_SERIAL, J7_SERIAL, FakeHub
+from support import FakeClock
 
 from agent_phone.cli.main import run
+from agent_phone.cli.settings import Settings
 from agent_phone.core.device import Connected, Serial
 from agent_phone.core.outcome import ErrorCode, Refusal
+from agent_phone.core.refs.store import SnapshotStore
 
 J7 = Connected(J7_SERIAL, "SM_J730F", ready=True)
 UNAUTHORIZED = Connected(Serial("R58M1234567"), "", ready=False)
 
 
-def invoke(argv, hub):
+def invoke(argv, hub, root=None, lock_wait_s=0.0, clock=None):
     out = io.StringIO()
-    code = run(argv, hub, out)
+    settings = Settings(state_root=root or Path("/nonexistent-agent-phone-root"), lock_wait_s=lock_wait_s)
+    code = run(argv, hub, settings, out, clock or FakeClock())
     lines = out.getvalue().splitlines()
     assert len(lines) == 1, "one command prints one envelope"
     return code, json.loads(lines[0])
@@ -72,3 +77,47 @@ def test_an_exception_nobody_expected_is_internal_and_still_one_envelope():
 
     code, wire = invoke(["devices"], Broken([]))
     assert code == 1 and wire["error"]["code"] == "INTERNAL" and "boom" in wire["error"]["message"]
+
+
+def test_server_start_then_stop_runs_the_servers_actions_and_prints_its_status(tmp_path):
+    hub = FakeHub([J7])
+    code, started = invoke(["server", "start"], hub, tmp_path)
+    assert code == 0 and started["device"] == J7_SERIAL and started["data"]["running"] is True
+    code, stopped = invoke(["server", "stop"], hub, tmp_path)
+    assert code == 0 and stopped["data"]["running"] is False and stopped["data"]["idle_for_s"] is None
+    assert hub.server(J7_SERIAL).calls == ["start", "stop"]
+
+
+def test_server_commands_need_a_device_choice_like_every_other_command(tmp_path):
+    emulator = Connected(EMULATOR_SERIAL, "emu", ready=True)
+    hub = FakeHub([J7, emulator])
+    code, wire = invoke(["server", "status"], hub, tmp_path)
+    assert code == 1 and wire["error"]["code"] == "DEVICE_AMBIGUOUS"
+    code, wire = invoke(["-d", EMULATOR_SERIAL, "server", "start"], hub, tmp_path)
+    assert code == 0 and wire["device"] == EMULATOR_SERIAL
+    assert hub.server(EMULATOR_SERIAL).running and not hub.server(J7_SERIAL).running
+    code, wire = invoke(["-d", "nope", "server", "status"], hub, tmp_path)
+    assert wire["error"]["code"] == "NO_DEVICE"
+
+
+def test_starting_or_stopping_waits_for_the_device_lock_and_status_does_not(tmp_path):
+    hub = FakeHub([J7])
+    with SnapshotStore(tmp_path).lock(J7_SERIAL, FakeClock(), 0, "snapshot"):
+        for action in ("start", "stop"):
+            code, wire = invoke(["server", action], hub, tmp_path)
+            assert code == 1 and wire["error"]["code"] == "DEVICE_BUSY"
+            assert (wire["delivery"], wire["retry"]) == ("not_delivered", "safe")
+        code, wire = invoke(["server", "status"], hub, tmp_path)
+        assert code == 0
+    assert hub.server(J7_SERIAL).calls == []
+    assert invoke(["server", "start"], hub, tmp_path)[0] == 0
+
+
+def test_the_lock_is_free_after_a_command_even_when_it_fails(tmp_path):
+    class Failing(FakeHub):
+        def server(self, serial):
+            raise Refusal(ErrorCode.SERVER_UNAVAILABLE, "no")
+
+    assert invoke(["server", "start"], Failing([J7]), tmp_path)[0] == 1
+    with SnapshotStore(tmp_path).lock(J7_SERIAL, FakeClock(), 0):
+        pass

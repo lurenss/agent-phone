@@ -9,11 +9,13 @@ from __future__ import annotations
 
 from agent_phone.adapters.uiautomator2.adb import Adb, first_line, parse_devices
 from agent_phone.adapters.uiautomator2.rpc import JsonRpc
+from agent_phone.adapters.uiautomator2.server import Server
 from agent_phone.adapters.uiautomator2.shell import Shell
 from agent_phone.core.device import Connected, DeviceInfo, DeviceState, Serial
 from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.phone import Delivery, Permit
 from agent_phone.core.screen import Screen
+from agent_phone.core.wait.clock import Clock, SystemClock
 
 
 class U2Phone:
@@ -56,8 +58,10 @@ class U2Phone:
 
 
 class U2Hub:
-    def __init__(self, adb: Adb) -> None:
+    def __init__(self, adb: Adb, idle_limit_s: int = 15 * 60, clock: Clock | None = None) -> None:
         self._adb = adb
+        self._idle_limit_s = idle_limit_s
+        self._clock = clock or SystemClock()
 
     def connected(self) -> tuple[Connected, ...]:
         """`adb devices -l`; `unauthorized` and `offline` rows are listed with ready=False."""
@@ -68,6 +72,9 @@ class U2Hub:
 
     def inspect(self, serial: Serial) -> DeviceInfo:
         return Shell(serial, self._adb).facts()
+
+    def server(self, serial: Serial) -> Server:
+        return Server(serial, self._adb, self._idle_limit_s, self._clock)
 
     def open(self, serial: Serial) -> U2Phone:
         """Forward a free host port to the server port, start the server if its health check

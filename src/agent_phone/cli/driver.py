@@ -20,6 +20,7 @@ from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 
+from agent_phone.cli.settings import Settings
 from agent_phone.core.act.intent import Direction
 from agent_phone.core.context import Context
 from agent_phone.core.device import Package, Serial
@@ -28,14 +29,21 @@ from agent_phone.core.phone import KeyName, Orientation
 from agent_phone.core.policy.rules import Effect
 from agent_phone.core.query import Query
 from agent_phone.core.refs.resolve import Target
+from agent_phone.core.refs.store import DeviceLock, SnapshotStore
 from agent_phone.core.snapshot.snapshot import RefToken, Snapshot
 from agent_phone.core.snapshot.view import Mode
+from agent_phone.core.wait.clock import Clock
 from agent_phone.core.wait.predicate import Predicate
 
 DEFAULT_POLICY = Path(__file__).resolve().parents[1] / "policy" / "default.toml"
 STATE_ROOT = Path.home() / ".agent-phone"
 
 TargetLike = Target | RefToken | Query | str
+
+
+def device_lock(settings: Settings, serial: Serial, clock: Clock, command: str) -> DeviceLock:
+    """The claim on one device for one command or one Driver session (A3-4)."""
+    return SnapshotStore(settings.state_root).lock(serial, clock, settings.lock_wait_s, command)
 
 
 class PhoneError(Exception):
