@@ -14,6 +14,7 @@ from enum import Enum
 from typing import NewType
 
 from agent_phone.core.geometry import Size
+from agent_phone.core.outcome import ErrorCode, Refusal
 
 Serial = NewType("Serial", str)
 BootId = NewType("BootId", str)
@@ -113,9 +114,55 @@ def select_device(
 
     A ref names its own device through its snapshot record, so `click @id:eN` needs no `-d`.
     """
-    # TODO:
-    #   if requested and ref_device and requested != ref_device: WRONG_DEVICE
-    #   want = requested or ref_device
-    #   if want: must be in connected and ready, else NO_DEVICE
-    #   else: exactly one ready device, else NO_DEVICE (zero) or DEVICE_AMBIGUOUS (several)
-    raise NotImplementedError
+    if requested is not None and ref_device is not None and requested != ref_device:
+        raise Refusal(
+            ErrorCode.WRONG_DEVICE,
+            f"-d {requested} contradicts the ref, which belongs to {ref_device}.",
+            {"requested": requested, "ref_device": ref_device},
+        )
+    want = requested or ref_device
+    if want is not None:
+        found = next((device for device in connected if device.serial == want), None)
+        if found is None:
+            raise Refusal(
+                ErrorCode.NO_DEVICE,
+                f"No device {want} is connected. {listing(connected)}",
+                {"serial": want, "connected": [device.serial for device in connected]},
+            )
+        if not found.ready:
+            raise Refusal(
+                ErrorCode.NO_DEVICE,
+                f"Device {want} is connected but adb does not list it as ready. "
+                "It may be unauthorized or offline.",
+                {"serial": want},
+            )
+        return found.serial
+    ready = [device for device in connected if device.ready]
+    if not ready:
+        raise Refusal(
+            ErrorCode.NO_DEVICE,
+            f"No device is connected and ready. {listing(connected)}",
+            {"connected": [device.serial for device in connected]},
+        )
+    if len(ready) > 1:
+        raise Refusal(
+            ErrorCode.DEVICE_AMBIGUOUS,
+            f"Several devices are ready: {', '.join(describe(device) for device in ready)}. "
+            "Pass -d <serial> to pick one.",
+            {"devices": [device.serial for device in ready]},
+        )
+    return ready[0].serial
+
+
+def describe(device: Connected) -> str:
+    return f"{device.serial} ({device.model})" if device.model else device.serial
+
+
+def listing(connected: Sequence[Connected]) -> str:
+    if not connected:
+        return "adb lists no device."
+    return (
+        "adb lists "
+        + ", ".join(describe(device) + ("" if device.ready else " (not ready)") for device in connected)
+        + "."
+    )
