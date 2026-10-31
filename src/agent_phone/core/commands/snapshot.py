@@ -5,9 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from agent_phone.core.context import Context
-from agent_phone.core.outcome import Outcome, Read, Refusal, Refused
+from agent_phone.core.outcome import ErrorCode, Outcome, Read, Refusal, Refused
 from agent_phone.core.screen import WindowId
-from agent_phone.core.snapshot.snapshot import RefToken
+from agent_phone.core.snapshot.capture import capture
+from agent_phone.core.snapshot.snapshot import RefToken, SettleState
 from agent_phone.core.snapshot.view import Mode
 
 
@@ -21,11 +22,9 @@ class SnapshotCommand:
 
 def run(ctx: Context, cmd: SnapshotCommand) -> Outcome:
     try:
-        # TODO: screen = observe(ctx, (Settled(),), deadline).screen if cmd.settle else ctx.phone.read()
-        #   root: observed_snapshot + locate the ref on this screen (a drill-down is a new
-        #   snapshot of the same surface, numbered the same way)
-        #   return Read(capture(ctx, screen, cmd.mode, settled, cmd.window, root_node))
-        raise NotImplementedError
+        if cmd.settle or cmd.root is not None:
+            raise Refusal(ErrorCode.NOT_SUPPORTED, "snapshot --settle and --root are not built yet.")
+        screen = ctx.phone.read()
+        return Read(capture(ctx, screen, cmd.mode, SettleState.UNCHECKED, cmd.window))
     except Refusal as refusal:
         return Refused.of(refusal)
-    _ = Read

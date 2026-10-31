@@ -30,6 +30,13 @@ FACTS_SCRIPT = (
     + '(echo "size=$(wm size)") & (echo "density=$(wm density)") & '
     + '(echo "ime=$(settings get secure default_input_method)") & wait'
 )
+
+
+def facts_script(also: str = "") -> str:
+    """`also` runs beside the reads in the same round trip and its output is ignored."""
+    return FACTS_SCRIPT if not also else FACTS_SCRIPT.removesuffix("wait") + f"({also}) & wait"
+
+
 PROPERTY_LINE = re.compile(r"\[([^\]]+)\]: \[(.*)\]")
 SIZE_LINE = re.compile(r"(Physical|Override) size: (\d+)x(\d+)")
 DENSITY_LINE = re.compile(r"(Physical|Override) density: (\d+)")
@@ -88,8 +95,8 @@ class Shell:
         self._serial = serial
         self._adb = adb
 
-    def facts(self) -> DeviceInfo:
-        result = shell(self._adb, self._serial, FACTS_SCRIPT, FACTS_TIMEOUT_S)
+    def facts(self, also: str = "") -> DeviceInfo:
+        result = shell(self._adb, self._serial, facts_script(also), FACTS_TIMEOUT_S)
         if result.status != 0:
             reason = first_line(result.stderr) or first_line(result.stdout) or f"exit status {result.status}"
             raise Refusal(ErrorCode.TRANSPORT, f"adb could not read the facts of {self._serial}: {reason}.")

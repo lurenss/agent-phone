@@ -1,3 +1,3 @@
-from agent_phone.cli.main import main
+from agent_phone.cli.process import main
 
 __all__ = ["main"]

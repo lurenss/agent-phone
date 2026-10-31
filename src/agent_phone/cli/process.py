@@ -13,11 +13,12 @@ from typing import TextIO
 from agent_phone.adapters.uiautomator2.adb import SubprocessAdb
 from agent_phone.adapters.uiautomator2.phone import U2Hub
 from agent_phone.cli.args import Invocation, parse_args
-from agent_phone.cli.driver import device_lock
+from agent_phone.cli.driver import PhoneError, device_lock, open_phone
 from agent_phone.cli.settings import Settings
 from agent_phone.core.commands import devices, server
 from agent_phone.core.commands.devices import DevicesCommand
 from agent_phone.core.commands.server import ServerCommand
+from agent_phone.core.commands.snapshot import SnapshotCommand
 from agent_phone.core.device import Serial, select_device
 from agent_phone.core.envelope import encode, exit_code, floor_envelope, to_wire
 from agent_phone.core.outcome import Outcome, Refusal, Refused
@@ -37,6 +38,8 @@ def run(
         outcome, device = execute(invocation, hub, settings, clock or SystemClock())
     except Refusal as refusal:
         outcome = Refused.of(refusal)
+    except PhoneError as error:
+        outcome, device = error.outcome, error.device
     except Exception as error:
         out.write(encode(floor_envelope(name, device, error, unrefunded=False)) + "\n")
         return 1
@@ -51,6 +54,11 @@ def execute(
     match invocation.command:
         case DevicesCommand():
             return devices.run(hub, profiles=()), None
+        case SnapshotCommand() as command:
+            with open_phone(
+                invocation.serial, hub=hub, settings=settings, clock=clock, command=invocation.name
+            ) as driver:
+                return driver.run(command), driver.serial
         case ServerCommand() as command:
             serial = select_device(hub.connected(), invocation.serial, None)
             if not command.drives:

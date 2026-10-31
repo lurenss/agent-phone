@@ -10,10 +10,11 @@ from typing import NoReturn
 
 from agent_phone.core.commands.devices import DevicesCommand
 from agent_phone.core.commands.server import ServerAction, ServerCommand
+from agent_phone.core.commands.snapshot import SnapshotCommand
 from agent_phone.core.device import Serial
 from agent_phone.core.outcome import ErrorCode, Refusal
 
-Command = DevicesCommand | ServerCommand
+Command = DevicesCommand | ServerCommand | SnapshotCommand
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +39,7 @@ def build() -> Parser:
     )
     commands = parser.add_subparsers(dest="command", metavar="command", required=True, parser_class=Parser)
     commands.add_parser("devices", help="list every device with the facts read from it")
+    commands.add_parser("snapshot", help="read the active window as compact lines with refs")
     server = commands.add_parser("server", help="control the on-device server that reads the screen")
     actions = server.add_subparsers(dest="action", metavar="action", required=True, parser_class=Parser)
     actions.add_parser("start", help="start the server, or confirm it runs")
@@ -51,6 +53,8 @@ def parse_args(argv: Sequence[str]) -> Invocation:
     match parsed.command:
         case "devices":
             command: Command = DevicesCommand()
+        case "snapshot":
+            command = SnapshotCommand()
         case "server":
             command = ServerCommand(ServerAction(parsed.action))
     return Invocation(parsed.command, Serial(parsed.device) if parsed.device else None, command)

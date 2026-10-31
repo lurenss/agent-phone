@@ -16,9 +16,11 @@ Written only by this class, under the device lock.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from agent_phone.core.device import DeviceIdentity
+from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.phone import InputAction, Permit
 from agent_phone.core.policy.engine import Grant, Verdict
 
@@ -31,8 +33,21 @@ class Ledger:
 
     def epoch(self) -> int:
         """A ledger file from another boot is restarted: refs from that boot already fail on
-        their boot id, so its epoch carries no information."""
-        raise NotImplementedError
+        their boot id, so its epoch carries no information. A file that cannot be read is
+        refused, because restarting it could make a spent ref current again."""
+        path = self._root / "devices" / self._device.serial / "ledger.json"
+        try:
+            document = json.loads(path.read_text())
+            boot_id, epoch = document["boot_id"], int(document["epoch"])
+        except FileNotFoundError:
+            return 0
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            raise Refusal(
+                ErrorCode.INTERNAL,
+                f"The ledger file {path} cannot be read. Delete it, and take new snapshots, "
+                "because every ref made before is gone.",
+            ) from error
+        return epoch if boot_id == self._device.boot_id else 0
 
     def spend(self, action: InputAction, verdict: Verdict, grant: Grant) -> Permit:
         # TODO: e = epoch() + 1; write {"boot_id", "epoch": e} to a temp file, fsync, rename,

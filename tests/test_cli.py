@@ -6,7 +6,7 @@ import pytest
 from fakes import EMULATOR_SERIAL, J7_SERIAL, FakeHub
 from support import FakeClock
 
-from agent_phone.cli.main import run
+from agent_phone.cli.process import run
 from agent_phone.cli.settings import Settings
 from agent_phone.core.device import Connected, Serial
 from agent_phone.core.outcome import ErrorCode, Refusal
