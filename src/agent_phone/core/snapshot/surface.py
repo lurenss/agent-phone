@@ -138,9 +138,13 @@ def pick_window(screen: Screen, pick: Pick) -> Window:
 
 def absence(screen: Screen, pick: Pick) -> str:
     if screen.active_window() is None:
-        return "No window has input focus. The screen may be off."
+        return (
+            f"No window has input focus. The screen may be off, or an app may be starting. {listing(screen)}"
+        )
     return f"No {pick.value} is on screen. {listing(screen)}"
 
 
 def listing(screen: Screen) -> str:
+    if not screen.windows:
+        return "No window is on screen."
     return "Windows: " + ", ".join(f"{w.id} {w.package} ({w.kind.value})" for w in screen.windows) + "."

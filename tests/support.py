@@ -17,7 +17,7 @@ from agent_phone.core.snapshot.view import Mode, View, build_view
 ROOT = Path(__file__).resolve().parents[1]
 DUMPS = ROOT / "tests" / "fixtures" / "dumps"
 GOLDEN = ROOT / "tests" / "golden"
-FIXTURES = ("dialog-over-app", "ig-feed", "mbs-home", "notification-shade", "settings-home")
+FIXTURES = ("app-starting", "dialog-over-app", "ig-feed", "mbs-home", "notification-shade", "settings-home")
 J7 = Size(1080, 1920)
 
 

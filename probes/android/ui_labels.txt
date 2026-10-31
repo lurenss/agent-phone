@@ -1,8 +1,12 @@
+Add network
+Advanced
+Advanced Button
 Advertise
 Airplane,mode,Off.,Button
 Allow
 An app is asking to turn on Bluetooth.
 Auto rotate,On.,Button
+Available networks
 Battery charging, 100 percent
 Block, Allow, Do not disturb
 Blue light,filter,On.,Button
@@ -11,9 +15,11 @@ Brightness settings panel
 Brightness, Blue light filter, Home screen
 Clear
 Clear,Button
+Connected
 Connections
 Create new post
 Create post
+Current network
 Deny
 Display
 Display brightness
@@ -32,9 +38,11 @@ Mobile,Hotspot,Off.,Button
 Mobile,data,Off.,Button
 More
 More actions for this post
+Navigate up
 Notification settings
 Notification settings,Button
 Notifications
+On
 Open settings.
 Opens Notifications
 Phone signal full.
@@ -58,7 +66,12 @@ Suggested
 Suggested for you
 Vibrate On.,Button
 Welcome to Meta Business Suite
+Wi-Fi
+Wi-Fi Direct
+Wi-Fi Direct Button
 Wi-Fi, Bluetooth, Data usage, Airplane mode
+Wi-Fi, On
+Wi-Fi, On, Switch
 Wifi signal full.
 Wifi three bars.
 Your story
