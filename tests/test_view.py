@@ -124,10 +124,35 @@ def test_fitting_a_long_list_keeps_its_ref_and_counts_what_it_cut():
     fitted = fit(view, ID)
     assert encoded_size(render(view, ID)) > BUDGET_BYTES
     assert encoded_size(render(fitted, ID)) <= BUDGET_BYTES - ENVELOPE_RESERVE
-    collection = fitted.lines[0]
+    collection, *rows = fitted.lines
+    assert fitted.mode is Mode.COMPACT and rows
+    assert [line.name for line in rows] == [line.name for line in view.lines[1 : len(rows) + 1]]
     assert collection.ref == 1 and collection.rows == 300 and collection.folded > 0
     assert len(fitted.lines) + collection.folded == len(view.lines)
     assert set(fitted.refs) == {line.ref for line in fitted.lines if line.ref is not None}
+
+
+def test_a_row_too_big_for_the_budget_falls_back_to_the_skeleton():
+    def row(r):
+        actions = (
+            node("android.widget.Button", text=f"Row {r} action {i} with a long label", clickable=True)
+            for i in range(150)
+        )
+        return node("android.widget.LinearLayout", *actions)
+
+    back = node("android.widget.Button", text="Back", clickable=True)
+    screen = screen_of(
+        node(
+            "android.widget.FrameLayout",
+            back,
+            node("android.widget.ListView", row(0), row(1), scrollable=True),
+        )
+    )
+    view = compact(screen)
+    fitted = fit(view, ID)
+    assert fitted.mode is Mode.SKELETON
+    assert [(line.name, line.ref, line.rows) for line in fitted.lines] == [("Back", 1, None), ("", 2, 2)]
+    assert fitted.lines[1].folded == len(view.lines) - 2
 
 
 def test_a_secret_field_shows_its_state_and_never_its_text():
