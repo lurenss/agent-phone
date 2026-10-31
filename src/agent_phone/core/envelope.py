@@ -25,6 +25,7 @@ HINTS: Mapping[ErrorCode, str] = {
     ErrorCode.COMMIT_REFUSED: "Grant the listed effect with --commit only when your user asked for it.",
     ErrorCode.DENIED: "A policy rule forbids this on this device. No flag overrides it.",
     ErrorCode.DEVICE_AMBIGUOUS: "Several devices are connected. Pass -d <serial>.",
+    ErrorCode.DEVICE_BUSY: "Run the command again when the other process is done. Nothing was sent.",
 }
 """Only codes whose recovery is not obvious from the message have a hint."""
 

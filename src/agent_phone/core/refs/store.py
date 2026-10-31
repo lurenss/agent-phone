@@ -4,6 +4,7 @@ Layout under the state root (default `~/.agent-phone/`):
 
     devices/<serial>/snapshots/<id>.json   one immutable file per snapshot, written once
     devices/<serial>/latest                 id of the device's newest snapshot
+    devices/<serial>/lock                   held while a process drives the device (A3-4)
 
 Each device writes only under its own directory, so two processes driving two devices never
 write the same file, and one device lock (A3-4) serializes writers within a device. Lookup by
@@ -16,6 +17,7 @@ The JSON schema is private to this module.
 
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import secrets
@@ -30,9 +32,12 @@ from agent_phone.core.device import Serial
 from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.refs.fingerprint import Fingerprint
 from agent_phone.core.snapshot.snapshot import ID_ALPHABET, ID_LENGTH, Snapshot, SnapshotId
+from agent_phone.core.wait.clock import Clock
+from agent_phone.core.wait.until import until
 
 RETAINED_PER_DEVICE = 64
 FORMAT = 1
+LOCK_WAIT_S = 10.0
 
 
 class SnapshotStore:
@@ -81,6 +86,11 @@ class SnapshotStore:
             return None
         return Serial(self._one(id).parent.parent.name)
 
+    def lock(
+        self, serial: Serial, clock: Clock, wait_s: float = LOCK_WAIT_S, command: str = ""
+    ) -> DeviceLock:
+        return DeviceLock(self._device(serial) / "lock", serial, clock, wait_s, command)
+
     def _device(self, serial: Serial) -> Path:
         return self._root / "devices" / serial
 
@@ -101,6 +111,61 @@ class SnapshotStore:
         if len(files) > 1:
             raise Refusal(ErrorCode.INTERNAL, f"Snapshot id {id} is stored for more than one device.")
         return files[0]
+
+
+class DeviceLock:
+    """The claim on one device. Only one process drives a device at a time (A3-4): the server
+    allows one UiAutomation client, and refs and the ledger assume one writer.
+
+    It is an advisory `flock` on a file that nobody deletes, so the kernel drops it when the
+    holder dies and no crash leaves a stale lock. The holder writes its pid and command into
+    the file only so that a refused process can say who is in the way.
+    """
+
+    def __init__(self, path: Path, serial: Serial, clock: Clock, wait_s: float, command: str) -> None:
+        self._path = path
+        self._serial = serial
+        self._clock = clock
+        self._wait_s = wait_s
+        self._command = command
+        self._fd: int | None = None
+
+    def __enter__(self) -> DeviceLock:
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(self._path, os.O_RDWR | os.O_CREAT, 0o600)
+        try:
+            if until(self._clock, lambda: self._try(fd), self._wait_s) is None:
+                raise Refusal(
+                    ErrorCode.DEVICE_BUSY,
+                    f"Another process is driving {self._serial}{self._holder(fd)}. "
+                    f"It did not let go within {self._wait_s:g} s.",
+                    {"serial": self._serial, "waited_s": self._wait_s},
+                )
+            os.ftruncate(fd, 0)
+            os.write(fd, f"{os.getpid()} {self._command}\n".encode())
+        except BaseException:
+            os.close(fd)
+            raise
+        self._fd = fd
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        if self._fd is not None:
+            os.close(self._fd)
+            self._fd = None
+
+    @staticmethod
+    def _try(fd: int) -> bool | None:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return None
+        return True
+
+    @staticmethod
+    def _holder(fd: int) -> str:
+        text = os.pread(fd, 200, 0).decode(errors="replace").strip()
+        return f" (pid {text})" if text else ""
 
 
 def write_atomically(path: Path, text: str) -> None:

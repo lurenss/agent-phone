@@ -93,3 +93,18 @@ def dump(*windows: str, rotation: int = 0) -> str:
 
 def screen_of(*windows: str, rotation: int = 0, ime_package: str | None = None) -> Screen:
     return parse_hierarchy(dump(*windows, rotation=rotation), J7, ime_package=ime_package)
+
+
+class FakeClock:
+    """Time that only moves when something pauses, so a bounded wait runs in no real time."""
+
+    def __init__(self) -> None:
+        self.time = 0.0
+        self.pauses: list[float] = []
+
+    def now(self) -> float:
+        return self.time
+
+    def pause(self, seconds: float) -> None:
+        self.pauses.append(seconds)
+        self.time += seconds
