@@ -1,0 +1,3 @@
+{"check": "default_limit_first_snapshot", "ms": 2174, "ok": true, "idle_limit_s": 900}
+{"check": "default_limit_server_stops", "gone_after_last_command_s": 917, "watchdog": false}
+{"check": "server_left", "running": false}
