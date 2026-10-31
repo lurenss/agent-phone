@@ -508,8 +508,13 @@ def instagram_commands(device):
     check(
         "surface_all_names_every_window", len(heads) == 2 and size < 8 * 1024, windows=len(heads), bytes=size
     )
-    wire, strip, _ = data_of("snapshot", "--window", "1")
-    check("window_one_is_the_status_bar", strip.get("app") == "com.android.systemui")
+    others = {other["app"]: other["id"] for other in whole.get("others", [])}
+    wire, strip, _ = data_of("snapshot", "--window", str(others.get("com.android.systemui", 99)))
+    check(
+        "window_id_from_others_describes_that_window",
+        strip.get("app") == "com.android.systemui",
+        status_bar_id=others.get("com.android.systemui"),
+    )
     wire, count, _ = data_of("find", "--role", "button", "--count")
     check("find_counts_buttons", wire["ok"] and count.get("count", 0) > 0, count=count.get("count"))
 
@@ -553,7 +558,72 @@ def commands():
         send(device, "key", "KEYCODE_HOME")
 
 
-COMMANDS = {"windows": windows, "freshness": freshness, "bench": bench, "commands": commands}
+def transition(rounds=10):
+    """What reads show right after `am start` with the server already up: the old screen, an empty
+    window, or the new one, and whether two reads in a row ever agree on something that is not the
+    new screen. That is A2-5 observed instead of inferred."""
+    from agent_phone.core.outcome import Refusal
+    from agent_phone.core.snapshot.surface import select_surface
+    from agent_phone.core.wait.predicate import Settled, holds
+
+    device = serial()
+    phone = open_phone_for_reads(device)
+    fooled, first_old, shown = 0, 0, []
+    try:
+        for i in range(rounds):
+            from_instagram(device, "android.settings.WIFI_SETTINGS")
+            start = time.perf_counter()
+            previous, states, agreed_on_old = None, [], False
+            while time.perf_counter() - start < 6:
+                screen = phone.read()
+                ms = round((time.perf_counter() - start) * 1000)
+                try:
+                    surface = select_surface(screen)
+                    nodes = len(screen.subtree(surface.root))
+                    new = any(n.attrs.text == "Wi-Fi" for n in screen.subtree(surface.root))
+                    state = "new" if new else ("empty" if nodes <= 1 else "old")
+                except Refusal:
+                    state = "none"
+                if previous is not None and state != "new" and holds(Settled(), previous, screen):
+                    agreed_on_old = True
+                states.append((ms, state))
+                previous = screen
+                if state == "new" and len(states) > 1 and states[-2][1] == "new":
+                    break
+            first_new = next((ms for ms, state in states if state == "new"), None)
+            fooled += agreed_on_old
+            first_old += states[0][1] != "new"
+            shown.append(first_new)
+            emit(
+                check="reads_after_am_start",
+                round=i,
+                reads=len(states),
+                first_state=states[0][1],
+                first_read_ms=states[0][0],
+                first_new_ms=first_new,
+                states=[state for _, state in states],
+                two_reads_agreed_on_a_screen_that_was_not_new=agreed_on_old,
+            )
+        emit(
+            check="transition_summary",
+            rounds=rounds,
+            first_read_was_not_the_new_screen=first_old,
+            settle_would_have_stopped_early=fooled,
+            new_screen_after_ms=summary([ms for ms in shown if ms is not None]) if any(shown) else None,
+        )
+    finally:
+        phone.close()
+        cli("server", "stop")
+        send(device, "key", "KEYCODE_HOME")
+
+
+COMMANDS = {
+    "windows": windows,
+    "freshness": freshness,
+    "transition": transition,
+    "bench": bench,
+    "commands": commands,
+}
 
 if __name__ == "__main__":
     try:

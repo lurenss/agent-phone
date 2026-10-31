@@ -152,3 +152,13 @@ def test_settling_on_a_dialog_that_never_comes_is_no_surface_at_the_deadline(tmp
     hub = FakeHub([J7], screens=[fixture_screen("ig-feed")])
     code, wire = invoke(["snapshot", "--surface", "dialog", "--settle", "--timeout-ms", "200"], hub, tmp_path)
     assert code == 1 and wire["error"]["code"] == "NO_SURFACE"
+
+
+def test_all_lists_windows_in_dump_order_so_a_window_id_is_its_place_in_the_tree(tmp_path):
+    starting = fixture_screen("app-starting")
+    code, wire = snapshot(["--surface", "all"], [starting], tmp_path)
+    heads = [line for line in wire["data"]["tree"] if line.startswith("group ")]
+    assert [line.split('"')[1] for line in heads] == ["com.android.systemui", "com.android.settings"]
+    assert ["focused" in line for line in heads] == [False, True]
+    code, wire = snapshot(["--window", "1"], [starting], tmp_path)
+    assert wire["data"]["app"] == "com.android.settings" and wire["data"]["others"][0]["id"] == 0

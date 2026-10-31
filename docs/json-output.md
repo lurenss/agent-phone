@@ -221,7 +221,7 @@ A line holds these parts in this order, separated by one space. Only the role is
 
 The `tree` array, encoded, stays within 7,680 bytes: the 8 KB budget (`A4-1`) minus 512 bytes for the rest of the envelope. When it does not fit, fitting tries each step in order and stops at the first that fits. It drops the details, then the bounds of lines without a ref, then the rows after the first k of each collection (k halves each time), then everything inside collections. As a last resort it drops lines from the end. A collection that lost rows keeps its ref and shows `(+N)`, so the agent can drill into it with `snapshot --root`.
 
-The tree of `--surface all` also has a line at depth 0 that opens each window: `group "<package>" "<window kind>"`, then `focused` for the active window, then the window's bounds. The window's own lines follow, indented one level, and the ref numbers run on across windows.
+The tree of `--surface all` also has a line at depth 0 that opens each window: `group "<package>" "<window kind>"`, then `focused` for the active window, then the window's bounds. The windows come in dump order, which is the order of their ids, so a window's place in the tree is the id that `--window` takes. The window's own lines follow, indented one level, and the ref numbers run on across windows.
 
 ### Roles
 

@@ -65,7 +65,8 @@ class Surface:
 
     @property
     def windows(self) -> tuple[Window, ...]:
-        return (self.window, *self.more)
+        """In dump order, so that a window's place in an all-windows tree is its id."""
+        return tuple(sorted((self.window, *self.more), key=lambda w: w.id))
 
     @property
     def roots(self) -> tuple[NodeId, ...]:
