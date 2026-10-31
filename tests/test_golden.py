@@ -16,17 +16,8 @@ from agent_phone.core.snapshot.view import Mode, build_view
 
 ID = SnapshotId("t0000")
 
-PAGER_HIDES_THE_PAGE = pytest.mark.xfail(
-    strict=True, reason="the skeleton folds the page pager, and its one row holds the whole feed"
-)
-
 CASES = [
-    pytest.param(
-        name,
-        mode,
-        id=f"{name}-{mode.value}",
-        marks=[PAGER_HIDES_THE_PAGE] if (name, mode) == ("ig-feed", Mode.SKELETON) else [],
-    )
+    pytest.param(name, mode, id=f"{name}-{mode.value}")
     for mode in (Mode.COMPACT, Mode.SKELETON)
     for name in FIXTURES
 ]

@@ -2,7 +2,8 @@
 
 Fitting degrades in a fixed order, and each step only removes: details, then bounds on non-ref
 lines, then rows beyond the first k of each collection (k halves until it fits, each cut
-collection keeps its ref and a `folded` count so the agent can drill), then skeleton. The
+collection keeps its ref and a `folded` count so the agent can drill), then a skeleton that
+folds pages too. The
 snapshot reports `truncated` and how many lines were cut, never a silently short tree.
 """
 
@@ -90,7 +91,7 @@ def degradations(view: View) -> Iterator[View]:
     while k >= 1:
         yield first_rows(view, k)
         k //= 2
-    yield skeleton(view)
+    yield skeleton(view, through_pages=False)
 
 
 def first_rows(view: View, k: int) -> View:

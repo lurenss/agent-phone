@@ -11,7 +11,8 @@ before folding.
 
 Skeleton keeps collections, named groups and actionable nodes outside collections, and prints a
 row count on each collection: the rows that hold at least one line. The agent drills into one
-with `snapshot --root <ref>`.
+with `snapshot --root <ref>`. A pager or list that holds one row is a page, not a choice of
+rows, so the skeleton looks through it and folds the first collection that has several rows.
 
 Ref numbers are the pre-order ordinal of the node among the ref-eligible nodes of the whole
 surface window, not of the lines printed. The same element on an unchanged screen therefore
@@ -198,10 +199,20 @@ def line_of(screen: Screen, node: Node, role: Role, depth: int, ref: int | None)
     )
 
 
+PAGE_ROLES = frozenset({Role.PAGER, Role.LIST})
+
+
 def folds(line: Line) -> bool:
     """A collection with a ref: skeleton and budget fitting may hide its rows, because the
     agent can drill into it with `snapshot --root`."""
     return line.ref is not None and line.role in COLLECTIONS
+
+
+def is_page(line: Line) -> bool:
+    """A pager or list with one row. It selects nothing, and hiding its row hides the whole
+    screen (the Instagram feed has a pager over a list over the feed list, A4-1). A scroll
+    view never counts: it holds one child by construction."""
+    return folds(line) and line.role in PAGE_ROLES and line.rows == 1
 
 
 def row_groups(screen: Screen, nodes: Sequence[NodeId], i: int) -> list[list[int]]:
@@ -223,8 +234,9 @@ def row_groups(screen: Screen, nodes: Sequence[NodeId], i: int) -> list[list[int
     return groups
 
 
-def skeleton(view: View) -> View:
-    """Hide every line under a folding collection, counting them on its line."""
+def skeleton(view: View, through_pages: bool = True) -> View:
+    """Hide every line under a folding collection, counting them on its line. Pages stay open
+    unless `through_pages` is False, which budget fitting uses when nothing else made it fit."""
     screen = view.surface.screen
     lines: list[Line] = []
     nodes: list[NodeId] = []
@@ -235,7 +247,7 @@ def skeleton(view: View) -> View:
             continue
         lines.append(line)
         nodes.append(node)
-        open_end = screen.node(node).end if folds(line) else -1
+        open_end = screen.node(node).end if folds(line) and not (through_pages and is_page(line)) else -1
     return View(view.surface, Mode.SKELETON, tuple(lines), tuple(nodes), refs_of(lines, nodes))
 
 
