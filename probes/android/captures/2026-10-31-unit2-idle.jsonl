@@ -1,0 +1,5 @@
+{"check": "idle_first_snapshot", "ms": 2226, "ok": true, "idle_limit_s": 8}
+{"check": "busy_server_survives", "seconds": 27, "snapshots_ok": 11, "running": true, "idle_for_s": 3}
+{"check": "idle_server_stops", "limit_s": 8, "gone_after_last_command_s": 7.5, "server": false, "watchdog": false}
+{"check": "next_command_starts_it_again", "ms": 2217, "ok": true, "running": true}
+{"check": "server_left", "running": false}

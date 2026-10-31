@@ -1,0 +1,1 @@
+{"check": "devices_facts", "ms": 250, "exit": 0, "differing": [], "serial": "0a1b2c3d4e5f6a7b", "model": "SM-J730F", "ready": true, "api": 28, "abi": "armeabi-v7a", "display": [1080, 1920], "density": 420, "locale": "en-US", "ime": "com.sec.android.inputmethod", "profile": null}

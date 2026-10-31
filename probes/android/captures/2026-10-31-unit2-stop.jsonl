@@ -1,0 +1,5 @@
+{"check": "old_dump_while_server_runs", "exit": 137, "worked": false, "tail": ""}
+{"check": "server_stop", "ms": 717, "exit": 0, "running": false}
+{"check": "after_stop", "pgrep_server": [], "pgrep_watchdog": [], "ps_lines_with_uia2": [], "lastuse_file": "ls: /data/local/tmp/ap-lastuse: No such file or directory", "forwards": []}
+{"check": "old_dump_after_stop", "exit": 0, "worked": true, "tail": "UI hierchary dumped to: /dev/stdout "}
+{"check": "stop_again", "exit": 0}

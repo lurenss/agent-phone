@@ -5,6 +5,12 @@
     uv run python -I probes/android/unit2_probe.py accessibility
     uv run python -I probes/android/unit2_probe.py quirks
     uv run python -I probes/android/unit2_probe.py bench
+    uv run python -I probes/android/unit2_probe.py devices
+    uv run python -I probes/android/unit2_probe.py idle
+    uv run python -I probes/android/unit2_probe.py idle-default
+    uv run python -I probes/android/unit2_probe.py concurrent
+    uv run python -I probes/android/unit2_probe.py stop
+    uv run python -I probes/android/unit2_probe.py foreign
 
 Each subcommand prints one JSON line per result. They read the phone and start and stop the
 uiautomator2 server. They send no input, launch no app and touch no package.
@@ -17,6 +23,7 @@ import statistics
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.request
 from pathlib import Path
@@ -126,12 +133,12 @@ def alive(device):
     return bool(shell(device, SERVER).strip()), bool(shell(device, WATCHDOG).strip())
 
 
-def wait_until(check, deadline_s):
+def wait_until(check, deadline_s, gap_s=0.25):
     start = time.monotonic()
     while time.monotonic() - start < deadline_s:
         if check():
             return time.monotonic() - start
-        time.sleep(0.25)
+        time.sleep(gap_s)
     return None
 
 
@@ -270,9 +277,10 @@ def timed_run(argv, env):
     return (time.perf_counter() - start) * 1000
 
 
-def phases(env, repeats=7):
-    """Where one warm run spends its time, from timers around each adb call, the server calls
-    and the capture. A separate run, because the timers are part of what they measure."""
+def phases(env):
+    """Where one run of the CLI's own code spends its time, from timers around each adb call,
+    the server calls and the capture. It runs in a process of its own, as the CLI does, and
+    apart from the timed runs, because the timers are part of what they measure."""
     from agent_phone.adapters.uiautomator2 import rpc
     from agent_phone.adapters.uiautomator2.adb import SubprocessAdb
     from agent_phone.adapters.uiautomator2.phone import U2Hub
@@ -294,7 +302,7 @@ def phases(env, repeats=7):
 
     class TimedAdb(SubprocessAdb):
         def run(self, args, timeout_s=15.0):
-            name = {"devices": "adb devices", "forward": "adb forward"}.get(
+            name = {"devices": "adb devices", "forward": "adb forward (open and remove)"}.get(
                 args[0] if args[0] != "-s" else args[2]
             )
             return timed(name or "adb shell (facts)", super().run)(args, timeout_s)
@@ -305,14 +313,24 @@ def phases(env, repeats=7):
     os.environ.update(env)
     settings = Settings.from_environment()
     hub = U2Hub(TimedAdb(), settings.idle_limit_s)
-    totals = []
+    start = time.perf_counter()
+    process.run(["snapshot"], hub, settings, io.StringIO())
+    total = (time.perf_counter() - start) * 1000
+    return {name: round(sum(values), 1) for name, values in spans.items()} | {"run_total": round(total, 1)}
+
+
+def phases_fresh(env, repeats=7):
+    runs = []
     for _ in range(repeats):
-        start = time.perf_counter()
-        process.run(["snapshot"], hub, settings, io.StringIO())
-        totals.append((time.perf_counter() - start) * 1000)
-    return {name: round(statistics.median(values), 1) for name, values in spans.items()} | {
-        "run_total_median": round(statistics.median(totals), 1)
-    }
+        done = subprocess.run(
+            [sys.executable, "-I", __file__, "phases-once"],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=60,
+        )
+        runs.append(json.loads(done.stdout))
+    return {name: round(statistics.median(run[name] for run in runs), 1) for name in runs[0]}
 
 
 def bench():
@@ -323,7 +341,7 @@ def bench():
         check="host_load",
         loadavg=os.getloadavg(),
         cores=os.cpu_count(),
-        phone_loadavg=shell(device, "cat /proc/loadavg").split()[:3],
+        phone_uptime=shell(device, "uptime").strip(),
     )
     try:
         run_cli(env, "server", "stop")
@@ -348,8 +366,261 @@ def bench():
         bare, imports = process_floor(env)
         emit(check="python_bare_start", **bare)
         emit(check="python_import_cli", **imports)
-        emit(check="phases_in_process", **phases(env))
+        emit(check="phases_fresh_process", runs=7, **phases_fresh(env))
     finally:
+        run_cli(env, "server", "stop")
+        emit(check="server_left", running=bool(shell(device, SERVER).strip()))
+
+
+def fresh_env(**extra):
+    return {**os.environ, "AGENT_PHONE_HOME": tempfile.mkdtemp(prefix="agent-phone-probe-"), **extra}
+
+
+def devices():
+    device = serial()
+    ms, code, wire = run_cli(fresh_env(), "devices")
+    row = next(row for row in wire["data"]["devices"] if row["serial"] == device)
+    raw = {
+        "model": shell(device, "getprop ro.product.model").strip(),
+        "api": int(shell(device, "getprop ro.build.version.sdk")),
+        "abi": shell(device, "getprop ro.product.cpu.abi").strip(),
+        "display": [int(n) for n in shell(device, "wm size").split()[-1].split("x")],
+        "density": int(shell(device, "wm density").split()[-1]),
+        "locale": shell(device, "getprop persist.sys.locale").strip(),
+        "ime": shell(device, "settings get secure default_input_method").strip().split("/")[0],
+        "boot_id": shell(device, "cat /proc/sys/kernel/random/boot_id").strip(),
+    }
+    emit(
+        check="devices_facts",
+        ms=round(ms),
+        exit=code,
+        differing=[key for key in raw if row[key] != raw[key]],
+        **{key: value for key, value in row.items() if key != "boot_id"},
+    )
+
+
+def server_status(env):
+    return run_cli(env, "server", "status")[2]["data"]
+
+
+def idle():
+    limit = 8
+    device = serial()
+    env = fresh_env(AGENT_PHONE_IDLE_S=str(limit))
+    try:
+        run_cli(env, "server", "stop")
+        ms, code, wire = run_cli(env, "snapshot")
+        emit(
+            check="idle_first_snapshot",
+            ms=round(ms),
+            ok=bool(wire and wire["ok"]),
+            idle_limit_s=server_status(env)["idle_limit_s"],
+        )
+
+        started = time.monotonic()
+        oks = 0
+        last_use = started
+        while time.monotonic() - started < 3 * limit:
+            oks += bool(run_cli(env, "snapshot")[2]["ok"])
+            last_use = time.monotonic()
+            time.sleep(2)
+        status = server_status(env)
+        emit(
+            check="busy_server_survives",
+            seconds=round(time.monotonic() - started),
+            snapshots_ok=oks,
+            running=status["running"],
+            idle_for_s=status["idle_for_s"],
+        )
+
+        gone = wait_until(lambda: not server_status(env)["running"], 4 * limit)
+        emit(
+            check="idle_server_stops",
+            limit_s=limit,
+            gone_after_last_command_s=gone and round(time.monotonic() - last_use, 1),
+            server=bool(shell(device, SERVER).strip()),
+            watchdog=bool(shell(device, WATCHDOG).strip()),
+        )
+
+        ms, code, wire = run_cli(env, "snapshot")
+        emit(
+            check="next_command_starts_it_again",
+            ms=round(ms),
+            ok=bool(wire and wire["ok"]),
+            running=server_status(env)["running"],
+        )
+    finally:
+        run_cli(env, "server", "stop")
+        emit(check="server_left", running=bool(shell(device, SERVER).strip()))
+
+
+def idle_default():
+    """The shipped 15 minute limit, waited out. It takes about 16 minutes."""
+    device = serial()
+    env = fresh_env()
+    try:
+        run_cli(env, "server", "stop")
+        ms, code, wire = run_cli(env, "snapshot")
+        last_use = time.monotonic()
+        emit(
+            check="default_limit_first_snapshot",
+            ms=round(ms),
+            ok=bool(wire and wire["ok"]),
+            idle_limit_s=server_status(env)["idle_limit_s"],
+        )
+        gone = wait_until(lambda: not server_status(env)["running"], 20 * 60, gap_s=20)
+        emit(
+            check="default_limit_server_stops",
+            gone_after_last_command_s=gone and round(time.monotonic() - last_use),
+            watchdog=bool(shell(device, WATCHDOG).strip()),
+        )
+    finally:
+        run_cli(env, "server", "stop")
+        emit(check="server_left", running=bool(shell(device, SERVER).strip()))
+
+
+HOLDER = (
+    "import time\n"
+    "from agent_phone import open_phone\n"
+    "with open_phone(command='probe holder') as phone:\n"
+    "    print('held', flush=True)\n"
+    "    time.sleep(4)\n"
+)
+
+
+def concurrent():
+    device = serial()
+    env = fresh_env()
+    try:
+        run_cli(env, "server", "stop")
+        run_cli(env, "snapshot")
+        holder = subprocess.Popen(
+            [sys.executable, "-I", "-c", HOLDER], stdout=subprocess.PIPE, text=True, env=env
+        )
+        assert holder.stdout.readline().strip() == "held"
+        held_at = time.monotonic()
+        ms, code, wire = run_cli({**env, "AGENT_PHONE_LOCK_WAIT_S": "0"}, "snapshot")
+        emit(
+            check="second_process_with_no_wait",
+            ms=round(ms),
+            exit=code,
+            error=wire["error"]["code"],
+            delivery=wire["delivery"],
+            message=wire["error"]["message"],
+        )
+        ms, code, wire = run_cli({**env, "AGENT_PHONE_LOCK_WAIT_S": "10"}, "snapshot")
+        emit(
+            check="second_process_that_waits",
+            ms=round(ms),
+            exit=code,
+            ok=wire["ok"],
+            waited_for_holder_s=round(time.monotonic() - held_at, 1),
+        )
+        holder.wait(timeout=30)
+
+        results = []
+        workers = [
+            threading.Thread(
+                target=lambda: results.append(run_cli(env, "snapshot")[:2] + (time.monotonic(),))
+            )
+            for _ in range(4)
+        ]
+        start = time.monotonic()
+        for worker in workers:
+            worker.start()
+        for worker in workers:
+            worker.join()
+        emit(
+            check="four_at_once",
+            exits=sorted(code for _, code, _ in results),
+            seconds=round(time.monotonic() - start, 2),
+            single_ms=round(statistics.median(ms for ms, _, _ in results)),
+        )
+    finally:
+        run_cli(env, "server", "stop")
+        emit(check="server_left", running=bool(shell(device, SERVER).strip()))
+
+
+def old_dump(device):
+    """The old `uiautomator dump`, which is its own UiAutomation client. It prints its success
+    line, or the shell prints `Killed` when the client's registration throws."""
+    done = adb("-s", device, "shell", "uiautomator dump /dev/stdout")
+    text = (done.stdout + done.stderr).replace("\n", " ")
+    return {
+        "exit": done.returncode,
+        "worked": done.returncode == 0 and "dumped to" in text,
+        "tail": text[-60:],
+    }
+
+
+def stop():
+    device = serial()
+    env = fresh_env()
+    try:
+        run_cli(env, "server", "start")
+        emit(check="old_dump_while_server_runs", **old_dump(device))
+        ms, code, wire = run_cli(env, "server", "stop")
+        emit(check="server_stop", ms=round(ms), exit=code, running=wire["data"]["running"])
+        emit(
+            check="after_stop",
+            pgrep_server=shell(device, SERVER).split(),
+            pgrep_watchdog=shell(device, WATCHDOG).split(),
+            ps_lines_with_uia2=[
+                line
+                for line in shell(device, "ps -A -o PID,ARGS").splitlines()
+                if "uia2" in line and "pgrep" not in line
+            ][:3],
+            lastuse_file=shell(device, f"ls {LASTUSE} 2>&1").strip(),
+            forwards=[line for line in adb("forward", "--list").stdout.splitlines() if device in line],
+        )
+        emit(check="old_dump_after_stop", **old_dump(device))
+        run_cli(env, "server", "stop")
+        emit(check="stop_again", exit=run_cli(env, "server", "stop")[1])
+    finally:
+        run_cli(env, "server", "stop")
+
+
+def uiautomator_pids(device):
+    return set(shell(device, "pgrep -x uiautomator").split())
+
+
+def foreign():
+    """Another UiAutomation client (`uiautomator events`, started here and killed here) holds
+    the device while agent-phone starts its server."""
+    device = serial()
+    env = fresh_env()
+    before = uiautomator_pids(device)
+    holder = set()
+    try:
+        run_cli(env, "server", "stop")
+        shell(device, "nohup uiautomator events </dev/null >/dev/null 2>&1 &")
+        wait_until(lambda: uiautomator_pids(device) - before, 10)
+        holder = uiautomator_pids(device) - before
+        emit(
+            check="foreign_client_running",
+            pids=len(holder),
+            accessibility_enabled=shell(device, "settings get secure accessibility_enabled").strip(),
+        )
+        ms, code, wire = run_cli(env, "snapshot")
+        emit(
+            check="snapshot_while_foreign_client_holds",
+            ms=round(ms),
+            exit=code,
+            error=wire["error"]["code"],
+            message=wire["error"]["message"],
+            delivery=wire["delivery"],
+        )
+        shell(device, "".join(f"kill {pid}; " for pid in holder))
+        wait_until(lambda: not (uiautomator_pids(device) & holder), 10)
+        emit(
+            check="foreign_client_stopped",
+            left=len(uiautomator_pids(device) & holder),
+            accessibility_enabled=shell(device, "settings get secure accessibility_enabled").strip(),
+        )
+        ms, code, wire = run_cli(env, "snapshot")
+        emit(check="snapshot_after_foreign_client", ms=round(ms), ok=bool(wire and wire["ok"]))
+    finally:
+        shell(device, "".join(f"kill {pid}; " for pid in holder))
         run_cli(env, "server", "stop")
         emit(check="server_left", running=bool(shell(device, SERVER).strip()))
 
@@ -361,4 +632,11 @@ if __name__ == "__main__":
         "accessibility": accessibility,
         "quirks": quirks,
         "bench": bench,
+        "devices": devices,
+        "idle": idle,
+        "concurrent": concurrent,
+        "stop": stop,
+        "foreign": foreign,
+        "idle-default": idle_default,
+        "phases-once": lambda: print(json.dumps(phases(os.environ))),
     }[sys.argv[1]]()

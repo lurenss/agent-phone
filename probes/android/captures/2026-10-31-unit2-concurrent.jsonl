@@ -1,0 +1,4 @@
+{"check": "second_process_with_no_wait", "ms": 102, "exit": 1, "error": "DEVICE_BUSY", "delivery": "not_delivered", "message": "Another process is driving 0a1b2c3d4e5f6a7b (pid 73354 probe holder). It did not let go within 0 s."}
+{"check": "second_process_that_waits", "ms": 4239, "exit": 0, "ok": true, "waited_for_holder_s": 4.3}
+{"check": "four_at_once", "exits": [0, 0, 0, 0], "seconds": 1.06, "single_ms": 652}
+{"check": "server_left", "running": false}
