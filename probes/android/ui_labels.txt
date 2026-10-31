@@ -1,8 +1,23 @@
 Advertise
+Airplane,mode,Off.,Button
+Auto rotate,On.,Button
 Battery charging, 100 percent
+Block, Allow, Do not disturb
+Blue light,filter,On.,Button
+Bluetooth,Off.,Button
+Brightness settings panel
+Brightness, Blue light filter, Home screen
+Clear
+Clear,Button
+Connections
 Create new post
 Create post
+Display
+Display brightness
 Edit profile
+Expanded
+Finder search
+Flashlight,Off.,Button
 Follow
 Home
 Instagram Home Feed
@@ -10,23 +25,38 @@ Instagram followers
 Instagram profile picture
 Message
 Messages and comments
+Mobile,Hotspot,Off.,Button
+Mobile,data,Off.,Button
 More
 More actions for this post
+Notification settings
+Notification settings,Button
+Notifications
+Open settings.
 Opens Notifications
 Phone signal full.
 Plan and share customized posts across Facebook and Instagram.
 Posts & Stories
+Power,mode,Off.,Button
 Profile
 Reel
 Reels
 Ringer vibrate.
+Samsung account profile
 Schedule a post
+Search
 Search and explore
 See more
+Settings
+Sound mode, Ringtone, Volume
+Sounds and vibration
 Story
 Suggested
 Suggested for you
+Vibrate On.,Button
 Welcome to Meta Business Suite
+Wi-Fi, Bluetooth, Data usage, Airplane mode
 Wifi signal full.
+Wifi three bars.
 Your story
 reels tray container
