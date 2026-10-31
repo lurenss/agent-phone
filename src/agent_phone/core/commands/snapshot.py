@@ -6,7 +6,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from agent_phone.core.context import Context
-from agent_phone.core.outcome import ErrorCode, Outcome, Read, Refusal, Refused
+from agent_phone.core.outcome import Outcome, Read, Refusal, Refused
+from agent_phone.core.refs.resolve import RefTarget, locate, observed_snapshot
 from agent_phone.core.screen import WindowId
 from agent_phone.core.snapshot.capture import capture
 from agent_phone.core.snapshot.snapshot import RefToken, SettleState
@@ -31,15 +32,25 @@ class SnapshotCommand:
 def run(ctx: Context, cmd: SnapshotCommand) -> Outcome:
     """With `settle`, read until two consecutive reads print the same lines, or until
     `timeout_ms` has passed. A timeout is not an error: the last read is described and its
-    snapshot says `unsettled`."""
+    snapshot says `unsettled`.
+
+    With `root`, the ref is checked first (`observed_snapshot`), and then found again on the
+    read that is described, so a drill-down never describes an element it did not just see.
+    The result is a new snapshot, and the one that held the ref stays valid.
+    """
     try:
-        if cmd.root is not None:
-            raise Refusal(ErrorCode.NOT_SUPPORTED, "snapshot --root is not built yet.")
+        target = None if cmd.root is None else RefTarget(cmd.root)
+        observed = None
+        if target is not None:
+            observed = observed_snapshot(target, ctx.store, ctx.info.identity, ctx.ledger.epoch())
         if cmd.settle:
             seen = observe(ctx, (Settled(cmd.pick, cmd.window),), ctx.clock.now() + cmd.timeout_ms / 1000)
             screen, settled = seen.screen, seen.settled
         else:
             screen, settled = ctx.phone.read(), SettleState.UNCHECKED
-        return Read(capture(ctx, screen, cmd.mode, settled, cmd.window, None, cmd.pick))
+        root = None
+        if target is not None and observed is not None:
+            root = locate(target, observed, screen).node
+        return Read(capture(ctx, screen, cmd.mode, settled, cmd.window, root, cmd.pick))
     except Refusal as refusal:
         return Refused.of(refusal)

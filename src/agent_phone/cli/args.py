@@ -14,6 +14,7 @@ from agent_phone.core.commands.snapshot import SETTLE_TIMEOUT_MS, SnapshotComman
 from agent_phone.core.device import Serial
 from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.screen import WindowId
+from agent_phone.core.snapshot.snapshot import RefToken
 from agent_phone.core.snapshot.surface import Pick
 from agent_phone.core.snapshot.view import Mode
 
@@ -80,6 +81,12 @@ def build() -> Parser:
         metavar="N",
         help="describe the window that `others` lists under this id, which is its place in the dump",
     )
+    where.add_argument(
+        "--root",
+        type=RefToken.parse,
+        metavar="REF",
+        help="describe only the subtree under this ref, as a new snapshot, and keep the ref numbers",
+    )
     snapshot.add_argument(
         "--timeout-ms",
         type=whole_number,
@@ -106,6 +113,7 @@ def parse_args(argv: Sequence[str]) -> Invocation:
                 settle=parsed.settle,
                 pick=Pick(parsed.surface),
                 window=None if parsed.window is None else WindowId(parsed.window),
+                root=parsed.root,
                 timeout_ms=parsed.timeout_ms,
             )
         case "server":

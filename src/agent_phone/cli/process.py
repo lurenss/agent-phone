@@ -56,7 +56,12 @@ def execute(
             return devices.run(hub, profiles=()), None
         case SnapshotCommand() as command:
             with open_phone(
-                invocation.serial, hub=hub, settings=settings, clock=clock, command=invocation.name
+                invocation.serial,
+                hub=hub,
+                settings=settings,
+                clock=clock,
+                command=invocation.name,
+                ref=command.root,
             ) as driver:
                 return driver.run(command), driver.serial
         case ServerCommand() as command:

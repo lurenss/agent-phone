@@ -19,10 +19,11 @@ from enum import Enum
 
 from agent_phone.core.device import DeviceIdentity
 from agent_phone.core.geometry import Point
+from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.query import Query
-from agent_phone.core.refs.fingerprint import Fingerprint
+from agent_phone.core.refs.fingerprint import Fingerprint, key_of
 from agent_phone.core.refs.store import SnapshotStore
-from agent_phone.core.screen import NodeId, Screen
+from agent_phone.core.screen import Node, NodeId, Screen
 from agent_phone.core.snapshot.snapshot import RefToken, Snapshot, SnapshotId
 
 
@@ -65,28 +66,94 @@ def observed_snapshot(
 ) -> Snapshot:
     """Check 1. Raises `Refusal`. `target` None is an input with no target (a key, a launch,
     a rotation): it too needs a current observation, or "press enter" could be resent blind."""
-    # TODO:
-    #   snap = store.load(id) for Ref/Point, store.latest(device.serial) for Query and None
-    #     (no latest -> OBSERVE_FIRST)
-    #   snap.device.serial != device.serial -> WRONG_DEVICE (details: the ref's device)
-    #   snap.device.boot_id != device.boot_id -> STALE_REF(REBOOTED)
-    #   snap.epoch != epoch -> STALE_REF(SPENT) or OBSERVE_FIRST for Query
-    raise NotImplementedError
+    match target:
+        case RefTarget(token):
+            snapshot_id: SnapshotId | None = token.snapshot
+        case PointTarget(snapshot):
+            snapshot_id = snapshot
+        case _:
+            snapshot_id = None
+    if snapshot_id is not None:
+        observed = store.load(snapshot_id)
+    else:
+        observed = store.latest(device.serial)
+        if observed is None:
+            raise Refusal(
+                ErrorCode.OBSERVE_FIRST,
+                f"No snapshot of {device.serial} exists yet. Take one and look first.",
+            )
+    if observed.device.serial != device.serial:
+        raise Refusal(
+            ErrorCode.WRONG_DEVICE,
+            f"Snapshot {observed.id} belongs to {observed.device.serial}, not {device.serial}.",
+            {"ref_device": observed.device.serial},
+        )
+    if observed.device.boot_id != device.boot_id:
+        raise stale(StaleReason.REBOOTED, f"{observed.id} was taken before the phone restarted.")
+    if observed.epoch != epoch:
+        if snapshot_id is None:
+            raise Refusal(
+                ErrorCode.OBSERVE_FIRST,
+                f"Input was sent since the latest snapshot, {observed.id}. Take a new one and look first.",
+            )
+        raise stale(StaleReason.SPENT, f"{observed.id} was taken before the last input.")
+    return observed
+
+
+def stale(reason: StaleReason, why: str) -> Refusal:
+    return Refusal(
+        ErrorCode.STALE_REF,
+        f"The ref cannot be trusted: {why} Take a new snapshot and use a ref from it.",
+        {"reason": reason.value},
+    )
 
 
 def locate(target: Target, observed: Snapshot, screen: Screen) -> Resolved:
     """Check 2. Searches every window of the stored package, not only the active one, so an
     element now under a dialog resolves and is then refused as OCCLUDED, not as STALE_REF.
     Raises `Refusal`."""
-    # TODO, for RefTarget:
-    #   fp = observed.fingerprints.get(n) or NOT_FOUND ("e<n> is not in snapshot <id>")
-    #   live = [m for m in nodes of windows with fp.key.package if key_of(m) == fp.key
-    #           and (fp.native_id is None or m.native_id in (None, fp.native_id))]
-    #   fp.twin is None: 0 -> STALE_REF(GONE), 1 -> it, >1 -> AMBIGUOUS_TARGET (a twin appeared)
-    #   fp.twin set: [m.bounds for m in live] == fp.twin.bounds -> live[fp.twin.ordinal]
-    #                else AMBIGUOUS_TARGET
-    # QueryTarget: matches() over the active window; 0 -> NOT_FOUND, >1 -> AMBIGUOUS_TARGET
-    #   with the candidates as refs of a snapshot recorded for the purpose.
+    # TODO (unit 4): QueryTarget matches() over the active window; 0 -> NOT_FOUND, >1 ->
+    #   AMBIGUOUS_TARGET with the candidates as refs of a snapshot recorded for the purpose.
     # PointTarget: hit.receiver_at(active window, point); None -> the point itself is the
     #   target with no receiver, which the engine judges as Clear(NO_RECEIVER).
-    raise NotImplementedError
+    if not isinstance(target, RefTarget):
+        raise NotImplementedError
+    number = target.token.number
+    fingerprint = observed.fingerprints.get(number)
+    if fingerprint is None:
+        raise Refusal(
+            ErrorCode.NOT_FOUND,
+            f"e{number} is not in snapshot {observed.id}. Use a ref that the snapshot printed.",
+            {"snapshot": observed.id, "number": number},
+        )
+    live = tuple(node for node in screen.nodes if matches_fingerprint(screen, node, fingerprint))
+    if fingerprint.twin is None:
+        if not live:
+            raise stale(StaleReason.GONE, f"{target.token} is no longer on screen.")
+        if len(live) > 1:
+            raise ambiguous(target.token, len(live))
+        return Resolved(live[0].id, observed, fingerprint)
+    if tuple(node.attrs.bounds for node in live) != fingerprint.twin.bounds:
+        raise ambiguous(target.token, len(live))
+    return Resolved(live[fingerprint.twin.ordinal].id, observed, fingerprint)
+
+
+def matches_fingerprint(screen: Screen, node: Node, fingerprint: Fingerprint) -> bool:
+    """The cheap fields first, because most nodes of a screen differ from the key in one of them."""
+    key, attrs = fingerprint.key, node.attrs
+    return (
+        attrs.package == key.package
+        and attrs.class_name == key.class_name
+        and attrs.resource_id == key.resource_id
+        and (fingerprint.native_id is None or attrs.native_id in (None, fingerprint.native_id))
+        and key_of(screen, node) == key
+    )
+
+
+def ambiguous(token: RefToken, live: int) -> Refusal:
+    return Refusal(
+        ErrorCode.AMBIGUOUS_TARGET,
+        f"{token} now matches {live} elements, so it is not clear which one it was. "
+        "Take a new snapshot and use a ref from it.",
+        {"matches": live},
+    )

@@ -9,7 +9,6 @@ from agent_phone.cli.settings import Settings
 from agent_phone.core.device import Connected, DeviceIdentity
 from agent_phone.core.outcome import ErrorCode, Refusal, Refused
 from agent_phone.core.refs.store import SnapshotStore
-from agent_phone.core.snapshot.snapshot import RefToken
 
 J7 = Connected(J7_SERIAL, "SM_J730F", ready=True)
 EMULATOR = Connected(EMULATOR_SERIAL, "emu", ready=True)
@@ -112,11 +111,12 @@ def test_a_screen_that_cannot_be_read_is_a_refusal_the_caller_can_catch(settings
     assert refusal_of(raised).code is ErrorCode.NO_SURFACE
 
 
-def test_root_waits_for_the_drill_down_commit(settings):
+def test_a_drill_down_through_the_driver_describes_the_subtree_of_a_ref(settings):
     hub = FakeHub([J7], screens=[fixture_screen("settings-home")])
-    with session(hub, settings) as phone, pytest.raises(PhoneError) as raised:
-        phone.snapshot(root=RefToken.parse("@k3x9q:e1"))
-    assert refusal_of(raised).code is ErrorCode.NOT_SUPPORTED
+    with session(hub, settings) as phone:
+        whole = phone.snapshot()
+        tiles = phone.snapshot(root=whole.ref(3))
+    assert tiles.id != whole.id and [line.ref for line in tiles.lines] == [3, 4, 5, 6, 7]
 
 
 def test_a_caller_policy_file_is_read_and_a_bad_one_is_refused_at_open(settings, tmp_path):
