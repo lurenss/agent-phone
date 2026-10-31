@@ -1,28 +1,13 @@
-import io
-import json
-from pathlib import Path
-
 import pytest
-from fakes import EMULATOR_SERIAL, J7_SERIAL, FakeHub
+from fakes import EMULATOR_SERIAL, J7_SERIAL, FakeHub, invoke
 from support import FakeClock
 
-from agent_phone.cli.process import run
-from agent_phone.cli.settings import Settings
 from agent_phone.core.device import Connected, Serial
 from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.refs.store import SnapshotStore
 
 J7 = Connected(J7_SERIAL, "SM_J730F", ready=True)
 UNAUTHORIZED = Connected(Serial("R58M1234567"), "", ready=False)
-
-
-def invoke(argv, hub, root=None, lock_wait_s=0.0, clock=None):
-    out = io.StringIO()
-    settings = Settings(state_root=root or Path("/nonexistent-agent-phone-root"), lock_wait_s=lock_wait_s)
-    code = run(argv, hub, settings, out, clock or FakeClock())
-    lines = out.getvalue().splitlines()
-    assert len(lines) == 1, "one command prints one envelope"
-    return code, json.loads(lines[0])
 
 
 def test_devices_lists_the_facts_of_every_ready_device_and_none_for_the_rest():

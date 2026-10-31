@@ -13,6 +13,7 @@ from agent_phone.core.commands.server import ServerAction, ServerCommand
 from agent_phone.core.commands.snapshot import SnapshotCommand
 from agent_phone.core.device import Serial
 from agent_phone.core.outcome import ErrorCode, Refusal
+from agent_phone.core.snapshot.view import Mode
 
 Command = DevicesCommand | ServerCommand | SnapshotCommand
 
@@ -41,7 +42,17 @@ def build() -> Parser:
     parser.add_argument("-d", "--device", **device)
     commands = parser.add_subparsers(dest="command", metavar="command", required=True, parser_class=Parser)
     commands.add_parser("devices", parents=[after], help="list every device with the facts read from it")
-    commands.add_parser("snapshot", parents=[after], help="read the active window as compact lines with refs")
+    snapshot = commands.add_parser(
+        "snapshot", parents=[after], help="read the active window as compact lines with refs"
+    )
+    modes = snapshot.add_mutually_exclusive_group()
+    snapshot.set_defaults(mode=Mode.COMPACT.value)
+    for mode, about in (
+        (Mode.COMPACT, "every element that takes input and every text no such element owns (default)"),
+        (Mode.SKELETON, "the outline: collections fold their rows into a count, drill in with --root"),
+        (Mode.FULL, "every node of the window, including the ones with no words"),
+    ):
+        modes.add_argument(f"--{mode.value}", dest="mode", action="store_const", const=mode.value, help=about)
     server = commands.add_parser("server", help="control the on-device server that reads the screen")
     actions = server.add_subparsers(dest="action", metavar="action", required=True, parser_class=Parser)
     actions.add_parser("start", parents=[after], help="start the server, or confirm it runs")
@@ -56,7 +67,7 @@ def parse_args(argv: Sequence[str]) -> Invocation:
         case "devices":
             command: Command = DevicesCommand()
         case "snapshot":
-            command = SnapshotCommand()
+            command = SnapshotCommand(mode=Mode(parsed.mode))
         case "server":
             command = ServerCommand(ServerAction(parsed.action))
     return Invocation(parsed.command, Serial(parsed.device) if parsed.device else None, command)

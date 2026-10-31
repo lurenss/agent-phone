@@ -3,13 +3,21 @@ tested with no device."""
 
 from __future__ import annotations
 
+import io
+import json
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 
+from support import FakeClock
+
+from agent_phone.cli.process import run
+from agent_phone.cli.settings import Settings
 from agent_phone.core.device import BootId, Connected, DeviceIdentity, DeviceInfo, Package, Serial
 from agent_phone.core.geometry import Size
 from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.phone import ServerStatus
 from agent_phone.core.screen import Screen
+from agent_phone.core.wait.clock import Clock
 
 J7_SERIAL = Serial("0a1b2c3d4e5f6a7b")
 J7_BOOT = BootId("8d3f6c1e-0b5a-4c2e-9f1d-2a7b3c4d5e6f")
@@ -123,3 +131,13 @@ class FakeHub:
         phone = FakePhone(self._infos[serial], *self._screens)
         self.phones.append(phone)
         return phone
+
+
+def invoke(argv, hub, root=None, lock_wait_s=0.0, clock: Clock | None = None):
+    """Run one command line against `hub` and return its exit code and its one envelope."""
+    out = io.StringIO()
+    settings = Settings(state_root=root or Path("/nonexistent-agent-phone-root"), lock_wait_s=lock_wait_s)
+    code = run(argv, hub, settings, out, clock or FakeClock())
+    lines = out.getvalue().splitlines()
+    assert len(lines) == 1, "one command prints one envelope"
+    return code, json.loads(lines[0])
