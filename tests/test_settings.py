@@ -1,11 +1,8 @@
 from pathlib import Path
 
-import pytest
-
 from agent_phone.cli.settings import Settings
 
 
-@pytest.mark.xfail(strict=True, reason="slots dataclass: Settings.state_root is a member_descriptor")
 def test_state_root_defaults_to_the_home_folder_when_the_variable_is_unset():
     assert Settings.from_environment({}).state_root == Path.home() / ".agent-phone"
 

@@ -18,11 +18,12 @@ from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.refs.store import LOCK_WAIT_S
 
 IDLE_LIMIT_S = 15 * 60
+DEFAULT_STATE_ROOT = Path.home() / ".agent-phone"
 
 
 @dataclass(frozen=True, slots=True)
 class Settings:
-    state_root: Path = Path.home() / ".agent-phone"
+    state_root: Path = DEFAULT_STATE_ROOT
     idle_limit_s: int = IDLE_LIMIT_S
     lock_wait_s: float = LOCK_WAIT_S
     adb: str | None = None
@@ -30,7 +31,7 @@ class Settings:
     @staticmethod
     def from_environment(env: Mapping[str, str] = os.environ) -> Settings:
         return Settings(
-            state_root=Path(env["AGENT_PHONE_HOME"]) if env.get("AGENT_PHONE_HOME") else Settings.state_root,
+            state_root=Path(env["AGENT_PHONE_HOME"]) if env.get("AGENT_PHONE_HOME") else DEFAULT_STATE_ROOT,
             idle_limit_s=whole(env, "AGENT_PHONE_IDLE_S", IDLE_LIMIT_S, 1),
             lock_wait_s=float(whole(env, "AGENT_PHONE_LOCK_WAIT_S", int(LOCK_WAIT_S), 0)),
             adb=env.get("ADB") or None,
