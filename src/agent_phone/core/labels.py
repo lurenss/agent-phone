@@ -142,6 +142,15 @@ def naming_values(screen: Screen, labels: Sequence[Label]) -> tuple[str, ...]:
     return tuple(shown)
 
 
+def typed_text(node: Node) -> str | None:
+    """The text a field or slider holds, which may be empty. None for every other node, and for
+    a secret field, whose text nothing reads: not a snapshot, a query or `get`."""
+    attrs = node.attrs
+    if role_of(attrs) in VALUE_ROLES and Flag.PASSWORD not in attrs.flags:
+        return attrs.text
+    return None
+
+
 def is_value(screen: Screen, label: Label) -> bool:
     """True for text the user changes or must not see: a field's or slider's own text, and
     any text of a password node."""

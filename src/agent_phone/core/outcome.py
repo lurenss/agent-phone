@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     from agent_phone.core.commands.find import Found
     from agent_phone.core.device import DeviceList
     from agent_phone.core.phone import ServerStatus
-    from agent_phone.core.snapshot.snapshot import Snapshot
+    from agent_phone.core.snapshot.snapshot import RefToken, Snapshot
 
 
 class ErrorCode(Enum):
@@ -123,10 +123,14 @@ class Acted:
 
 @dataclass(frozen=True, slots=True)
 class Value:
-    """A scalar answer: `get` text, `is` checks, clipboard text, a screenshot's path."""
+    """A scalar answer: `get` text, `is` checks, clipboard text, a screenshot's path. `ref` and
+    `property` say what was asked when the answer is about one element. `value` is None when the
+    element has no such property, for example the value of a button."""
 
-    value: str | bool | int
+    value: str | bool | int | tuple[int, ...] | tuple[str, ...] | None
     snapshot: Snapshot | None = None
+    ref: RefToken | None = None
+    property: str = ""
 
 
 @dataclass(frozen=True, slots=True)

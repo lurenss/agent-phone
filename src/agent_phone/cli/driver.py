@@ -29,12 +29,14 @@ from agent_phone.adapters.uiautomator2.phone import U2Hub
 from agent_phone.cli.settings import Settings
 from agent_phone.core.act.intent import Direction
 from agent_phone.core.act.ledger import Ledger
-from agent_phone.core.commands import find, snapshot
+from agent_phone.core.commands import find, get, is_, snapshot
 from agent_phone.core.commands.find import DEFAULT_LIMIT, FindCommand, Found
+from agent_phone.core.commands.get import GetCommand, GetProperty
+from agent_phone.core.commands.is_ import IsCommand, IsProperty
 from agent_phone.core.commands.snapshot import SnapshotCommand
 from agent_phone.core.context import Context
 from agent_phone.core.device import Serial, select_device
-from agent_phone.core.outcome import Acted, ErrorCode, Outcome, Read, Refusal, Refused
+from agent_phone.core.outcome import Acted, ErrorCode, Outcome, Read, Refusal, Refused, Value
 from agent_phone.core.phone import KeyName, Orientation, PhoneHub
 from agent_phone.core.policy.rules import Effect, Policy, merge, parse_policy
 from agent_phone.core.query import Query
@@ -81,13 +83,17 @@ class Driver:
     def serial(self) -> Serial:
         return self._ctx.info.identity.serial
 
-    def run(self, command: SnapshotCommand | FindCommand) -> Outcome:
+    def run(self, command: SnapshotCommand | FindCommand | GetCommand | IsCommand) -> Outcome:
         """The one dispatch over command dataclasses, for `main()` and for the typed methods."""
         match command:
             case SnapshotCommand():
                 return snapshot.run(self._ctx, command)
             case FindCommand():
                 return find.run(self._ctx, command)
+            case GetCommand():
+                return get.run(self._ctx, command)
+            case IsCommand():
+                return is_.run(self._ctx, command)
 
     def snapshot(
         self,
@@ -130,6 +136,24 @@ class Driver:
         outcome = self.run(FindCommand(query, DEFAULT_LIMIT, True, Scope(pick, window, root)))
         if isinstance(outcome, Read) and isinstance(outcome.payload, Found):
             return outcome.payload.count
+        raise PhoneError(outcome)
+
+    def get(
+        self, ref: RefToken, property: GetProperty = GetProperty.TEXT
+    ) -> str | tuple[int, ...] | tuple[str, ...] | None:
+        """One property of the element, read live. None when it has no such property."""
+        outcome = self.run(GetCommand(ref, property))
+        if isinstance(outcome, Read) and isinstance(outcome.payload, Value):
+            value = outcome.payload.value
+            if value is None or isinstance(value, str | tuple):
+                return value
+        raise PhoneError(outcome)
+
+    def is_(self, ref: RefToken, property: IsProperty = IsProperty.VISIBLE) -> bool:
+        outcome = self.run(IsCommand(ref, property))
+        if isinstance(outcome, Read) and isinstance(outcome.payload, Value):
+            if isinstance(outcome.payload.value, bool):
+                return outcome.payload.value
         raise PhoneError(outcome)
 
     def click(

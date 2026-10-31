@@ -18,12 +18,15 @@ from agent_phone.cli.settings import Settings
 from agent_phone.core.commands import devices, server
 from agent_phone.core.commands.devices import DevicesCommand
 from agent_phone.core.commands.find import FindCommand
+from agent_phone.core.commands.get import GetCommand
+from agent_phone.core.commands.is_ import IsCommand
 from agent_phone.core.commands.server import ServerCommand
 from agent_phone.core.commands.snapshot import SnapshotCommand
 from agent_phone.core.device import Serial, select_device
 from agent_phone.core.envelope import encode, exit_code, floor_envelope, to_wire
 from agent_phone.core.outcome import Outcome, Refusal, Refused
 from agent_phone.core.phone import PhoneHub
+from agent_phone.core.snapshot.snapshot import RefToken
 from agent_phone.core.wait.clock import Clock, SystemClock
 
 
@@ -55,14 +58,14 @@ def execute(
     match invocation.command:
         case DevicesCommand():
             return devices.run(hub, profiles=()), None
-        case SnapshotCommand() | FindCommand() as command:
+        case SnapshotCommand() | FindCommand() | GetCommand() | IsCommand() as command:
             with open_phone(
                 invocation.serial,
                 hub=hub,
                 settings=settings,
                 clock=clock,
                 command=invocation.name,
-                ref=command.scope.root,
+                ref=ref_of(command),
             ) as driver:
                 return driver.run(command), driver.serial
         case ServerCommand() as command:
@@ -74,6 +77,15 @@ def execute(
                     return server.run(hub.server(serial), command), serial
             except Refusal as refusal:
                 raise PhoneError(Refused.of(refusal), serial) from refusal
+
+
+def ref_of(command: SnapshotCommand | FindCommand | GetCommand | IsCommand) -> RefToken | None:
+    """The ref that names the device when no `-d` does."""
+    match command:
+        case GetCommand() | IsCommand():
+            return command.ref
+        case SnapshotCommand() | FindCommand():
+            return command.scope.root
 
 
 def main() -> int:

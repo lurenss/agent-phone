@@ -132,6 +132,40 @@ The exit code is 0 when `ok` is true, 1 for an error envelope, and 2 when the ar
  "matches":["@p4n8c:e4 button \"Connections\" \"Wi-Fi, Bluetooth, Data usage, Airplane m…\" focused [0,179,1920,394]"]}}
 ```
 
+## Get and is payload
+
+`agent-phone get <ref>` reads one property of the element a ref names, and `agent-phone is <ref>` checks one boolean. Both read the live screen, after the ref is resolved strictly (see `STALE_REF` and `AMBIGUOUS_TARGET`). They record no snapshot and send no input, so no ref changes.
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `ref` | string | The ref that was asked about. |
+| `property` | string | The property that was read. |
+| `value` | string, bool, array or null | The answer. `null` means the element has no such property, such as the value of a button. |
+
+```json
+{"v":1,"ok":true,"command":"get","device":"0a1b2c3d4e5f6a7b","data":{
+ "ref":"@p4n8c:e4","property":"bounds","value":[0,179,1920,394]}}
+```
+
+### Get properties
+
+| Property | Value |
+| --- | --- |
+| `text` | What a person reads: the typed text of a field or slider when it has some, otherwise the name and then the detail, joined with `, `. Never a secret field's text. |
+| `value` | The text a field or slider holds, `""` when it is empty, and `null` for every other element and for a secret field. |
+| `bounds` | `[left, top, right, bottom]` in pixels of the current rotation. |
+| `states` | The element's states, from [States](#states), in that table's order. |
+
+### Is properties
+
+| Property | Value |
+| --- | --- |
+| `visible` | `true` when the element is visible to the user. |
+| `enabled` | `true` when the element is enabled. |
+| `checked` | `true` when the element is checked. It is `false` for an element that cannot be checked. |
+| `focused` | `true` when the element has input focus. |
+| `selected` | `true` when the element is selected. |
+
 ## Snapshot payload
 
 `snapshot`, `wait` and the `after` of an input all carry the same object.
@@ -171,8 +205,6 @@ The Settings home fixture (`tests/fixtures/dumps/settings-home.xml`), in landsca
 
 ### Tree lines
 
-With `--surface all`, a line at depth 0 opens each window: `group "<package>" "<window kind>"`, then `focused` for the active window and the window's bounds. The window's own lines follow, indented one level, and the ref numbers run on across windows.
-
 A line holds these parts in this order, separated by one space. Only the role is always present.
 
 1. Two spaces of indent per level. A line is indented one level under the line it belongs to.
@@ -188,6 +220,8 @@ A line holds these parts in this order, separated by one space. Only the role is
 11. Bounds, `[left,top,right,bottom]`, in pixels of the current rotation.
 
 The `tree` array, encoded, stays within 7,680 bytes: the 8 KB budget (`A4-1`) minus 512 bytes for the rest of the envelope. When it does not fit, fitting tries each step in order and stops at the first that fits. It drops the details, then the bounds of lines without a ref, then the rows after the first k of each collection (k halves each time), then everything inside collections. As a last resort it drops lines from the end. A collection that lost rows keeps its ref and shows `(+N)`, so the agent can drill into it with `snapshot --root`.
+
+The tree of `--surface all` also has a line at depth 0 that opens each window: `group "<package>" "<window kind>"`, then `focused` for the active window, then the window's bounds. The window's own lines follow, indented one level, and the ref numbers run on across windows.
 
 ### Roles
 

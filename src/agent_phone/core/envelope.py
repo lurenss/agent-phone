@@ -74,7 +74,9 @@ def payload_data(payload: object) -> dict[str, object]:
                 "idle_for_s": payload.idle_for_s,
             }
         case Value():
-            return {"value": payload.value}
+            if payload.ref is None:
+                return {"value": payload.value}
+            return {"ref": str(payload.ref), "property": payload.property, "value": payload.value}
         case _:
             raise NotImplementedError(f"no wire form for {type(payload).__name__}")
 

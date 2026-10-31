@@ -36,7 +36,7 @@ from agent_phone.core.role import (
     role_of,
     shows_surface,
 )
-from agent_phone.core.screen import Flag, Node, NodeId, Screen, Window
+from agent_phone.core.screen import Attrs, Flag, Node, NodeId, Screen, Window
 from agent_phone.core.snapshot.surface import Pick, Surface
 
 
@@ -201,6 +201,15 @@ def window_line(window: Window) -> Line:
     )
 
 
+def states_of(attrs: Attrs) -> frozenset[State]:
+    states = {state for flag, state in STATE_FLAGS.items() if flag in attrs.flags}
+    if Flag.ENABLED not in attrs.flags:
+        states.add(State.DISABLED)
+    if Flag.VISIBLE not in attrs.flags:
+        states.add(State.OFFSCREEN)
+    return frozenset(states)
+
+
 def line_of(screen: Screen, node: Node, role: Role, depth: int, ref: int | None) -> Line:
     attrs = node.attrs
     shown = shown_values(screen, node, role)
@@ -208,11 +217,6 @@ def line_of(screen: Screen, node: Node, role: Role, depth: int, ref: int | None)
     detail = ", ".join(shown[1:])
     if len(detail) > DETAIL_CHARS:
         detail = detail[:DETAIL_CHARS] + "…"
-    states = {state for flag, state in STATE_FLAGS.items() if flag in attrs.flags}
-    if Flag.ENABLED not in attrs.flags:
-        states.add(State.DISABLED)
-    if Flag.VISIBLE not in attrs.flags:
-        states.add(State.OFFSCREEN)
     secret = Flag.PASSWORD in attrs.flags
     return Line(
         ref=ref,
@@ -222,7 +226,7 @@ def line_of(screen: Screen, node: Node, role: Role, depth: int, ref: int | None)
         detail=detail,
         value=attrs.text if role in VALUE_ROLES and not secret else "",
         id_hint="" if name else attrs.resource_id.rpartition("/")[2],
-        states=frozenset(states),
+        states=states_of(attrs),
         bounds=attrs.bounds,
         rows=None,
         folded=0,

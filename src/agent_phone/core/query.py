@@ -15,10 +15,10 @@ import json
 from dataclasses import dataclass
 from enum import Enum
 
-from agent_phone.core.labels import display_name, normalized, shown_values
+from agent_phone.core.labels import display_name, normalized, shown_values, typed_text
 from agent_phone.core.outcome import ErrorCode, Refusal
-from agent_phone.core.role import VALUE_ROLES, Role, role_of
-from agent_phone.core.screen import Flag, Node, Screen
+from agent_phone.core.role import Role, role_of
+from agent_phone.core.screen import Node, Screen
 
 
 class Match(Enum):
@@ -88,15 +88,10 @@ def matches(query: Query, screen: Screen, node: Node) -> bool:
         return False
     if query.text is not None and not said(query, query.text, shown_values(screen, node, role)):
         return False
-    return query.value is None or said(query, query.value, typed(node, role))
-
-
-def typed(node: Node, role: Role) -> tuple[str, ...]:
-    """The text a field or slider holds. A secret field holds none that a query can read, so a
-    query cannot find a password by guessing it."""
-    if role in VALUE_ROLES and Flag.PASSWORD not in node.attrs.flags:
-        return (node.attrs.text,)
-    return ()
+    if query.value is None:
+        return True
+    held = typed_text(node)
+    return held is not None and said(query, query.value, (held,))
 
 
 def said(query: Query, wanted: str, candidates: tuple[str, ...]) -> bool:

@@ -10,6 +10,8 @@ from typing import NoReturn
 
 from agent_phone.core.commands.devices import DevicesCommand
 from agent_phone.core.commands.find import DEFAULT_LIMIT, FindCommand
+from agent_phone.core.commands.get import GetCommand, GetProperty
+from agent_phone.core.commands.is_ import IsCommand, IsProperty
 from agent_phone.core.commands.server import ServerAction, ServerCommand
 from agent_phone.core.commands.snapshot import SnapshotCommand
 from agent_phone.core.device import Serial
@@ -22,7 +24,7 @@ from agent_phone.core.snapshot.snapshot import RefToken
 from agent_phone.core.snapshot.surface import Pick
 from agent_phone.core.snapshot.view import Mode
 
-Command = DevicesCommand | ServerCommand | SnapshotCommand | FindCommand
+Command = DevicesCommand | ServerCommand | SnapshotCommand | FindCommand | GetCommand | IsCommand
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +66,8 @@ def build() -> Parser:
     commands.add_parser("devices", parents=[after], help="list every device with the facts read from it")
     add_snapshot(commands, after)
     add_find(commands, after)
+    add_property(commands, after, "get", GetProperty, GetProperty.TEXT, "read one property of an element")
+    add_property(commands, after, "is", IsProperty, IsProperty.VISIBLE, "check one boolean of an element")
     server = commands.add_parser("server", help="control the on-device server that reads the screen")
     actions = server.add_subparsers(dest="action", metavar="action", required=True, parser_class=Parser)
     actions.add_parser("start", parents=[after], help="start the server, or confirm it runs")
@@ -157,6 +161,31 @@ def add_find(commands: argparse._SubParsersAction, after: Parser) -> None:
     add_scope(find, "to search")
 
 
+def add_property(
+    commands: argparse._SubParsersAction,
+    after: Parser,
+    name: str,
+    properties: type[GetProperty] | type[IsProperty],
+    default: GetProperty | IsProperty,
+    help: str,
+) -> None:
+    """`get` and `is` have one shape: a ref, and which of its properties to read live."""
+    command = commands.add_parser(
+        name,
+        parents=[after],
+        help=f"{help}, live",
+        description=f"{help[0].upper()}{help[1:]} on the live screen. The ref is checked first, "
+        "and the element must still be there exactly once.",
+    )
+    command.add_argument("ref", type=RefToken.parse, metavar="REF", help="a ref such as @k3x9q:e12")
+    command.add_argument(
+        "--property",
+        choices=[member.value for member in properties],
+        default=default.value,
+        help=f"which property (default {default.value})",
+    )
+
+
 def query_of(parsed: argparse.Namespace) -> Query:
     return Query(
         name=parsed.name,
@@ -182,6 +211,10 @@ def parse_args(argv: Sequence[str]) -> Invocation:
             )
         case "find":
             command = FindCommand(query_of(parsed), parsed.limit, parsed.count, scope_of(parsed))
+        case "get":
+            command = GetCommand(parsed.ref, GetProperty(parsed.property))
+        case "is":
+            command = IsCommand(parsed.ref, IsProperty(parsed.property))
         case "server":
             command = ServerCommand(ServerAction(parsed.action))
     return Invocation(parsed.command, Serial(parsed.device) if parsed.device else None, command)
