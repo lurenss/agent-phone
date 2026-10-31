@@ -53,16 +53,24 @@ tests/                      behavior tests and redacted golden fixtures
 - **Comments explain a non-obvious why.** The code says what. Delete a comment that restates the code.
 - **Errors carry a code and a delivery disposition.** Nothing raises a bare exception across the CLI boundary. `main()` turns every error into the JSON envelope and an exit code.
 
-## Phone safety
+## Device safety
 
-The phone runs real Instagram and Business Suite accounts. A wrong tap can post or schedule, and that cannot be undone.
+agent-phone drives real phones with real accounts. A wrong tap can post, send or delete, and that cannot be undone.
 
-- Never send a commit action (share, schedule, post, publish, delete, send, confirm) without the caller's explicit `--commit`. Tests never pass it.
-- Never force-stop SocksTun (`hev.sockstun`) or change VPN settings. Always-on lockdown means a dead tunnel takes the phone offline.
-- Install nothing on the phone. The only footprint is `/data/local/tmp/u2.jar` (`A3-1`).
-- Raw dumps contain private feed content. Keep them in `probes/android/raw/`, which git ignores. Commit only redacted fixtures.
-- Only one process drives the phone at a time (`A3-4`).
-- Write every app the run opened on the phone, and every input it sent, to `decisions.tsv`.
+**Core knows no app.** App names, labels and package lists never appear in `core/`. They live in policy files, device profiles, fixtures and `examples/`. A rule that only makes sense for one app is data, not code.
+
+The framework enforces these on every device:
+
+- Never send a commit action without the caller's explicit `--commit`. The policy engine decides what counts as a commit action from its rules. Tests never pass `--commit`.
+- Never stop a package that the device profile marks as protected.
+- Install nothing on the device. The only footprint is `/data/local/tmp/u2.jar` (`A3-1`).
+- Only one process drives a device at a time (`A3-4`).
+- Raw dumps contain private screen content. Keep them in `probes/android/raw/`, which git ignores. Commit only fixtures that pass `tests/test_fixtures_are_redacted.py`.
+
+The development phone, Lorenzo's Samsung J7, adds these:
+
+- SocksTun (`hev.sockstun`) is protected. Never stop it or change VPN settings. With always-on lockdown VPN, a dead tunnel takes the phone offline.
+- It runs live Instagram and Business Suite accounts. Write every app a run opened on it, and every input it sent, to `decisions.tsv`.
 
 ## Commits
 

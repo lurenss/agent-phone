@@ -2,7 +2,7 @@
 
 agent-phone lets an AI agent see and operate an Android phone through its accessibility tree, over adb. It applies the design of [vercel-labs/agent-desktop](https://github.com/vercel-labs/agent-desktop) to a phone: a snapshot returns compact JSON with a ref for every element the agent can act on, the agent acts on a ref, and it snapshots again to check. The loop stays in the agent.
 
-It is in development and has no commands yet. `docs/plan.md` lists the units and the check each one must pass.
+It is in development and has no commands yet. It is built for any app on any Android phone. App knowledge lives in policy data and examples, never in core. `docs/plan.md` lists the units and the check each one must pass.
 
 ## Why it is built this way
 
