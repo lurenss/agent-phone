@@ -11,11 +11,13 @@ a nested touch consumer. A clickable `Button` with empty text owns the words of 
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from dataclasses import dataclass
 from enum import Enum
 
-from agent_phone.core.role import Role
-from agent_phone.core.screen import Node, NodeId, Screen
+from agent_phone.core.role import VALUE_ROLES, Role, consumes_touch, role_of, shows_surface
+from agent_phone.core.screen import Flag, Node, NodeId, Screen
 
 
 class LabelField(Enum):
@@ -61,28 +63,52 @@ class Surface:
         return any(lbl.naming or lbl.field is LabelField.RESOURCE_ID for lbl in self.labels)
 
 
+ROLE_WORDS = frozenset({"button", "switch", "checkbox", "check box", "toggle button", "radio button", "tab"})
+"""Trailing parts that system UIs append to a comma-joined description."""
+
+CAMEL_HUMP = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
+WORD = re.compile(r"[^\W_]+")
+
+
 def surface_of(screen: Screen, node: Node) -> Surface:
-    # TODO: walk screen.subtree(node.id); skip the subtree of any descendant d != node with
-    # consumes_touch(d.attrs); for each kept node emit one Label per non-empty label field.
-    # A resource-id label holds the full id; `words` reads only its entry name.
-    raise NotImplementedError
+    labels: list[Label] = []
+    i = node.id
+    while i < node.end:
+        member = screen.nodes[i]
+        if member.id != node.id and consumes_touch(member.attrs):
+            i = member.end
+            continue
+        labels.extend(own_labels(member))
+        i += 1
+    return Surface(node.id, tuple(labels))
+
+
+def own_labels(node: Node) -> tuple[Label, ...]:
+    """One Label per non-empty label field of the node itself, in `LabelField` order."""
+    attrs = node.attrs
+    return tuple(
+        Label(value, field, node.id, attrs.resource_id)
+        for field in LabelField
+        if (value := getattr(attrs, field.value))
+    )
 
 
 def display_name(screen: Screen, node: Node, role: Role) -> str:
     """The name a snapshot line shows and a `Query` matches.
 
-    Own text, then own content-desc, then hint for fields, then the first naming label of the
-    surface. Collections name themselves from their own fields only, never from a row. A
-    field's typed text is its value, not its name. Some system UIs write a description as
-    comma-joined parts ending in the role word ("<name>,<state>,Button"): commas become spaces
-    and a trailing role word is dropped.
+    Own text, then own content-desc, then hint for fields, then, for a touch consumer, the
+    first naming label of the surface. Collections and plain views name themselves from their
+    own fields only (`role.shows_surface`). A field's typed text is its value, not its name.
+    Some system UIs write a description as comma-joined parts ending in the role word
+    ("<name>,<state>,Button"): commas become spaces and a trailing role word is dropped.
     """
-    raise NotImplementedError
+    shown = shown_values(screen, node, role)
+    return shown[0] if shown else ""
 
 
 def display_detail(screen: Screen, node: Node) -> str:
-    """The surface's other naming labels, joined, for the snapshot line's second string."""
-    raise NotImplementedError
+    """The values the line shows after its name, joined, for the snapshot line's second string."""
+    return ", ".join(shown_values(screen, node, role_of(node.attrs))[1:])
 
 
 def stable_name(screen: Screen, node: Node, role: Role) -> str | None:
@@ -90,9 +116,41 @@ def stable_name(screen: Screen, node: Node, role: Role) -> str | None:
 
     Mutable values never identify: a field's typed text, a slider's value, a checkbox's
     checked state, a text that the surface marks as a password. A field keeps its hint and
-    content-desc, so its identity survives text being typed into it.
+    content-desc, so its identity survives text being typed into it. The display name already
+    leaves every one of these out, so the stable name is the display name when there is one.
     """
-    raise NotImplementedError
+    return display_name(screen, node, role) or None
+
+
+def shown_values(screen: Screen, node: Node, role: Role) -> tuple[str, ...]:
+    """The naming values a snapshot line shows for the node, in name order, cleaned and
+    without repeats. The first is the name, the rest are the detail."""
+    labels = surface_of(screen, node).labels if shows_surface(node.attrs, role) else own_labels(node)
+    shown: list[str] = []
+    for label in labels:
+        if label.naming and not is_value(screen, label):
+            value = cleaned(label)
+            if value and value not in shown:
+                shown.append(value)
+    return tuple(shown)
+
+
+def is_value(screen: Screen, label: Label) -> bool:
+    """True for text the user changes or must not see: a field's or slider's own text, and
+    any text of a password node."""
+    source = screen.node(label.node).attrs
+    return label.field is LabelField.TEXT and (
+        role_of(source) in VALUE_ROLES or Flag.PASSWORD in source.flags
+    )
+
+
+def cleaned(label: Label) -> str:
+    value = label.value
+    if label.field is LabelField.CONTENT_DESC:
+        parts = [part.strip() for part in value.split(",")]
+        if len(parts) > 1 and parts[-1].casefold() in ROLE_WORDS:
+            value = " ".join(parts[:-1])
+    return " ".join(value.split())
 
 
 def words(value: str, field: LabelField) -> tuple[str, ...]:
@@ -102,9 +160,14 @@ def words(value: str, field: LabelField) -> tuple[str, ...]:
     and on `_`. A resource-id contributes only its entry name (`row_feed_button_share` ->
     row feed button share), a class only its simple name (`ShareButton` -> share button).
     """
-    raise NotImplementedError
+    if field is LabelField.RESOURCE_ID:
+        value = value.rpartition("/")[2]
+    elif field is LabelField.CLASS_NAME:
+        value = value.rpartition(".")[2]
+    value = CAMEL_HUMP.sub(" ", unicodedata.normalize("NFKC", value))
+    return tuple(WORD.findall(value.casefold()))
 
 
 def normalized(value: str) -> str:
     """Whitespace-collapsed casefold of a whole label, for exact-label policy rules."""
-    raise NotImplementedError
+    return " ".join(unicodedata.normalize("NFKC", value).casefold().split())

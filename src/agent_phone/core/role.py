@@ -59,16 +59,29 @@ CLASS_ROLES: Mapping[str, Role] = {
 `android.support.v7.widget.RecyclerView` (both in the fixtures) map the same way."""
 
 COLLECTIONS = frozenset({Role.LIST, Role.PAGER, Role.SCROLL})
+SELF_NAMED = COLLECTIONS | {Role.WEB}
+"""Roles that name themselves from their own fields only. A list's rows and a page's content
+print their own lines instead of becoming the container's words."""
+VALUE_ROLES = frozenset({Role.TEXT_FIELD, Role.SLIDER})
+"""Roles whose own text is a value the user changes, shown as `value=` and never as a name."""
+CHOICES = frozenset({Role.CHECKBOX, Role.SWITCH, Role.RADIO})
+
+
+def simple_name(class_name: str) -> str:
+    return class_name.rpartition(".")[2]
 
 
 def role_of(attrs: Attrs) -> Role:
-    # TODO:
-    #   base = CLASS_ROLES.get(simple_name(attrs.class_name), Role.GROUP)
-    #   EDITABLE flag -> TEXT_FIELD whatever the class (Compose text fields are Views)
-    #   CHECKABLE and base not in {CHECKBOX, SWITCH, RADIO} -> CHECKBOX
-    #   base in {GROUP, IMAGE, TEXT} and consumes_touch(attrs) -> BUTTON
-    #   base is GROUP and SCROLLABLE -> SCROLL
-    raise NotImplementedError
+    base = CLASS_ROLES.get(simple_name(attrs.class_name), Role.GROUP)
+    if Flag.EDITABLE in attrs.flags:
+        return Role.TEXT_FIELD
+    if Flag.CHECKABLE in attrs.flags and base not in CHOICES:
+        return Role.CHECKBOX
+    if base in (Role.GROUP, Role.IMAGE, Role.TEXT) and consumes_touch(attrs):
+        return Role.BUTTON
+    if base is Role.GROUP and Flag.SCROLLABLE in attrs.flags:
+        return Role.SCROLL
+    return base
 
 
 def consumes_touch(attrs: Attrs) -> bool:
@@ -78,5 +91,13 @@ def consumes_touch(attrs: Attrs) -> bool:
 
 def is_actionable(attrs: Attrs, role: Role) -> bool:
     """Gets a ref in a snapshot. Disabled nodes still get one, so `wait` and `is` can name them."""
-    # TODO: VISIBLE and (consumes_touch or SCROLLABLE or role is TEXT_FIELD or role is SLIDER)
-    raise NotImplementedError
+    return Flag.VISIBLE in attrs.flags and (
+        consumes_touch(attrs) or Flag.SCROLLABLE in attrs.flags or role in VALUE_ROLES
+    )
+
+
+def shows_surface(attrs: Attrs, role: Role) -> bool:
+    """True when the node's name and detail come from its whole label surface: a touch consumer
+    owns the words of the plain views inside it. Every other node shows only its own fields, so
+    a layout around a text never repeats that text."""
+    return consumes_touch(attrs) and role not in SELF_NAMED

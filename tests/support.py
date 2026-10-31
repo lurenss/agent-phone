@@ -5,7 +5,8 @@ from xml.sax.saxutils import quoteattr
 
 from agent_phone.adapters.uiautomator2.parse import parse_hierarchy
 from agent_phone.core.geometry import Size
-from agent_phone.core.screen import Screen
+from agent_phone.core.role import consumes_touch
+from agent_phone.core.screen import Node, Screen
 
 ROOT = Path(__file__).resolve().parents[1]
 DUMPS = ROOT / "tests" / "fixtures" / "dumps"
@@ -20,6 +21,18 @@ def fixture_xml(name: str) -> str:
 
 def fixture_screen(name: str) -> Screen:
     return parse_hierarchy(fixture_xml(name), J7, ime_package=None)
+
+
+def labelled(screen: Screen, value: str) -> Node:
+    """The one node whose own text or content-desc is `value`."""
+    found = [n for n in screen.nodes if value in (n.attrs.text, n.attrs.content_desc)]
+    assert len(found) == 1, f"{len(found)} nodes say {value!r}"
+    return found[0]
+
+
+def consumer_of(screen: Screen, node_: Node) -> Node:
+    """The node a tap on `node_` reaches: itself or its nearest touch-consuming ancestor."""
+    return next(n for n in (node_, *screen.ancestors(node_.id)) if consumes_touch(n.attrs))
 
 
 def node(cls: str = "android.view.View", *children: str, **attrs: object) -> str:
