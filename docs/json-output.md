@@ -1,6 +1,6 @@
 # JSON output
 
-Every agent-phone command prints one JSON object, the envelope, on stdout and exits. This page is the contract for that object. `core/envelope.py` builds it from the command's `Outcome` (`core/outcome.py`), and the snapshot payload comes from `Snapshot` (`core/snapshot/snapshot.py`). `tests/test_docs.py` checks every value table below against its enum. The CLI that prints the envelope is unit 3 of `docs/plan.md`.
+Every agent-phone command prints one JSON object, the envelope, on stdout and exits. This page is the contract for that object. `core/envelope.py` builds it from the command's `Outcome` (`core/outcome.py`), and the snapshot payload comes from `Snapshot` (`core/snapshot/snapshot.py`). `tests/test_docs.py` checks every value table below against its enum and the examples below against the code.
 
 The envelope is UTF-8 JSON with no escaping of non-ASCII characters and no spaces between tokens. The example below is wrapped for reading.
 
@@ -75,6 +75,44 @@ The exit code is 0 when `ok` is true, 1 for an error envelope, and 2 when the ar
 | `ACTION_FAILED` | The input went out, and reading the screen back contradicts what was asked. |
 | `INTERNAL` | A defect in agent-phone. |
 
+## Devices payload
+
+`agent-phone devices` lists every device adb knows, in adb's order, as `{"devices": [...]}`. It reads facts from each ready device in one shell call and starts nothing on it. The envelope's `device` is null.
+
+| Key | Type | Present | Meaning |
+| --- | --- | --- | --- |
+| `serial` | string | always | The adb serial. Pass it to `-d`. |
+| `model` | string | always | The device's own model name when its facts were read, otherwise the name adb lists, with `_` for spaces. |
+| `ready` | bool | always | `true` when adb lists the device as `device`. An unauthorized or offline device is `false` and has no facts. |
+| `api` | int | with facts | The Android API level. |
+| `abi` | string | with facts | The primary CPU ABI. |
+| `display` | array | with facts | `[width, height]` in pixels, in the device's natural orientation. A size override wins over the physical size. |
+| `density` | int | with facts | Dots per inch. An override wins over the physical density. |
+| `locale` | string | with facts | The user's language tag, such as `en-US`. |
+| `ime` | string or null | with facts | The package of the default keyboard, or null when none is set. |
+| `boot_id` | string | with facts | The kernel's boot id. It changes at every reboot, and a ref from an earlier boot is `STALE_REF`. |
+| `problem` | string | when facts failed | Why a ready device has no facts. |
+| `profile` | string or null | always | The device profile that applies. It is null until profile files load. |
+
+```json
+{"v":1,"ok":true,"command":"devices","device":null,"data":{"devices":[
+ {"serial":"0a1b2c3d4e5f6a7b","model":"SM-J730F","ready":true,"api":28,"abi":"armeabi-v7a","display":[1080,1920],
+  "density":420,"locale":"en-US","ime":"com.sec.android.inputmethod","boot_id":"8d3f6c1e-0b5a-4c2e-9f1d-2a7b3c4d5e6f",
+  "profile":null},
+ {"serial":"R58M1234567","model":"","ready":false,"profile":null}]}}
+```
+
+## Server payload
+
+`agent-phone server start`, `stop` and `status` each print the server's status after the command, as the `data` object. `start` and `stop` can run again with no harm. The server holds the device's one UiAutomation client (`A3-4`), so `stop` also makes the device free for any other tool.
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `running` | bool | The uiautomator2 server process is alive on the phone. |
+| `watchdog` | bool | The watchdog that stops an idle server is alive. |
+| `idle_limit_s` | int or null | The idle limit the running watchdog was started with, in seconds. The default is 900. `AGENT_PHONE_IDLE_S` sets it for the next start. |
+| `idle_for_s` | int or null | Seconds since a command last used the server. Null when no server runs. |
+
 ## Snapshot payload
 
 `snapshot`, `wait` and the `after` of an input all carry the same object.
@@ -88,7 +126,7 @@ The exit code is 0 when `ok` is true, 1 for an error envelope, and 2 when the ar
 | `settled` | string | See [Settle states](#settle-states). |
 | `keyboard` | bool | `true` when a keyboard window is on screen. |
 | `dialog` | bool | `true` when the described window does not cover the display. |
-| `others` | array | Every other window, in dump order, as `{"id", "app", "window", "bounds", "nodes"}`. `nodes` is the window's node count. |
+| `others` | array | Every other window, in dump order, as `{"id", "app", "window", "bounds", "nodes"}`. `bounds` is `[left, top, right, bottom]`, and `nodes` is the window's node count. |
 | `toasts` | array of strings | Toast texts the backend saw. |
 | `truncated` | int | The number of lines that budget fitting removed. |
 | `tree` | array of strings | One string per line, described below. |

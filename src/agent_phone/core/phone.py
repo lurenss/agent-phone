@@ -185,11 +185,35 @@ class Sent:
 Delivery = NotSent | Sent
 
 
+@dataclass(frozen=True, slots=True)
+class ServerStatus:
+    """The backend's on-device server, as the phone reports it. `idle_limit_s` is the limit the
+    running watchdog was started with, and `idle_for_s` the time since the last client use. Both
+    are None when no server runs."""
+
+    running: bool
+    watchdog: bool
+    idle_limit_s: int | None
+    idle_for_s: int | None
+
+
+class BackendServer(Protocol):
+    """The lifetime of a backend's on-device server. `start` and `stop` are idempotent, and each
+    returns the status that follows it."""
+
+    def status(self) -> ServerStatus: ...
+
+    def start(self) -> ServerStatus: ...
+
+    def stop(self) -> ServerStatus: ...
+
+
 class Phone(Protocol):
     """One connected device. Every method either returns core types or raises `Refusal`.
 
     `inject` sends its action exactly once. It never retries, because only it knows how far
     the request got, and a retry after the request was written can double a commit.
+    `close` releases what `PhoneHub.open` acquired and leaves the device's server running.
     """
 
     def info(self) -> DeviceInfo: ...
@@ -204,10 +228,20 @@ class Phone(Protocol):
 
     def screenshot(self) -> bytes: ...
 
+    def close(self) -> None: ...
+
 
 class PhoneHub(Protocol):
-    """The transport that lists devices and opens one. adb for every backend planned so far."""
+    """The transport that lists devices and opens one. adb for every backend planned so far.
+
+    `inspect` reads a device's facts and starts nothing. `server` is the handle for the
+    backend's on-device server, which `open` starts on demand.
+    """
 
     def connected(self) -> tuple[Connected, ...]: ...
+
+    def inspect(self, serial: Serial) -> DeviceInfo: ...
+
+    def server(self, serial: Serial) -> BackendServer: ...
 
     def open(self, serial: Serial) -> Phone: ...

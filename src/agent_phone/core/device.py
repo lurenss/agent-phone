@@ -112,6 +112,22 @@ class Connected:
     ready: bool
 
 
+@dataclass(frozen=True, slots=True)
+class Listed:
+    """One row of `devices`. `info` is None for a device that is not ready, and for a ready one
+    whose facts could not be read, in which case `problem` says why."""
+
+    connected: Connected
+    info: DeviceInfo | None
+    problem: str | None
+    profile: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class DeviceList:
+    devices: tuple[Listed, ...]
+
+
 def select_device(
     connected: Sequence[Connected], requested: Serial | None, ref_device: Serial | None
 ) -> Serial:
