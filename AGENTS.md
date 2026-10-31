@@ -11,7 +11,9 @@ uv sync                         # install the package and the dev tools
 uv run pytest                   # every test, including the architecture and no-sleep gates
 uv run ruff check               # lint
 uv run ruff format --check .    # formatting
+uv run agent-phone devices      # the CLI; `snapshot` and `server start|stop|status` are the other commands
 probes/android/server_lifetime.sh                         # re-run a platform probe against the phone
+uv run python -I probes/android/unit2_probe.py <check>    # facts, watchdog, bench, idle, concurrent, stop, foreign
 uv run python -I probes/android/compare_backends.py <label>   # compare the old dump with the server dump
 ```
 
@@ -67,7 +69,7 @@ The framework enforces these on every device:
 
 - Never send a commit action without the caller's explicit `--commit`. The policy engine decides what counts as a commit action from its rules. Tests never pass `--commit`.
 - Never stop a package that the device profile marks as protected.
-- Install nothing on the device. The only footprint is `/data/local/tmp/u2.jar` (`A3-1`).
+- Install nothing on the device. The only footprint is `/data/local/tmp/u2.jar` (`A3-1`) and the empty file `/data/local/tmp/ap-lastuse` that the idle watchdog reads (`A3-8`). `agent-phone server stop` removes the second.
 - Only one process drives a device at a time (`A3-4`).
 - Raw dumps contain private screen content. Keep them in `probes/android/raw/`, which git ignores. Commit only fixtures that pass `tests/test_fixtures_are_redacted.py`.
 

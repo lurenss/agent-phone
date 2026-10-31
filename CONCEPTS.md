@@ -134,6 +134,24 @@ One input counter per device (`Ledger`, `core/act/ledger.py`). Every input spend
 
 What a command produced (`Outcome`, `core/outcome.py`): `Refused`, `Acted` or `Read`. The outcome type decides the `delivery` disposition, and `retry` follows from it. `not_delivered` is the only safe retry. `docs/json-output.md` lists the values.
 
+## Devices and the server
+
+### Device facts
+
+What a process reads from the phone once, in one shell call (`DeviceInfo`, `core/device.py`): model, API level, ABI, display size, density, locale, default keyboard and the boot id that completes the device identity. An override size or density wins over the physical one. A fact the phone does not report is `TRANSPORT`, never a default.
+
+### State root
+
+The folder for everything agent-phone keeps between commands: `AGENT_PHONE_HOME`, or `~/.agent-phone`. Each device has its own `devices/<serial>/` folder in it, with its snapshots, its ledger and its lock. Two state roots are two sets of locks, so processes that share a device must share a root.
+
+### Device lock
+
+The claim on one device (`DeviceLock`, `core/refs/store.py`). It is an advisory `flock` on `devices/<serial>/lock`, held for one command or for one Driver session. A second process waits up to `AGENT_PHONE_LOCK_WAIT_S` seconds (10 by default) and then gets `DEVICE_BUSY`. The kernel drops the lock when its holder dies, so a crash leaves nothing to clean up.
+
+### Server, watchdog and idle limit
+
+The server is the uiautomator2 process on the phone that answers screen reads (`Server`, `adapters/uiautomator2/server.py`). A command starts it detached when its health check fails. A watchdog shell on the phone kills it when the last-use file is older than the idle limit, 15 minutes by default (`AGENT_PHONE_IDLE_S`). `agent-phone server stop` ends both, which frees the device's one UiAutomation client for another tool.
+
 ## Relationships
 
 A backend turns one dump into a `Screen`. `select_surface` picks the window to describe. `build_view` walks it with the label surface and the role rules and produces lines, and `fit` keeps those lines within the budget. `fingerprints` keys every node so that each printed ref can be found again. The `Snapshot` holds the lines, the fingerprints and the device identity, and the store writes it to disk. A later command reads the snapshot back by the id in its ref, checks the device and the ledger epoch, and finds the element on a new `Screen` by its key. The policy engine reads the same label surface that named the element, so it judges the words the agent saw.

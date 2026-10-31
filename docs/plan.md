@@ -25,7 +25,7 @@ Every number above comes from one device. A second device must confirm that the 
 
 ## What the server's lifetime showed
 
-- No uiautomator APK is installed on the phone. The only footprint is `u2.jar` in `/data/local/tmp` (A3-1).
+- No uiautomator APK is installed on the phone. The only footprint is `u2.jar` in `/data/local/tmp` (A3-1) and the empty `ap-lastuse` file that the idle watchdog reads (A3-8).
 - Started by the uiautomator2 Python library, the server stops answering as soon as the adb shell stream that launched it closes. Started with `nohup app_process ...`, it survives and answers after about 3 seconds. Each fact rests on two observations (A3-2, A3-3).
 - Android allows one UiAutomation client at a time (A3-4). While an agent-phone server runs, any other UiAutomation user on that device fails with "already registered", including the old scripts' `uiautomator dump`.
 - A server left running keeps accessibility switched on, and apps can detect that (A3-5). The server must stop when idle.
@@ -41,8 +41,8 @@ Every number above comes from one device. A second device must confirm that the 
 ## Choices made so far
 
 - **Backend.** The uiautomator2 jar (`u2.jar` 0.4.1) runs from `/data/local/tmp` through `app_process`. uiautomator2's IME APK is never installed. A custom `app_process` server or an AccessibilityService can replace this backend later without changing the commands, because only its adapter folder talks to it.
-- **Server lifetime.** agent-phone starts the server detached on the phone and stops it after 15 idle minutes. The idle timer lives on the computer and runs `pkill -f uia2.Main` over adb. No process on the computer has to hold a stream open.
-- **Devices.** A device is chosen by adb serial. When only one device is connected, it is the default. Device facts such as API level, screen size, density and rotation are read from the device, never assumed.
+- **Server lifetime.** agent-phone starts the server detached on the phone and stops it after 15 idle minutes. The idle timer is a watchdog shell on the phone that kills the server when the last-use file is older than the limit. No process on the computer has to hold a stream open or stay alive, so the limit holds while the computer sleeps or the cable is out (A3-8, A3-14). A client touches the file at most every limit/4 seconds, capped at 60, from inside a shell call it makes anyway.
+- **Devices.** A device is chosen by adb serial. When only one device is ready, it is the default. Several ready devices and no `-d` is `DEVICE_AMBIGUOUS`. Device facts such as API level, screen size, density and rotation are read from the device, never assumed.
 - **Language.** Python, managed with uv. uiautomator2 is Python. Lorenzo approved the plan with this default on 2026-10-31.
 - **Clicks.** In AOSP UiAutomator, `UiObject.click()` injects a touch at the element's center instead of calling the accessibility click action. I have not checked this inside `u2.jar`, so unit 4 checks it (A4-2). Until then, every click reports `delivered_unverified` and the agent confirms it by reading the screen again. `set-text` uses `ACTION_SET_TEXT`.
 - **Types.** pstack runs its architect step, with an Opus and a Fable runner, for data shapes that later code depends on. The ref fingerprint, the device identity, the delivery result and the policy shape are those shapes, so unit 1 runs it once.
@@ -53,7 +53,7 @@ Each unit ends in a check that has to pass before the next unit starts.
 
 0. **Repo.** Done. uv project, ruff, pytest, the layout from agent-desktop (`core/`, `adapters/`, `cli/`, `probes/android/` with `FINDINGS.md`, `AGENTS.md`), the gate that keeps core free of backend imports, and the lint that rejects `time.sleep`. Check passed: `uv run pytest` and the lint pass, and each gate fails when a violation is planted.
 1. **Types.** Done (`f1eb992` to `7197a4a`). Settle `Device` and its identity, `Snapshot`, `Node`, the role list, `Ref`, the stored fingerprint for finding an element again, the result envelope, `Disposition`, the error codes, the policy rule shape and the device profile. Check: golden tests turn the redacted fixtures into the expected snapshots, and the CONCEPTS.md glossary and `docs/json-output.md` contract match the types.
-2. **Devices, server lifetime and lock.** List devices, read device facts, start and health-check the server, stop it when idle, and hold one lock per device so only one process drives it. Check: over 20 warm calls, the median `snapshot` is under 400 ms, and the server is gone 15 minutes after the last call.
+2. **Devices, server lifetime and lock.** Done (`f1ac62c` to `cd633b9`). List devices, read device facts, start and health-check the server, stop it when idle, and hold one lock per device so only one process drives it. Check passed on the J7: 20 warm `snapshot` runs have a median of 349 ms and 356 ms in two probe runs (A5-1), and the server was gone 917 s after the last call with the default limit (A3-17). The median was measured on a light screen. Open for unit 3: measure it on the four screens of done-when 1, because the Instagram feed and Business Suite home may push it past 400 ms (A5-3). Open for unit 4: profile files do not load yet, so `devices` prints `profile: null` and the J7's protections wait for the policy engine. A lock covers one state root, so tools that share a phone must share `AGENT_PHONE_HOME`. A server that another tool started has no watchdog until `server start` runs.
 3. **Reading.** Open from unit 1: on the Instagram feed, `--skeleton` hides the whole page behind the root pager. `snapshot -i --compact`, `--skeleton`, `--root`, `--settle`, system surfaces (dialogs, keyboard, notification shade), then `find`, `get` and `is`, and the first agent skill under `skills/`. Then pstack's `create-verification-skill` writes a project skill that drives a real device through the CLI, so every later unit proves its change the same way. Check: done-when 1 on the J7, plus golden tests.
 4. **Actions and device operations.** Open from unit 1: measure how often the page-level row key stales refs on a live feed with no input, and settle the hit test for a dialog over an app. `click`, `set-text`, `scroll` and `press` on refs, plus `back`, `home`, `recents`, `launch`, `stop`, `open-url` for intents and deep links, `rotate`, clipboard and `screenshot` as evidence. Each ref action finds the ref again first, checks the target (visible, enabled, same bounds on two reads) and returns a delivery result. The policy engine sits here. Check: done-when 2 and 3.
 5. **Waiting.** `wait --text`, `wait --gone`, and `--wait-for` on actions. Check: a script opens a known Settings page and reads it with no sleeps.
@@ -78,7 +78,7 @@ The framework enforces these on every device:
 
 - Never send a commit action without `--commit`. Tests never pass it.
 - Never stop a package that the device profile marks as protected.
-- Install nothing on the device. The jar in `/data/local/tmp` is the only footprint.
+- Install nothing on the device. The jar in `/data/local/tmp` and the empty `ap-lastuse` file are the only footprint.
 - Only one process drives a device at a time.
 - Keep raw dumps out of git. Commit only redacted fixtures.
 

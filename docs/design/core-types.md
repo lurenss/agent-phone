@@ -194,7 +194,7 @@ No input through the keyboard, because the IME APK is never installed (A3-1). No
 
 ### Interface depth
 
-The backend `Phone` protocol has six methods, and only `read` and `inject` carry the work. The public `Driver` has one method per command, and each returns the same outcome the CLI prints. Behind `click` sit resolution, twin geometry, auto-wait, hit testing, the policy engine, the ledger and verification. The caller passes a target, an optional effect grant and optional wait predicates.
+The backend `Phone` protocol has seven methods, and only `read` and `inject` carry the work. `PhoneHub` lists devices, reads a device's facts, hands out the handle for its on-device server and opens it. The public `Driver` has one method per command, and each returns the same outcome the CLI prints. Behind `click` sit resolution, twin geometry, auto-wait, hit testing, the policy engine, the ledger and verification. The caller passes a target, an optional effect grant and optional wait predicates.
 
 ### Module map
 
@@ -203,13 +203,14 @@ agent_phone/core/
   geometry.py device.py screen.py role.py labels.py query.py
   outcome.py envelope.py phone.py context.py
   snapshot/  surface.py view.py budget.py snapshot.py capture.py
-  refs/      fingerprint.py resolve.py store.py
+  refs/      fingerprint.py resolve.py store.py   (store.py also holds the device lock)
   policy/    rules.py engine.py
   act/       intent.py hit.py ledger.py act.py
-  wait/      clock.py predicate.py observe.py
-  commands/  snapshot.py click.py set_text.py press.py stop.py wait.py screenshot.py devices.py
-agent_phone/adapters/uiautomator2/  phone.py parse.py rpc.py delivery.py address.py shell.py
+  wait/      clock.py predicate.py observe.py until.py
+  commands/  snapshot.py click.py set_text.py press.py stop.py wait.py screenshot.py devices.py server.py
+agent_phone/adapters/uiautomator2/  phone.py parse.py rpc.py delivery.py address.py shell.py adb.py server.py
 agent_phone/cli/driver.py           the one wiring point, for main() and in-process consumers
+agent_phone/cli/                    args.py (arguments), process.py (envelope and exit code), settings.py (environment)
 agent_phone/policy/default.toml     built-in rules, package data, no app names
 examples/business_suite/  examples/instagram/policy.toml  examples/devices/j7.toml
 ```
