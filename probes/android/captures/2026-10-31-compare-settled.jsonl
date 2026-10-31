@@ -1,0 +1,6 @@
+{"label": "ig-feed-settled", "side": "old", "runs": 6, "errors": 0, "median_ms": 2564, "min_ms": 2303, "max_ms": 2874, "nodes": [116], "fail_msgs": []}
+{"label": "ig-feed-settled", "side": "u2", "runs": 10, "errors": 0, "median_ms": 154, "min_ms": 145, "max_ms": 262, "nodes": [152, 153], "fail_msgs": []}
+{"label": "ig-feed-settled", "realistic_snapshot_bytes": 6004, "rows": 54, "refs": 30, "raw_bytes": 71891}
+{"label": "mbs-home-settled", "side": "old", "runs": 6, "errors": 0, "median_ms": 2350, "min_ms": 2261, "max_ms": 3107, "nodes": [72], "fail_msgs": []}
+{"label": "mbs-home-settled", "side": "u2", "runs": 10, "errors": 0, "median_ms": 164, "min_ms": 134, "max_ms": 222, "nodes": [108], "fail_msgs": []}
+{"label": "mbs-home-settled", "realistic_snapshot_bytes": 3976, "rows": 48, "refs": 18, "raw_bytes": 46667}

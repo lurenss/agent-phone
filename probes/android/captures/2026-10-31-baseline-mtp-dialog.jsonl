@@ -1,0 +1,4 @@
+{"probe": "adb_floor", "runs": 5, "errors": 0, "median_ms": 36, "min_ms": 27, "max_ms": 49, "last_note": ""}
+{"probe": "uiautomator_dump_mbs", "runs": 5, "errors": 0, "median_ms": 2125, "min_ms": 2095, "max_ms": 2169, "last_note": "nodes=12 bytes=4804 msg='UI hierchary dumped to: /sdcard/ap.xml'"}
+{"probe": "input_noop", "runs": 5, "errors": 0, "median_ms": 902, "min_ms": 868, "max_ms": 917, "last_note": ""}
+{"probe": "screencap", "runs": 5, "errors": 0, "median_ms": 1254, "min_ms": 1211, "max_ms": 1295, "last_note": "bytes=347696"}
