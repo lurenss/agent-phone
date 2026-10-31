@@ -1,5 +1,7 @@
 Advertise
 Airplane,mode,Off.,Button
+Allow
+An app is asking to turn on Bluetooth.
 Auto rotate,On.,Button
 Battery charging, 100 percent
 Block, Allow, Do not disturb
@@ -12,6 +14,7 @@ Clear,Button
 Connections
 Create new post
 Create post
+Deny
 Display
 Display brightness
 Edit profile

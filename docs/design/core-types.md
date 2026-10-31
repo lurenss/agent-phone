@@ -267,13 +267,12 @@ Rejected from Fable: binding `--commit` to a label. A grant names an effect from
 
 ## Open questions and risks
 
-- Is the dump's window order stable? Fable read that `UiDevice.getWindowRoots` builds a `HashSet`, and Opus read that it puts the active root first. Unit 3 captures a dialog over an app before `hit.py` relies on either reading.
+- Is the dump's window order stable? Fable read that `UiDevice.getWindowRoots` builds a `HashSet`, and Opus read that it puts the active root first. Answered for one or two windows (A2-7): with a dialog over an app, and without, the first window was the one Android reported as focused, on 20 of 20 reads each. The same row records that a dialog hides the app beneath it from the dump. Three or more windows, such as a keyboard over an app, are still unobserved.
 - Does `UiSelector.instance` count nodes in the dump's document order? `adapters/uiautomator2/address.py` depends on it.
 - Should ENTER commit by default? It is strict for a search field. A per-app `exempt` rule may be enough relief.
 - The server only sees toasts shown while it runs. Is that enough for a toast predicate, or does it leave unit 5?
-- The hit test refuses a point that a window of unknown stacking covers. On a dialog over an app, the app window covers every dialog point, so the rule must not refuse input to the active window itself. Unit 4 settles it with a probe.
+- The hit test refuses a point that a window of unknown stacking covers. A dialog over an app leaves only the dialog and the status bar in the dump (A2-7), so no other window covers a dialog point. Unit 4 still has to settle a keyboard over an app.
 
-- Is the first window in the uiautomator2 dump always the active one? The fixtures agree, and androidx `UiDevice.getWindowRoots` puts the active root first, but no fixture has a dialog over an app. Unit 3 should capture one before `hit.py` relies on it.
 - Should a permission dialog's "Allow" count as a commit? The default treats it as an affirmative that inherits its dialog's words, and permission text rarely contains a commit word, so it passes as clear today.
 - Is `--commit <effect>` acceptable in place of the bare `--commit` that AGENTS.md and the plan name? I think the effect name is the safer contract, because a grant for one effect cannot open another.
 - Does the Business Suite time picker's dialog contain "Schedule" in its title? If it does, its "OK" inherits `schedule`, and the dry run stops with `COMMIT_REFUSED`. That failure is safe, and an exemption fixes it once a capture shows the title.

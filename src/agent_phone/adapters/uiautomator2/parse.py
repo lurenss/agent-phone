@@ -4,8 +4,9 @@ The server dump has one `<node>` per window under `<hierarchy rotation="N">` and
 type, layer or focus attribute. What this module infers, and from what:
 
 - active: the first window. The server lists `getRootInActiveWindow()` first and then the rest
-  of `getWindows()` (androidx UiDevice.getWindowRoots). Matches all four fixtures; not yet
-  probed with a dialog over an app. Open question for unit 3.
+  of `getWindows()` (androidx UiDevice.getWindowRoots). On the phone the first window was the one
+  `dumpsys window` named as the focus window, on 20 of 20 reads with a dialog over an app and
+  20 of 20 without (A2-7). A dialog hides the app beneath it from the dump.
 - kind: INPUT_METHOD for the device's default IME package (`shell.py` reads it), SYSTEM for
   the platform's own UI packages in PLATFORM_UI, APPLICATION otherwise. A backend that reads
   AccessibilityWindowInfo replaces all of this with facts.
