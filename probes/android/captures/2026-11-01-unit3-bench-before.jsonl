@@ -1,0 +1,15 @@
+{"check": "host_load", "loadavg": [3.5703125, 3.576171875, 3.61328125], "cores": 12, "phone_uptime": "16:47:28 up 20 days,  8:47,  0 users,  load average: 6.06, 6.60, 5.96"}
+{"check": "settled", "screen": "stock Settings", "attempts": 1, "ms": 2337}
+{"check": "warm_snapshot", "screen": "stock Settings", "errors": 0, "wrong_screen": 0, "apps": ["com.android.settings"], "bytes": [1178, 1178], "under_8_kb": true, "tree_lines": [11, 11], "runs": 20, "median_ms": 352, "min_ms": 296, "max_ms": 379}
+{"check": "warm_settle", "screen": "stock Settings", "settled": 10, "runs": 10, "median_ms": 508, "min_ms": 459, "max_ms": 541}
+{"check": "settled", "screen": "system dialog", "attempts": 1, "ms": 391}
+{"check": "warm_snapshot", "screen": "system dialog", "errors": 0, "wrong_screen": 0, "apps": ["com.android.settings"], "bytes": [514, 514], "under_8_kb": true, "tree_lines": [3, 3], "runs": 20, "median_ms": 346, "min_ms": 280, "max_ms": 390}
+{"check": "warm_settle", "screen": "system dialog", "settled": 10, "runs": 10, "median_ms": 508, "min_ms": 448, "max_ms": 546}
+{"check": "settled", "screen": "Instagram feed", "attempts": 1, "ms": 939}
+{"check": "warm_snapshot", "screen": "Instagram feed", "errors": 0, "wrong_screen": 0, "apps": ["com.instagram.android"], "bytes": [2294, 2376], "under_8_kb": true, "tree_lines": [30, 31], "runs": 20, "median_ms": 434, "min_ms": 379, "max_ms": 598}
+{"check": "warm_settle", "screen": "Instagram feed", "settled": 10, "runs": 10, "median_ms": 664, "min_ms": 599, "max_ms": 1953}
+{"check": "phases_fresh_process", "screen": "Instagram feed", "adb devices": 15.0, "adb forward (open and remove)": 29.0, "adb shell (facts)": 151.5, "ping": 7.0, "dump rpc": 106.2, "capture and store": 7.8, "run_total": 324.2}
+{"check": "settled", "screen": "Business Suite home", "attempts": 1, "ms": 931}
+{"check": "warm_snapshot", "screen": "Business Suite home", "errors": 0, "wrong_screen": 0, "apps": ["com.facebook.pages.app"], "bytes": [1559, 1559], "under_8_kb": true, "tree_lines": [21, 21], "runs": 20, "median_ms": 398, "min_ms": 325, "max_ms": 471}
+{"check": "warm_settle", "screen": "Business Suite home", "settled": 10, "runs": 10, "median_ms": 577, "min_ms": 500, "max_ms": 633}
+{"check": "inputs_sent", "inputs": ["action android.settings.SETTINGS", "action android.bluetooth.adapter.action.REQUEST_ENABLE", "key KEYCODE_BACK", "app com.instagram.android", "app com.facebook.pages.app", "key KEYCODE_HOME"]}
