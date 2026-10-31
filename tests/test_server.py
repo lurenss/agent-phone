@@ -135,23 +135,40 @@ def test_a_server_that_runs_but_stays_silent_is_stopped_before_it_is_started_aga
     assert phone.calls[:3] == ["stop", "push", "start"]
 
 
-def test_a_server_that_never_answers_is_refused_after_its_deadline_and_says_why(jar):
+def test_a_server_that_exits_as_it_starts_is_refused_within_seconds_and_names_the_likely_cause(jar):
     phone = FakePhone()
-    phone.answers = False
-    clock = FakeClock()
     original = phone.shell
 
     def start_then_die(script):
         out = original(script)
         if script == lifetime.start_script(900):
-            phone.server, phone.answers = False, False
+            phone.server = False
         return out
 
     phone.shell = start_then_die
+    clock = FakeClock()
     with pytest.raises(Refusal) as raised:
         server_for(phone, jar, clock).start()
     assert raised.value.code is ErrorCode.SERVER_UNAVAILABLE
-    assert "20 s" in raised.value.message and "exited" in raised.value.message
+    assert "exited as it started" in raised.value.message and "UiAutomation client" in raised.value.message
+    assert clock.time < 3, "it did not wait for the deadline"
+
+
+def test_a_server_that_runs_but_never_answers_is_refused_at_the_deadline(jar):
+    phone = FakePhone()
+    original = phone.shell
+
+    def start_but_stay_silent(script):
+        out = original(script)
+        if script == lifetime.start_script(900):
+            phone.answers = False
+        return out
+
+    phone.shell = start_but_stay_silent
+    clock = FakeClock()
+    with pytest.raises(Refusal) as raised:
+        server_for(phone, jar, clock).start()
+    assert "20 s" in raised.value.message and "does not answer" in raised.value.message
     assert lifetime.START_DEADLINE_S <= clock.time <= lifetime.START_DEADLINE_S + lifetime.PING_GAP_S + 0.01
 
 

@@ -5,7 +5,7 @@ Android allows one UiAutomation client per device (A3-4), and a running server k
 accessibility on (A3-11), so it must not outlive its use. The idle limit lives on the phone:
 a watchdog shell kills the server when `ap-lastuse` is older than the limit, so it works while
 the computer sleeps or the cable is pulled (A3-8). Clients touch that file at most every
-`touch_every` seconds, from inside a shell call they make anyway.
+`touch_interval` seconds, from inside a shell call they make anyway.
 
 Every on-device pattern is written with a bracket, as `uia2[.]Main`, because a plain pattern
 matches the calling shell (A3-9). For the same reason no script spells `uia2.Main` or
@@ -17,6 +17,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 from collections.abc import Callable
+from contextlib import suppress
 from pathlib import Path
 from typing import Protocol
 
@@ -36,6 +37,7 @@ STOP_DEADLINE_S = 5.0
 PUSH_TIMEOUT_S = 60.0
 PING_GAP_S = 0.1
 PING_TIMEOUT_S = 2.0
+EXIT_CHECK_POLLS = 10
 SIGNATURES = "pgrep -f 'uia2[.]Main'"
 WATCHERS = "pgrep -f 'ap-watchdo[g]'"
 KILL_WATCHERS = f"for p in $({WATCHERS}); do kill -9 $p; done"
@@ -141,7 +143,9 @@ class Forward:
         return Forward(adb, serial, int(line))
 
     def close(self) -> None:
-        self._adb.run(("-s", self._serial, "forward", "--remove", f"tcp:{self.port}"))
+        """Best effort. A forward that stays behind is harmless, and `server stop` removes it."""
+        with suppress(Refusal):
+            self._adb.run(("-s", self._serial, "forward", "--remove", f"tcp:{self.port}"))
 
 
 class Server:
@@ -170,6 +174,7 @@ class Server:
         forward = Forward.open(self._adb, self._serial)
         try:
             self.ensure(self._rpc_for(forward.port), repair_watchdog=True)
+            self._shell(touch_script(0), "count this use")
         finally:
             forward.close()
         return self.status()
@@ -192,24 +197,44 @@ class Server:
     def ensure(self, rpc: Pinger, repair_watchdog: bool = False) -> None:
         """Leave a server answering on `rpc`. Nothing happens when one already answers, unless
         `repair_watchdog` finds it running without its watchdog."""
-        if rpc.ping():
+        if rpc.ping() or rpc.ping():
             if not repair_watchdog or self.status().watchdog:
                 return
         elif self.status().running:
             self.stop()
         self._push_jar()
         self._shell(start_script(self._idle_limit_s), "start the server")
-        if until(self._clock, lambda: rpc.ping() or None, START_DEADLINE_S, PING_GAP_S) is None:
-            raise Refusal(
+        if self._answers(rpc) is not True:
+            raise self._silent()
+
+    def _silent(self) -> Refusal:
+        if self.status().running:
+            return Refusal(
                 ErrorCode.SERVER_UNAVAILABLE,
                 f"The server on {self._serial} did not answer within {START_DEADLINE_S:g} s of its start. "
-                f"{self._why_silent()}",
+                "Its process is running but does not answer.",
             )
+        return Refusal(
+            ErrorCode.SERVER_UNAVAILABLE,
+            f"The server on {self._serial} exited as it started. "
+            "Another UiAutomation client may hold the device (A3-4).",
+        )
 
-    def _why_silent(self) -> str:
-        if self.status().running:
-            return "Its process is running but does not answer."
-        return "Its process exited. Another UiAutomation client may hold the device (A3-4)."
+    def _answers(self, rpc: Pinger) -> bool | None:
+        """True once `rpc` answers. None at the deadline, or when the server process is gone,
+        which a check every `EXIT_CHECK_POLLS` polls notices long before the deadline."""
+        polls = 0
+
+        def attempt() -> bool | None:
+            nonlocal polls
+            if rpc.ping():
+                return True
+            polls += 1
+            if polls % EXIT_CHECK_POLLS == 0 and not self.status().running:
+                return False
+            return None
+
+        return until(self._clock, attempt, START_DEADLINE_S, PING_GAP_S)
 
     def _push_jar(self) -> None:
         jar = self._jar or bundled_jar()
