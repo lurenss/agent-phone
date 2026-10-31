@@ -61,10 +61,13 @@ def execute(
                 return driver.run(command), driver.serial
         case ServerCommand() as command:
             serial = select_device(hub.connected(), invocation.serial, None)
-            if not command.drives:
-                return server.run(hub.server(serial), command), serial
-            with device_lock(settings, serial, clock, f"server {command.action.value}"):
-                return server.run(hub.server(serial), command), serial
+            try:
+                if not command.drives:
+                    return server.run(hub.server(serial), command), serial
+                with device_lock(settings, serial, clock, f"server {command.action.value}"):
+                    return server.run(hub.server(serial), command), serial
+            except Refusal as refusal:
+                raise PhoneError(Refused.of(refusal), serial) from refusal
 
 
 def main() -> int:

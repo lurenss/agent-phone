@@ -121,3 +121,29 @@ def test_the_lock_is_free_after_a_command_even_when_it_fails(tmp_path):
     assert invoke(["server", "start"], Failing([J7]), tmp_path)[0] == 1
     with SnapshotStore(tmp_path).lock(J7_SERIAL, FakeClock(), 0):
         pass
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["-d", EMULATOR_SERIAL, "server", "start"],
+        ["server", "start", "-d", EMULATOR_SERIAL],
+        ["--device", EMULATOR_SERIAL, "server", "start"],
+    ],
+)
+def test_dash_d_works_before_the_command_and_after_it(tmp_path, argv):
+    hub = FakeHub([J7, Connected(EMULATOR_SERIAL, "emu", ready=True)])
+    code, wire = invoke(argv, hub, tmp_path)
+    assert code == 0 and wire["device"] == EMULATOR_SERIAL
+
+
+def test_a_busy_server_command_still_names_its_device(tmp_path):
+    with SnapshotStore(tmp_path).lock(J7_SERIAL, FakeClock(), 0):
+        code, wire = invoke(["server", "stop"], FakeHub([J7]), tmp_path)
+    assert wire["error"]["code"] == "DEVICE_BUSY" and wire["device"] == J7_SERIAL
+
+
+def test_a_state_root_that_a_command_creates_is_closed_to_other_users(tmp_path):
+    root = tmp_path / "agent-phone-home"
+    invoke(["server", "start"], FakeHub([J7]), root)
+    assert (root.stat().st_mode & 0o777) == 0o700

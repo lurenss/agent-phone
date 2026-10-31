@@ -50,7 +50,9 @@ TargetLike = Target | RefToken | Query | str
 
 
 def device_lock(settings: Settings, serial: Serial, clock: Clock, command: str) -> DeviceLock:
-    """The claim on one device for one command or one Driver session (A3-4)."""
+    """The claim on one device for one command or one Driver session (A3-4). It creates the state
+    root closed to other users, because snapshots under it hold what the screen showed."""
+    settings.state_root.mkdir(mode=0o700, parents=True, exist_ok=True)
     return SnapshotStore(settings.state_root).lock(serial, clock, settings.lock_wait_s, command)
 
 
