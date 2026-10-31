@@ -235,7 +235,9 @@ class PhoneHub(Protocol):
     """The transport that lists devices and opens one. adb for every backend planned so far.
 
     `inspect` reads a device's facts and starts nothing. `server` is the handle for the
-    backend's on-device server, which `open` starts on demand.
+    backend's on-device server, which `open` starts on demand. `first_read` says that the caller
+    reads once, straight after opening, so the backend may take that read while it learns the
+    device's facts. A caller that does anything else first must leave it False.
     """
 
     def connected(self) -> tuple[Connected, ...]: ...
@@ -244,4 +246,4 @@ class PhoneHub(Protocol):
 
     def server(self, serial: Serial) -> BackendServer: ...
 
-    def open(self, serial: Serial) -> Phone: ...
+    def open(self, serial: Serial, first_read: bool = False) -> Phone: ...

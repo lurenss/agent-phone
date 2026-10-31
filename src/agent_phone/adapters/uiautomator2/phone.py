@@ -9,6 +9,7 @@ is never installed (A3-1).
 from __future__ import annotations
 
 from agent_phone.adapters.uiautomator2.adb import Adb, first_line, parse_devices
+from agent_phone.adapters.uiautomator2.first_read import MAX_AGE_S, FirstRead, overlap
 from agent_phone.adapters.uiautomator2.parse import parse_hierarchy
 from agent_phone.adapters.uiautomator2.rpc import JsonRpc, Phase
 from agent_phone.adapters.uiautomator2.server import Forward, Server, touch_interval, touch_script
@@ -34,6 +35,7 @@ class U2Phone:
         server: Server,
         idle_limit_s: int,
         clock: Clock,
+        first: FirstRead | None = None,
     ) -> None:
         self._info = info
         self._rpc = rpc
@@ -42,13 +44,15 @@ class U2Phone:
         self._clock = clock
         self._touch_every = touch_interval(idle_limit_s)
         self._touched = clock.now()
+        self._first = first
 
     def info(self) -> DeviceInfo:
         return self._info
 
     def read(self) -> Screen:
         """`dumpWindowHierarchy(false, 50)`, then `parse.parse_hierarchy`. A read may be repeated
-        freely; it never touches the screen."""
+        freely; it never touches the screen. The first read of a phone opened with a `FirstRead`
+        uses it when it is young enough, and every later read asks the server."""
         self._keepalive()
         return parse_hierarchy(self._dump(), self._info.display, self._info.default_ime)
 
@@ -85,34 +89,46 @@ class U2Phone:
             self._touched = self._clock.now()
 
     def _dump(self) -> str:
-        serial = self._info.identity.serial
-        reply = self._rpc.call(DUMP_METHOD, [False, MAX_DEPTH])
-        if reply.phase is not Phase.ANSWERED:
+        first, self._first = self._first, None
+        if first is not None and self._clock.now() - first.taken_at <= MAX_AGE_S:
+            return first.text()
+        return dump_text(self._rpc, self._info.identity.serial)
+
+
+def dump_text(rpc: JsonRpc, serial: Serial) -> str:
+    """The server's dump of every window, or the `Refusal` that says what went wrong."""
+    reply = rpc.call(DUMP_METHOD, [False, MAX_DEPTH])
+    if reply.phase is not Phase.ANSWERED:
+        raise Refusal(ErrorCode.SERVER_UNAVAILABLE, f"The server on {serial} did not answer the screen read.")
+    if reply.error_message is not None:
+        if ALREADY_REGISTERED in reply.error_message:
             raise Refusal(
-                ErrorCode.SERVER_UNAVAILABLE, f"The server on {serial} did not answer the screen read."
+                ErrorCode.DEVICE_BUSY,
+                f"Another UiAutomation client holds {serial} (A3-4). Wait for it, or stop that tool.",
             )
-        if reply.error_message is not None:
-            if ALREADY_REGISTERED in reply.error_message:
-                raise Refusal(
-                    ErrorCode.DEVICE_BUSY,
-                    f"Another UiAutomation client holds {serial} (A3-4). Wait for it, or stop that tool.",
-                )
-            raise Refusal(
-                ErrorCode.SERVER_UNAVAILABLE,
-                f"The server on {serial} failed the screen read: {reply.error_message[:200]}",
-            )
-        if not isinstance(reply.result, str):
-            raise Refusal(ErrorCode.TRANSPORT, f"The screen read on {serial} did not return text.")
-        if not reply.result.strip():
-            raise Refusal(ErrorCode.NO_SURFACE, "The screen dump is empty. The screen may be off.")
-        return reply.result
+        raise Refusal(
+            ErrorCode.SERVER_UNAVAILABLE,
+            f"The server on {serial} failed the screen read: {reply.error_message[:200]}",
+        )
+    if not isinstance(reply.result, str):
+        raise Refusal(ErrorCode.TRANSPORT, f"The screen read on {serial} did not return text.")
+    if not reply.result.strip():
+        raise Refusal(ErrorCode.NO_SURFACE, "The screen dump is empty. The screen may be off.")
+    return reply.result
 
 
 class U2Hub:
-    def __init__(self, adb: Adb, idle_limit_s: int = 15 * 60, clock: Clock | None = None) -> None:
+    def __init__(
+        self,
+        adb: Adb,
+        idle_limit_s: int = 15 * 60,
+        clock: Clock | None = None,
+        overlap_first_read: bool = True,
+    ) -> None:
         self._adb = adb
         self._idle_limit_s = idle_limit_s
         self._clock = clock or SystemClock()
+        self._overlap = overlap_first_read
 
     def connected(self) -> tuple[Connected, ...]:
         """`adb devices -l`; `unauthorized` and `offline` rows are listed with ready=False."""
@@ -127,18 +143,31 @@ class U2Hub:
     def server(self, serial: Serial) -> Server:
         return Server(serial, self._adb, self._idle_limit_s, self._clock)
 
-    def open(self, serial: Serial) -> U2Phone:
+    def open(self, serial: Serial, first_read: bool = False) -> U2Phone:
         """Forward a free host port to the server port, read the facts (and count this use),
         and start the server if its health check fails, within a deadline. Raises
-        `Refusal(SERVER_UNAVAILABLE)`."""
+        `Refusal(SERVER_UNAVAILABLE)`.
+
+        With `first_read`, the first screen read happens while the facts are read, which a
+        command that reads once asks for (`first_read.py`)."""
         forward = Forward.open(self._adb, serial)
         try:
             touch = touch_script(touch_interval(self._idle_limit_s))
-            info = Shell(serial, self._adb).facts(also=touch)
+            shell = Shell(serial, self._adb)
             rpc = JsonRpc(forward.port, READ_TIMEOUT_S)
             server = self.server(serial)
-            server.ensure(rpc)
-            return U2Phone(info, rpc, forward, server, self._idle_limit_s, self._clock)
+            first = None
+            if first_read and self._overlap:
+                info, first = overlap(
+                    lambda: shell.facts(also=touch),
+                    lambda: server.ensure(rpc),
+                    lambda: dump_text(rpc, serial),
+                    self._clock,
+                )
+            else:
+                info = shell.facts(also=touch)
+                server.ensure(rpc)
+            return U2Phone(info, rpc, forward, server, self._idle_limit_s, self._clock, first)
         except BaseException:
             forward.close()
             raise

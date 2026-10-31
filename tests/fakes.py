@@ -110,6 +110,7 @@ class FakeHub:
         self.inspected: list[Serial] = []
         self.servers: dict[Serial, FakeServer] = {}
         self.phones: list[FakePhone] = []
+        self.first_read_asked: list[bool] = []
         self._screens = tuple(screens)
         self._open_problem = open_problem
 
@@ -125,7 +126,8 @@ class FakeHub:
     def server(self, serial: Serial) -> FakeServer:
         return self.servers.setdefault(serial, FakeServer())
 
-    def open(self, serial: Serial) -> FakePhone:
+    def open(self, serial: Serial, first_read: bool = False) -> FakePhone:
+        self.first_read_asked.append(first_read)
         if self._open_problem is not None:
             raise self._open_problem
         phone = FakePhone(self._infos[serial], *self._screens)

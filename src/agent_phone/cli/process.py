@@ -66,6 +66,7 @@ def execute(
                 clock=clock,
                 command=invocation.name,
                 ref=ref_of(command),
+                first_read=True,
             ) as driver:
                 return driver.run(command), driver.serial
         case ServerCommand() as command:

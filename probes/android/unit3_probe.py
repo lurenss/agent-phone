@@ -2,7 +2,10 @@
 
     uv run python -I probes/android/unit3_probe.py windows
     uv run python -I probes/android/unit3_probe.py freshness
+    uv run python -I probes/android/unit3_probe.py transition
     uv run python -I probes/android/unit3_probe.py bench
+    uv run python -I probes/android/unit3_probe.py overlap
+    uv run python -I probes/android/unit3_probe.py commands
 
 Each subcommand prints one JSON line per result and ends with the list of inputs it sent.
 Every input goes through `send`, which refuses anything outside ALLOWED, so a probe cannot
@@ -617,7 +620,74 @@ def transition(rounds=10):
         send(device, "key", "KEYCODE_HOME")
 
 
+AB_CODE = """
+import io, sys
+from agent_phone.adapters.uiautomator2.adb import SubprocessAdb
+from agent_phone.adapters.uiautomator2.phone import U2Hub
+from agent_phone.cli import process
+from agent_phone.cli.settings import Settings
+settings = Settings.from_environment()
+hub = U2Hub(SubprocessAdb(settings.adb), settings.idle_limit_s, overlap_first_read=sys.argv[1] == "overlap")
+out = io.StringIO()
+code = process.run(["snapshot"], hub, settings, out)
+sys.stdout.write(out.getvalue())
+sys.exit(code)
+"""
+
+
+def ab_run(variant):
+    start = time.perf_counter()
+    done = subprocess.run(
+        [sys.executable, "-I", "-c", AB_CODE, variant],
+        capture_output=True,
+        text=True,
+        env=plain_env(),
+        timeout=60,
+    )
+    ms = (time.perf_counter() - start) * 1000
+    try:
+        wire = json.loads(done.stdout)
+    except ValueError:
+        wire = None
+    return ms, bool(wire and wire["ok"]), wire["data"]["app"] if wire and wire["ok"] else None
+
+
+def overlap_ab(rounds=20):
+    """The first read beside the facts shell against the same CLI run without it, alternating,
+    on the two screens that were over or near 400 ms in A5-4. Both sides are the default
+    configuration of one commit, with the one switch that `U2Hub` has for it."""
+    device = serial()
+    emit(check="host_load", loadavg=os.getloadavg(), cores=os.cpu_count())
+    try:
+        cli("server", "stop")
+        for label, kind, value, package, dialog in SCREENS[2:]:
+            show(device, kind, value)
+            settled_screen(package, dialog)
+            times = {"serial": [], "overlap": []}
+            errors = {"serial": 0, "overlap": 0}
+            wrong = {"serial": 0, "overlap": 0}
+            for _ in range(rounds):
+                for variant in ("serial", "overlap"):
+                    ms, ok, app = ab_run(variant)
+                    times[variant].append(ms)
+                    errors[variant] += not ok
+                    wrong[variant] += ok and app != package
+            for variant in ("serial", "overlap"):
+                emit(
+                    check="first_read_ab",
+                    screen=label,
+                    variant=variant,
+                    errors=errors[variant],
+                    wrong_screen=wrong[variant],
+                    **summary(times[variant]),
+                )
+    finally:
+        cli("server", "stop")
+        send(device, "key", "KEYCODE_HOME")
+
+
 COMMANDS = {
+    "overlap": overlap_ab,
     "windows": windows,
     "freshness": freshness,
     "transition": transition,

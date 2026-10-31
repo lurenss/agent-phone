@@ -242,13 +242,15 @@ def open_phone(
     clock: Clock | None = None,
     command: str = "session",
     ref: RefToken | None = None,
+    first_read: bool = False,
 ) -> Iterator[Driver]:
     """`with open_phone("0a1b2c3d4e5f6a7b", policies=[here / "policy.toml"]) as phone: ...`
 
     The device lock is held until the block ends, and the phone is closed then. `hub`, `settings`
     and `clock` are for tests and for consumers that bring their own; the defaults read the
     environment and use adb. A `ref` names its device through its snapshot, so no `serial` is
-    needed when the ref is given.
+    needed when the ref is given. `first_read` is for a caller that reads once, straight after
+    it opens, as the CLI does (`PhoneHub.open`).
     """
     try:
         settings = settings or Settings.from_environment()
@@ -264,7 +266,7 @@ def open_phone(
             ref_device = SnapshotStore(settings.state_root).device_of(ref.snapshot) if ref else None
             chosen = select_device(hub.connected(), Serial(serial) if serial else None, ref_device)
             stack.enter_context(device_lock(settings, chosen, clock, command))
-            phone = hub.open(chosen)
+            phone = hub.open(chosen, first_read)
             stack.callback(phone.close)
             info = phone.info()
             ctx = Context(
