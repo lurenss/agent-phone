@@ -10,6 +10,8 @@ tap, type, press another key or open another app. SocksTun is never named here.
 """
 
 import json
+import os
+import statistics
 import subprocess
 import sys
 import time
@@ -29,6 +31,9 @@ ALLOWED_KEYS = frozenset({"KEYCODE_BACK", "KEYCODE_HOME"})
 DIALOG_ACTIVITY = "RequestPermissionHelperActivity"
 INPUTS: list[str] = []
 RAW = Path(__file__).resolve().parent / "raw"
+CLI = str(Path(sys.executable).parent / "agent-phone")
+INSTAGRAM = "com.instagram.android"
+SETTLE_S = 2.0
 
 
 def adb(*args, timeout=30):
@@ -158,7 +163,148 @@ def windows():
         emit(check="bluetooth_after", on=shell(device, "settings get global bluetooth_on").strip())
 
 
-COMMANDS = {"windows": windows}
+def plain_env():
+    """The environment of a plain shell: no AGENT_PHONE_* variable, so the CLI runs its defaults
+    (docs/solutions/a-probe-that-sets-every-variable-never-runs-the-default.md)."""
+    return {k: v for k, v in os.environ.items() if not k.startswith("AGENT_PHONE_")}
+
+
+def cli(*args):
+    """One CLI process from spawn to exit: (ms, exit code, bytes printed, envelope or None)."""
+    start = time.perf_counter()
+    done = subprocess.run([CLI, *args], capture_output=True, text=True, env=plain_env(), timeout=60)
+    ms = (time.perf_counter() - start) * 1000
+    try:
+        wire = json.loads(done.stdout)
+    except ValueError:
+        wire = None
+    return ms, done.returncode, len(done.stdout.encode()), wire
+
+
+def summary(values):
+    return {
+        "runs": len(values),
+        "median_ms": round(statistics.median(values)),
+        "min_ms": round(min(values)),
+        "max_ms": round(max(values)),
+    }
+
+
+def foreground(device, package):
+    return wait_until(lambda: (focus(device) or "").startswith(package + "/"), 15)
+
+
+def from_instagram(device, action):
+    """Start `action` from another app, so the transition crosses apps, as an agent's does."""
+    send(device, "app", INSTAGRAM)
+    foreground(device, INSTAGRAM)
+    time.sleep(SETTLE_S)
+    send(device, "action", action)
+
+
+def first_reads(device, title, raw_name):
+    """Open the phone cold, as a CLI call does when the server is down, and read until the active
+    surface shows `title`. Records what the very first read held."""
+    from agent_phone.core.outcome import Refusal
+    from agent_phone.core.snapshot.surface import select_surface
+
+    start = time.perf_counter()
+    phone = open_phone_for_reads(device)
+    try:
+        reads = []
+        while time.perf_counter() - start < 8:
+            screen = phone.read()
+            try:
+                surface = select_surface(screen)
+                shown = surface.window.package
+                on_surface = any(n.attrs.text == title for n in screen.subtree(surface.root))
+            except Refusal:
+                shown, on_surface = None, False
+            reads.append(
+                {
+                    "windows": [(w.package, w.active, len(screen.subtree(w.root))) for w in screen.windows],
+                    "surface": shown,
+                    "title_on_surface": on_surface,
+                    "title_anywhere": any(n.attrs.text == title for n in screen.nodes),
+                }
+            )
+            if len(reads) == 1 and reads[0]["surface"] != "com.android.settings":
+                RAW.mkdir(exist_ok=True)
+                (RAW / f"{raw_name}.raw.xml").write_text(phone._dump())
+            if on_surface and len(reads) > 1:
+                break
+        return reads
+    finally:
+        phone.close()
+
+
+def freshness(rounds=10):
+    """After `am start`, does the next snapshot show the new screen? Three views of one question:
+    what the first read after a cold open holds, `snapshot --settle` with the server already up,
+    and `snapshot --settle` with the server down, which is the CLI's first call of a session."""
+    device = serial()
+    emit(check="host_load", loadavg=os.getloadavg(), cores=os.cpu_count())
+    try:
+        wrong, never = 0, 0
+        for i in range(rounds):
+            cli("server", "stop")
+            from_instagram(device, "android.settings.WIFI_SETTINGS")
+            reads = first_reads(device, "Wi-Fi", "app-starting")
+            first = reads[0]
+            wrong += first["surface"] == "com.android.systemui"
+            never += not any(r["title_on_surface"] for r in reads)
+            emit(check="first_read_after_am_start", round=i, reads=len(reads), **first)
+        emit(
+            check="first_read_summary",
+            rounds=rounds,
+            first_read_surface_was_the_status_bar=wrong,
+            title_never_on_surface=never,
+        )
+        for variant in ("warm", "cold"):
+            shown, wrong_surface, unsettled, times = 0, 0, 0, []
+            for i in range(rounds):
+                if variant == "cold":
+                    cli("server", "stop")
+                action, title = (
+                    ("android.settings.WIFI_SETTINGS", "Wi-Fi")
+                    if i % 2 == 0
+                    else ("android.settings.SETTINGS", "Settings")
+                )
+                from_instagram(device, action)
+                ms, code, size, wire = cli("snapshot", "--settle")
+                data = wire["data"] if wire and wire["ok"] else {}
+                has_title = any(f'text "{title}" [' in line for line in data.get("tree", []))
+                shown += has_title
+                wrong_surface += data.get("app") == "com.android.systemui"
+                unsettled += data.get("settled") != "settled"
+                times.append(ms)
+                emit(
+                    check="settle_after_am_start",
+                    variant=variant,
+                    round=i,
+                    target=title,
+                    ok=bool(wire and wire["ok"]),
+                    error=None if not wire or wire["ok"] else wire["error"]["code"],
+                    app=data.get("app"),
+                    settled=data.get("settled"),
+                    title_shown=has_title,
+                    ms=round(ms),
+                )
+            emit(
+                check="settle_summary",
+                variant=variant,
+                rounds=rounds,
+                title_shown=shown,
+                surface_was_the_status_bar=wrong_surface,
+                not_settled=unsettled,
+                **summary(times),
+            )
+    finally:
+        cli("server", "stop")
+        send(device, "key", "KEYCODE_HOME")
+
+
+COMMANDS = {"windows": windows, "freshness": freshness}
 
 if __name__ == "__main__":
     try:
