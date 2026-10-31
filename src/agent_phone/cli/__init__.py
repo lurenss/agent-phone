@@ -1,2 +1,3 @@
-def main() -> int:
-    raise SystemExit("agent-phone: no commands yet")
+from agent_phone.cli.main import main
+
+__all__ = ["main"]
