@@ -31,11 +31,11 @@ $ agent-phone -d 0a1b2c3d4e5f6a7b snapshot
  "id":"q7m2k","app":"com.android.settings","window":"application","settled":"unchecked",
  "keyboard":false,"dialog":false,"others":[],"truncated":0,
  "tree":[
-  "text \"Settings\"",
+  "text \"Settings\" [63,33,277,114]",
   "@q7m2k:e1 button \"Search\" [1648,0,1775,147]",
   "@q7m2k:e2 button \"Samsung account profile\" [1775,0,1920,147]",
   "@q7m2k:e3 list #dashboard_container (4 rows) [0,179,1920,1080]",
-  "  @q7m2k:e4 button \"Connections\" \"Wi-Fi, Bluetooth, Data usage, Airplane m…\" [0,179,1920,394]",
+  "  @q7m2k:e4 button \"Connections\" \"Wi-Fi, Bluetooth, Data usage, Airplane m…\" focused [0,179,1920,394]",
   "  @q7m2k:e5 button \"Sounds and vibration\" \"Sound mode, Ringtone, Volume\" [0,436,1920,653]",
   "  @q7m2k:e6 button \"Notifications\" \"Block, Allow, Do not disturb\" [0,653,1920,868]",
   "  @q7m2k:e7 button \"Display\" \"Brightness, Blue light filter, Home scre…\" [0,910,1920,1080]"]}}
@@ -71,9 +71,9 @@ Every input spends every ref taken before it. The agent cannot repeat a tap with
 ```
 $ agent-phone -d 0a1b2c3d4e5f6a7b snapshot          # the shade is pulled down
  ... "app":"com.android.systemui","window":"system", ...
-  "@k3x9q:e14 button \"Airplane mode Off.\" [998,203,1114,307]", ...
+  "@k3x9q:e8 button \"Airplane mode Off.\" [998,203,1114,307]", ...
 
-$ agent-phone click @k3x9q:e14 --commit system
+$ agent-phone click @k3x9q:e8 --commit system
 {"v":1,"ok":false,"command":"click","delivery":"not_delivered","retry":"safe",
  "error":{"code":"DENIED","message":"Rule j7.vpn-lockdown denies this input: always-on lockdown VPN, turning off the network takes the phone offline.",
   "details":{"rule":"j7.vpn-lockdown","source":"~/.agent-phone/profiles/j7.toml"}}}

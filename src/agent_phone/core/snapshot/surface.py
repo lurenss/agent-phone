@@ -16,6 +16,7 @@ from dataclasses import dataclass
 
 from agent_phone.core.device import Package
 from agent_phone.core.geometry import Rect
+from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.screen import NodeId, Screen, Window, WindowId, WindowKind
 
 
@@ -45,12 +46,25 @@ def select_surface(screen: Screen, window: WindowId | None = None, root: NodeId 
     was asked for.
 
     `dialog` is true when the surface window does not cover the display. The policy engine
-    reads a dialog's whole text as the context of its buttons (`policy/engine.py`).
+    reads a dialog's whole text as the context of its buttons (`policy/engine.py`). A `root`
+    given without a `window` describes the window that holds it.
     """
-    # TODO:
-    #   chosen = screen.windows[window] if window is not None else screen.active_window()
-    #   if chosen is None: Refusal(NO_SURFACE)
-    #   keyboard = any(w.kind is INPUT_METHOD for w in screen.windows)
-    #   dialog = not chosen.bounds.covers(Rect(0, 0, display.width, display.height))
-    #   others = every other window, in dump order
-    raise NotImplementedError
+    if window is None and root is not None:
+        window = screen.node(root).window
+    chosen = screen.windows[window] if window is not None else screen.active_window()
+    if chosen is None:
+        raise Refusal(ErrorCode.NO_SURFACE, "No window has input focus. The screen may be off.")
+    display = Rect(0, 0, screen.display.width, screen.display.height)
+    others = tuple(
+        OtherWindow(w.id, w.package, w.kind, w.bounds, len(screen.subtree(w.root)))
+        for w in screen.windows
+        if w.id != chosen.id
+    )
+    return Surface(
+        screen=screen,
+        window=chosen,
+        root=root if root is not None else chosen.root,
+        keyboard=any(w.kind is WindowKind.INPUT_METHOD for w in screen.windows),
+        dialog=not chosen.bounds.covers(display),
+        others=others,
+    )

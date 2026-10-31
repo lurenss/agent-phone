@@ -1,0 +1,8 @@
+text "Settings" [63,33,277,114]
+@t0000:e1 button "Search" [1648,0,1775,147]
+@t0000:e2 button "Samsung account profile" [1775,0,1920,147]
+@t0000:e3 list #dashboard_container (4 rows) [0,179,1920,1080]
+  @t0000:e4 button "Connections" "Wi-Fi, Bluetooth, Data usage, Airplane m…" focused [0,179,1920,394]
+  @t0000:e5 button "Sounds and vibration" "Sound mode, Ringtone, Volume" [0,436,1920,653]
+  @t0000:e6 button "Notifications" "Block, Allow, Do not disturb" [0,653,1920,868]
+  @t0000:e7 button "Display" "Brightness, Blue light filter, Home scre…" [0,910,1920,1080]
