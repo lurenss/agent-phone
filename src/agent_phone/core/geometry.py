@@ -45,13 +45,23 @@ class Rect:
         return self.right <= self.left or self.bottom <= self.top
 
     def contains(self, p: Point) -> bool:
-        raise NotImplementedError
+        return self.left <= p.x < self.right and self.top <= p.y < self.bottom
 
     def center(self) -> Point:
-        raise NotImplementedError
+        return Point((self.left + self.right) // 2, (self.top + self.bottom) // 2)
 
     def intersect(self, other: Rect) -> Rect:
-        raise NotImplementedError
+        return Rect(
+            max(self.left, other.left),
+            max(self.top, other.top),
+            min(self.right, other.right),
+            min(self.bottom, other.bottom),
+        )
 
     def covers(self, other: Rect) -> bool:
-        raise NotImplementedError
+        return (
+            self.left <= other.left
+            and self.top <= other.top
+            and self.right >= other.right
+            and self.bottom >= other.bottom
+        )

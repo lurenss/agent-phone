@@ -9,12 +9,13 @@ hit tests descend `children`. Nothing after `build` needs a map, an index or a c
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 from typing import NewType
 
 from agent_phone.core.device import Package
 from agent_phone.core.geometry import Point, Rect, Rotation, Size
+from agent_phone.core.outcome import ErrorCode, Refusal
 
 NodeId = NewType("NodeId", int)
 WindowId = NewType("WindowId", int)
@@ -125,9 +126,24 @@ class Screen:
     def build(
         display: Size, rotation: Rotation, windows: Sequence[WindowSpec], toasts: Sequence[str] = ()
     ) -> Screen:
-        # TODO: one pre-order walk per window: assign ids, depth, parent, children, and set
-        # `end` on the way back up. Refuse (INTERNAL) if two windows claim `active`.
-        raise NotImplementedError
+        if sum(spec.active for spec in windows) > 1:
+            raise Refusal(ErrorCode.INTERNAL, "The backend reported more than one active window.")
+        nodes: list[Node] = []
+
+        def walk(spec: NodeSpec, window: WindowId, parent: NodeId | None, depth: int) -> NodeId:
+            id = NodeId(len(nodes))
+            nodes.append(Node(id, window, parent, id, depth, (), spec.attrs))
+            children = tuple(walk(child, window, id, depth + 1) for child in spec.children)
+            nodes[id] = replace(nodes[id], end=NodeId(len(nodes)), children=children)
+            return id
+
+        built = []
+        for i, spec in enumerate(windows):
+            root = walk(spec.root, WindowId(i), None, 0)
+            built.append(
+                Window(WindowId(i), spec.package, spec.kind, spec.bounds, spec.active, spec.layer, root)
+            )
+        return Screen(display, rotation, tuple(built), tuple(nodes), tuple(toasts))
 
     def node(self, id: NodeId) -> Node:
         return self.nodes[id]
@@ -136,13 +152,17 @@ class Screen:
         return self.nodes[id : self.nodes[id].end]
 
     def ancestors(self, id: NodeId) -> Iterator[Node]:
-        raise NotImplementedError
+        """Nearest first, the node itself excluded."""
+        parent = self.nodes[id].parent
+        while parent is not None:
+            yield self.nodes[parent]
+            parent = self.nodes[parent].parent
 
     def window_of(self, id: NodeId) -> Window:
-        raise NotImplementedError
+        return self.windows[self.nodes[id].window]
 
     def active_window(self) -> Window | None:
-        raise NotImplementedError
+        return next((w for w in self.windows if w.active), None)
 
     def windows_at(self, p: Point) -> tuple[Window, ...]:
-        raise NotImplementedError
+        return tuple(w for w in self.windows if w.bounds.contains(p))

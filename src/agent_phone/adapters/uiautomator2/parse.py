@@ -15,8 +15,12 @@ type, layer or focus attribute. What this module infers, and from what:
 
 from __future__ import annotations
 
+import re
+import xml.etree.ElementTree as ET
+
 from agent_phone.core.device import Package
 from agent_phone.core.geometry import Rect, Rotation, Size
+from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.screen import Attrs, Flag, NodeSpec, Screen, WindowKind, WindowSpec
 
 PLATFORM_UI: frozenset[str] = frozenset({"android", "com.android.systemui"})
@@ -38,24 +42,79 @@ BOOL_FLAGS: dict[str, Flag] = {
 }
 
 
+EDITABLE_CLASSES = frozenset({"EditText", "AutoCompleteTextView"})
+"""The dump has no `editable` attribute, so these class simple names stand in for it."""
+
+BOUNDS = re.compile(r"\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]")
+
+
 def parse_hierarchy(xml: str, natural_display: Size, ime_package: Package | None) -> Screen:
     """Raise `Refusal(TRANSPORT)` on XML that does not parse, `Refusal(NO_SURFACE)` on an
     empty hierarchy (screen off). `natural_display` is swapped for rotation 1 and 3, as the
     landscape fixtures (`settings-home.xml`, `notification-shade.xml`) need."""
-    raise NotImplementedError
+    try:
+        hierarchy = ET.fromstring(xml)
+    except ET.ParseError as error:
+        raise Refusal(ErrorCode.TRANSPORT, f"The screen dump is not valid XML: {error}.") from error
+    try:
+        rotation = Rotation(int(hierarchy.get("rotation", "0")))
+    except ValueError as error:
+        raise Refusal(
+            ErrorCode.TRANSPORT, f"The screen dump has rotation {hierarchy.get('rotation')!r}."
+        ) from error
+    roots = hierarchy.findall("node")
+    if not roots:
+        raise Refusal(ErrorCode.NO_SURFACE, "The screen dump has no window. The screen may be off.")
+    display = natural_display
+    if rotation in (Rotation.LEFT, Rotation.RIGHT):
+        display = Size(natural_display.height, natural_display.width)
+    windows = [window_spec(parse_node(root), order, ime_package) for order, root in enumerate(roots)]
+    return Screen.build(display, rotation, windows)
+
+
+def parse_node(element: ET.Element) -> NodeSpec:
+    return NodeSpec(
+        parse_attrs(element.attrib), tuple(parse_node(child) for child in element.findall("node"))
+    )
 
 
 def parse_bounds(text: str) -> Rect:
     """`[0,63][1080,1920]` -> Rect(0, 63, 1080, 1920)."""
-    raise NotImplementedError
+    match = BOUNDS.fullmatch(text)
+    if match is None:
+        raise Refusal(ErrorCode.TRANSPORT, f"The screen dump has bounds {text!r}.")
+    left, top, right, bottom = (int(group) for group in match.groups())
+    return Rect(left, top, right, bottom)
 
 
 def parse_attrs(attrib: dict[str, str]) -> Attrs:
-    # TODO: EDITABLE when class simple name is EditText or AutoCompleteTextView, because the
-    # dump has no `editable` attribute; drawing_order None when absent; hint "" when absent (API < 26).
-    raise NotImplementedError
+    class_name = attrib.get("class", "")
+    flags = {flag for name, flag in BOOL_FLAGS.items() if attrib.get(name) == "true"}
+    if class_name.rpartition(".")[2] in EDITABLE_CLASSES:
+        flags.add(Flag.EDITABLE)
+    drawing_order = attrib.get("drawing-order")
+    if drawing_order is not None and not drawing_order.lstrip("-").isdigit():
+        raise Refusal(ErrorCode.TRANSPORT, f"The screen dump has drawing-order {drawing_order!r}.")
+    return Attrs(
+        class_name=class_name,
+        package=attrib.get("package", ""),
+        resource_id=attrib.get("resource-id", ""),
+        text=attrib.get("text", ""),
+        content_desc=attrib.get("content-desc", ""),
+        hint=attrib.get("hint", ""),
+        bounds=parse_bounds(attrib.get("bounds", "")),
+        flags=frozenset(flags),
+        drawing_order=int(drawing_order) if drawing_order is not None else None,
+        native_id=None,
+    )
 
 
 def window_spec(root: NodeSpec, order: int, ime_package: Package | None) -> WindowSpec:
-    _ = (Rotation, WindowKind)
-    raise NotImplementedError
+    package = Package(root.attrs.package)
+    if ime_package is not None and package == ime_package:
+        kind = WindowKind.INPUT_METHOD
+    elif package in PLATFORM_UI:
+        kind = WindowKind.SYSTEM
+    else:
+        kind = WindowKind.APPLICATION
+    return WindowSpec(package, kind, root.attrs.bounds, active=order == 0, layer=None, root=root)
