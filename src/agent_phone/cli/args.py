@@ -10,7 +10,7 @@ from typing import NoReturn
 
 from agent_phone.core.commands.devices import DevicesCommand
 from agent_phone.core.commands.server import ServerAction, ServerCommand
-from agent_phone.core.commands.snapshot import SnapshotCommand
+from agent_phone.core.commands.snapshot import SETTLE_TIMEOUT_MS, SnapshotCommand
 from agent_phone.core.device import Serial
 from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.snapshot.view import Mode
@@ -28,6 +28,12 @@ class Invocation:
 class Parser(argparse.ArgumentParser):
     def error(self, message: str) -> NoReturn:
         raise Refusal(ErrorCode.INVALID_ARGS, f"{message}. Run agent-phone --help for the commands.")
+
+
+def milliseconds(text: str) -> int:
+    if not text.isdigit():
+        raise argparse.ArgumentTypeError(f"{text!r} is not a whole number of milliseconds")
+    return int(text)
 
 
 def build() -> Parser:
@@ -53,6 +59,18 @@ def build() -> Parser:
         (Mode.FULL, "every node of the window, including the ones with no words"),
     ):
         modes.add_argument(f"--{mode.value}", dest="mode", action="store_const", const=mode.value, help=about)
+    snapshot.add_argument(
+        "--settle",
+        action="store_true",
+        help="read until two reads in a row print the same lines, and say whether they did",
+    )
+    snapshot.add_argument(
+        "--timeout-ms",
+        type=milliseconds,
+        default=SETTLE_TIMEOUT_MS,
+        metavar="N",
+        help=f"how long --settle may take before it gives up (default {SETTLE_TIMEOUT_MS})",
+    )
     server = commands.add_parser("server", help="control the on-device server that reads the screen")
     actions = server.add_subparsers(dest="action", metavar="action", required=True, parser_class=Parser)
     actions.add_parser("start", parents=[after], help="start the server, or confirm it runs")
@@ -67,7 +85,9 @@ def parse_args(argv: Sequence[str]) -> Invocation:
         case "devices":
             command: Command = DevicesCommand()
         case "snapshot":
-            command = SnapshotCommand(mode=Mode(parsed.mode))
+            command = SnapshotCommand(
+                mode=Mode(parsed.mode), settle=parsed.settle, timeout_ms=parsed.timeout_ms
+            )
         case "server":
             command = ServerCommand(ServerAction(parsed.action))
     return Invocation(parsed.command, Serial(parsed.device) if parsed.device else None, command)

@@ -30,7 +30,7 @@ from agent_phone.cli.settings import Settings
 from agent_phone.core.act.intent import Direction
 from agent_phone.core.act.ledger import Ledger
 from agent_phone.core.commands import snapshot
-from agent_phone.core.commands.snapshot import SnapshotCommand
+from agent_phone.core.commands.snapshot import SETTLE_TIMEOUT_MS, SnapshotCommand
 from agent_phone.core.context import Context
 from agent_phone.core.device import Serial, select_device
 from agent_phone.core.outcome import Acted, ErrorCode, Outcome, Read, Refusal, Refused
@@ -84,9 +84,13 @@ class Driver:
                 return snapshot.run(self._ctx, command)
 
     def snapshot(
-        self, mode: Mode = Mode.COMPACT, settle: bool = False, root: RefToken | None = None
+        self,
+        mode: Mode = Mode.COMPACT,
+        settle: bool = False,
+        root: RefToken | None = None,
+        timeout_ms: int = SETTLE_TIMEOUT_MS,
     ) -> Snapshot:
-        outcome = self.run(SnapshotCommand(mode, settle, None, root))
+        outcome = self.run(SnapshotCommand(mode, settle, None, root, timeout_ms))
         if isinstance(outcome, Read) and isinstance(outcome.payload, Snapshot):
             return outcome.payload
         raise PhoneError(outcome)
