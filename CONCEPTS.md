@@ -1,6 +1,6 @@
 # Concepts
 
-The words agent-phone's code, docs and tests use, each with the type that owns it. Read it before `docs/design/core-types.md`, which explains why the types have their shape. Some entries describe behavior that later units of `docs/plan.md` build, such as the `wait` command. Those entries describe the types in `core/` as the design doc lays them out.
+The words agent-phone's code, docs and tests use, each with the type that owns it. Read it before `docs/design/core-types.md`, which explains why the types have their shape. Some entries describe behavior that later units of `docs/plan.md` build. Those entries describe the types in `core/` as the design doc lays them out.
 
 ## Reading the screen
 
@@ -157,6 +157,16 @@ One input counter per device (`Ledger`, `core/act/ledger.py`). Every input spend
 ### Outcome and disposition
 
 What a command produced (`Outcome`, `core/outcome.py`): `Refused`, `Acted` or `Read`. The outcome type decides the `delivery` disposition, and `retry` follows from it. `not_delivered` is the only safe retry. `docs/json-output.md` lists the values.
+
+## Waiting
+
+### Wait condition
+
+One thing a wait checks on a read (`Predicate`, `core/wait/predicate.py`): `Present` and `Gone` match a `Query` against the lines of the active window's compact view, as `find` does, `Foreground` names the package of the focused window, and `Settled` says that two reads in a row printed the same lines. Each is decided from the previous and the current read, and a read with no active window or no line decides neither `Present` nor `Gone`. `wait` and `--wait-for` build the same conditions from the same query syntax.
+
+### Wait
+
+The read-only command that reads the screen until every condition holds on one read (`wait`, `core/commands/wait.py`). It returns the snapshot of that read, recorded at the current epoch, so it is also the observation that the next input needs. A timeout is `TIMEOUT` with the last read's snapshot in `details.after`. It sends nothing, so it spends no permit and its retry is safe. `--wait-for` on an input runs the same loop (`observe`, `core/wait/observe.py`) after the input and turns what it saw into the input's `delivery`. *Avoid:* "auto-wait", which is what an input does before it is sent.
 
 ## Devices and the server
 

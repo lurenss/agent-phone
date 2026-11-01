@@ -184,3 +184,15 @@ def test_the_example_refused_commit_is_what_the_code_prints(tmp_path):
     _, taken = invoke(["snapshot"], hub, tmp_path)
     code, wire = invoke(["click", f"@{taken['data']['id']}:e1"], hub, tmp_path)
     assert code == 1 and wire == example
+
+
+def test_the_example_wait_timeout_is_what_the_code_prints_for_its_fixture(tmp_path):
+    example = next(block for block in json_blocks() if block["command"] == "wait")
+    assert set(example["error"]["details"]["after"]) == set(first_column("## Snapshot payload"))
+    hub = FakeHub(
+        [Connected(Serial(example["device"]), "SM_J730F", True)], screens=[fixture_screen("settings-home")]
+    )
+    code, wire = invoke(["wait", "--for", "name=Brightness", "--timeout-ms", "200"], hub, tmp_path)
+    id = wire["error"]["details"]["after"]["id"]
+    printed = json.dumps(wire, ensure_ascii=False).replace(id, example["error"]["details"]["after"]["id"])
+    assert code == 1 and json.loads(printed) == example

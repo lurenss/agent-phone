@@ -33,7 +33,7 @@ The exit code is 0 when `ok` is true, 1 for an error envelope, and 2 when the ar
 | `code` | string | One of the [error codes](#error-codes). |
 | `message` | string | One or two sentences for the agent, naming what failed and what to use instead. |
 | `hint` | string or null | A recovery step for codes whose recovery the message does not make obvious, otherwise null. |
-| `details` | object | Machine-readable facts for the code, such as `reason` for `STALE_REF` or `source`, `table` and `field` for `POLICY_INVALID`. |
+| `details` | object | Machine-readable facts for the code, such as `reason` for `STALE_REF`, `source`, `table` and `field` for `POLICY_INVALID`, or `after`, a [snapshot](#snapshot-payload), for the `TIMEOUT` of `wait`. |
 
 ## Delivery
 
@@ -70,7 +70,7 @@ The exit code is 0 when `ok` is true, 1 for an error envelope, and 2 when the ar
 | `COMMIT_REFUSED` | The input would commit an effect that `--commit` did not grant. `details` lists the `effects`, the `granted` effects and the `evidence`. |
 | `DENIED` | A deny rule forbids the input whatever the caller grants. `details` names the `rule`, its `source` and the `evidence`. A device profile's protected package is denied this way. A deny rule reads a tap, a set-text, a scroll and Enter, and never back, home or recents. |
 | `LOCALE_UNSUPPORTED` | The device language has no policy rules, so input that commit rules read, a tap or Enter, cannot be judged. |
-| `TIMEOUT` | A wait reached its deadline. |
+| `TIMEOUT` | A wait reached its deadline. For `wait`, nothing was sent, `delivery` is `not_delivered`, and `details.after` is the snapshot of the last read, or null when that read had no window to describe. For `--wait-for` on an input, the input went out, `delivery` says how far, and `data.after` is that snapshot. |
 | `TRANSPORT` | adb or the server failed, or the device returned output that does not parse. |
 | `ACTION_FAILED` | The input went out, and reading the screen back contradicts what was asked, such as a field that does not hold the text `set-text` sent. |
 | `INTERNAL` | A defect in agent-phone. |
@@ -188,6 +188,34 @@ The exit code is 0 when `ok` is true, 1 for an error envelope, and 2 when the ar
 | `checked` | `true` when the element is checked. It is `false` for an element that cannot be checked. |
 | `focused` | `true` when the element has input focus. |
 | `selected` | `true` when the element is selected. |
+
+## Wait payload
+
+`agent-phone wait [--for QUERY]... [--gone QUERY]... [--app PACKAGE] [--settled] [--timeout-ms N]` reads the screen until every condition holds on one read. `--for` and `--gone` take the query that `--wait-for` and `--wait-for-gone` take, `--app` holds when the window that has focus belongs to that package, and `--settled` holds when two reads in a row print the same lines. At least one condition is required, or the command is `INVALID_ARGS` and reads nothing. The default timeout is 10,000 ms.
+
+`wait` sends no input, so it is a read: it never has a permit, and running it again is safe.
+
+- When the conditions hold, the result is `ok: true` with no `delivery` and no `retry`, like every read. `data` is the [snapshot payload](#snapshot-payload) of the read they held on, recorded at the current epoch, so its refs serve the next command and it is the observation that the next input needs. `settled` is `settled` when `--settled` was asked and `unchecked` otherwise.
+- When the deadline comes first, the result is an error with `code` `TIMEOUT`, `delivery` `not_delivered` and `retry` `safe`. `error.details.after` is the snapshot of the last read, recorded the same way, so the agent sees what the screen showed instead. Its `settled` is `unsettled` when `--settled` was asked.
+
+```json
+{"v":1,"ok":false,"command":"wait","device":"0a1b2c3d4e5f6a7b","delivery":"not_delivered","retry":"safe",
+ "error":{"code":"TIMEOUT","message":"present name=\"Brightness\" did not hold within 200 ms.","hint":null,
+  "details":{"after":{
+   "id":"q7m2k","app":"com.android.settings","window":"application","mode":"compact","settled":"unchecked",
+   "keyboard":false,"dialog":false,"others":[],"toasts":[],"truncated":0,
+   "tree":[
+    "text \"Settings\" [63,33,277,114]",
+    "@q7m2k:e1 button \"Search\" [1648,0,1775,147]",
+    "@q7m2k:e2 button \"Samsung account profile\" [1775,0,1920,147]",
+    "@q7m2k:e3 list #dashboard_container (4 rows) [0,179,1920,1080]",
+    "  @q7m2k:e4 button \"Connections\" \"Wi-Fi, Bluetooth, Data usage, Airplane m…\" focused [0,179,1920,394]",
+    "  @q7m2k:e5 button \"Sounds and vibration\" \"Sound mode, Ringtone, Volume\" [0,436,1920,653]",
+    "  @q7m2k:e6 button \"Notifications\" \"Block, Allow, Do not disturb\" [0,653,1920,868]",
+    "  @q7m2k:e7 button \"Display\" \"Brightness, Blue light filter, Home scre…\" [0,910,1920,1080]"]}}}}
+```
+
+Every condition has to hold on the same read. `--for` holds when a line of the active window matches, and `--gone` holds when the window prints lines and none matches, so `--gone` for something that never showed holds at once. A read with no active window, or with no line, such as the blank frame between two screens, holds neither. A read that fails, such as `NO_SURFACE` for a screen that is off, ends the command with that error and not with `TIMEOUT`.
 
 ## Input payload
 
