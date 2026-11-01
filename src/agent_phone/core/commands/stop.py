@@ -19,7 +19,8 @@ from agent_phone.core.wait.predicate import Predicate
 class StopCommand:
     package: Package
     wait_for: tuple[Predicate, ...] = ()
+    timeout_ms: int = 5000
 
 
 def run(ctx: Context, cmd: StopCommand) -> Outcome:
-    return act(ctx, Request(Stop(cmd.package), wait_for=cmd.wait_for))
+    return act(ctx, Request(Stop(cmd.package), wait_for=cmd.wait_for, timeout_ms=cmd.timeout_ms))

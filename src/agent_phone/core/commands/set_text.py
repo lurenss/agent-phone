@@ -1,6 +1,7 @@
 """`agent-phone set-text <target> <text> [--wait-for ...]`. Typing commits nothing; the engine
-judges the tap or key that submits it. The field is read back, so a delivered set-text without
-a contradiction is VERIFIED (except for secret fields, which are never echoed)."""
+judges the tap or key that submits it. The backend sets the text through ACTION_SET_TEXT and
+sends no touch (A2-12). The field is read back, so a delivered set-text without a contradiction
+is VERIFIED (except for secret fields, which are never echoed)."""
 
 from __future__ import annotations
 
@@ -19,7 +20,8 @@ class SetTextCommand:
     target: Target
     text: str
     wait_for: tuple[Predicate, ...] = ()
+    timeout_ms: int = 5000
 
 
 def run(ctx: Context, cmd: SetTextCommand) -> Outcome:
-    return act(ctx, Request(Fill(cmd.target, cmd.text), wait_for=cmd.wait_for))
+    return act(ctx, Request(Fill(cmd.target, cmd.text), wait_for=cmd.wait_for, timeout_ms=cmd.timeout_ms))

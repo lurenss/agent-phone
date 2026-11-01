@@ -12,10 +12,10 @@ from support import FakeClock
 
 from agent_phone.cli.process import run
 from agent_phone.cli.settings import Settings
-from agent_phone.core.device import BootId, Connected, DeviceIdentity, DeviceInfo, Package, Serial
+from agent_phone.core.device import BootId, Capability, Connected, DeviceIdentity, DeviceInfo, Package, Serial
 from agent_phone.core.geometry import Size
 from agent_phone.core.outcome import ErrorCode, Refusal
-from agent_phone.core.phone import ServerStatus
+from agent_phone.core.phone import Ack, Delivery, Permit, Sent, ServerStatus, SetClipboard
 from agent_phone.core.screen import Screen
 from agent_phone.core.wait.clock import Clock
 
@@ -24,7 +24,13 @@ J7_BOOT = BootId("8d3f6c1e-0b5a-4c2e-9f1d-2a7b3c4d5e6f")
 EMULATOR_SERIAL = Serial("emulator-5554")
 
 
-def info_for(serial: Serial, model: str = "SM-J730F", boot: BootId = J7_BOOT) -> DeviceInfo:
+def info_for(
+    serial: Serial,
+    model: str = "SM-J730F",
+    boot: BootId = J7_BOOT,
+    locale: str = "en-US",
+    capabilities: frozenset[Capability] = frozenset({Capability.CLIPBOARD, Capability.SCREENSHOT}),
+) -> DeviceInfo:
     return DeviceInfo(
         DeviceIdentity(serial, boot),
         model,
@@ -32,9 +38,9 @@ def info_for(serial: Serial, model: str = "SM-J730F", boot: BootId = J7_BOOT) ->
         "armeabi-v7a",
         Size(1080, 1920),
         420,
-        "en-US",
+        locale,
         Package("com.sec.android.inputmethod"),
-        frozenset(),
+        capabilities,
     )
 
 
@@ -61,19 +67,33 @@ class FakeServer:
 
 class FakePhone:
     """A device that shows the screens it is given, one per read, the last one forever. A screen
-    that is a Refusal is raised instead, like a backend that cannot read."""
+    that is a Refusal is raised instead, like a backend that cannot read. Each input it receives
+    is kept in `permits`. A delivered input switches to the `after_input` screens, when given."""
 
-    def __init__(self, info: DeviceInfo, *screens: Screen | Refusal) -> None:
+    def __init__(
+        self,
+        info: DeviceInfo,
+        *screens: Screen | Refusal,
+        after_input: Sequence[Screen | Refusal] = (),
+        delivery: Delivery | None = None,
+        clipboard: str | None = "",
+    ) -> None:
         self._info = info
-        self._screens = screens
+        self._screens = tuple(screens)
+        self._after_input = tuple(after_input)
+        self._delivery = delivery or Sent(Ack.ACKNOWLEDGED, "fake")
+        self._at = 0
         self.reads = 0
         self.closed = False
+        self.permits: list[Permit] = []
+        self.clip = clipboard
 
     def info(self) -> DeviceInfo:
         return self._info
 
     def read(self) -> Screen:
-        shown = self._screens[min(self.reads, len(self._screens) - 1)]
+        shown = self._screens[min(self._at, len(self._screens) - 1)]
+        self._at += 1
         self.reads += 1
         if isinstance(shown, Refusal):
             raise shown
@@ -83,16 +103,22 @@ class FakePhone:
         self.closed = True
 
     def state(self) -> object:
-        raise AssertionError("unit 2 asks for no device state")
+        raise AssertionError("no command asks for device state yet")
 
-    def inject(self, permit: object) -> object:
-        raise AssertionError("unit 2 sends no input")
+    def inject(self, permit: Permit) -> Delivery:
+        self.permits.append(permit)
+        if isinstance(self._delivery, Sent):
+            if self._after_input:
+                self._screens, self._at = self._after_input, 0
+            if isinstance(permit.action, SetClipboard):
+                self.clip = permit.action.text
+        return self._delivery
 
-    def clipboard(self) -> str:
-        raise AssertionError("unit 2 reads no clipboard")
+    def clipboard(self) -> str | None:
+        return self.clip
 
     def screenshot(self) -> bytes:
-        raise AssertionError("unit 2 takes no screenshot")
+        return b"\xff\xd8 a fake jpeg"
 
 
 class FakeHub:
@@ -103,6 +129,8 @@ class FakeHub:
         problems: Mapping[Serial, str] | None = None,
         screens: Sequence[Screen | Refusal] = (),
         open_problem: Refusal | None = None,
+        after_input: Sequence[Screen | Refusal] = (),
+        delivery: Delivery | None = None,
     ) -> None:
         self._connected = tuple(connected)
         self._infos = dict(infos or {d.serial: info_for(d.serial) for d in connected if d.ready})
@@ -113,6 +141,8 @@ class FakeHub:
         self.first_read_asked: list[bool] = []
         self._screens = tuple(screens)
         self._open_problem = open_problem
+        self._after_input = tuple(after_input)
+        self._delivery = delivery
 
     def connected(self) -> tuple[Connected, ...]:
         return self._connected
@@ -130,7 +160,9 @@ class FakeHub:
         self.first_read_asked.append(first_read)
         if self._open_problem is not None:
             raise self._open_problem
-        phone = FakePhone(self._infos[serial], *self._screens)
+        phone = FakePhone(
+            self._infos[serial], *self._screens, after_input=self._after_input, delivery=self._delivery
+        )
         self.phones.append(phone)
         return phone
 

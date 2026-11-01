@@ -7,16 +7,26 @@ name, and in the text of a child it owns, and each placement must give the row's
 import tomllib
 
 import pytest
-from support import ROOT, node, screen_of
+from fakes import J7_SERIAL, FakePhone, info_for
+from support import ROOT, FakeClock, node, screen_of
 
 from agent_phone.cli.driver import DEFAULT_POLICY
+from agent_phone.core.act.act import act
 from agent_phone.core.act.hit import context_labels, plan_point, receiver_at
+from agent_phone.core.act.intent import Click, Request
+from agent_phone.core.act.ledger import Ledger
+from agent_phone.core.context import Context
 from agent_phone.core.device import Package
 from agent_phone.core.labels import LabelField, surface_of, words
+from agent_phone.core.outcome import Acted, ErrorCode, Refused
 from agent_phone.core.phone import NodeAddress, Tap
 from agent_phone.core.policy.engine import Clear, Commits, Site, classify
 from agent_phone.core.policy.rules import CommitRule, Effect, merge, parse_policy
+from agent_phone.core.refs.resolve import RefTarget
+from agent_phone.core.refs.store import SnapshotStore
 from agent_phone.core.screen import Screen
+from agent_phone.core.snapshot.capture import capture
+from agent_phone.core.snapshot.snapshot import SettleState
 
 TABLE = tomllib.loads((ROOT / "tests" / "policy" / "commit_table.toml").read_text(encoding="utf-8"))["case"]
 POLICY = merge((parse_policy(tomllib.loads(DEFAULT_POLICY.read_text(encoding="utf-8")), "default.toml"),))
@@ -94,3 +104,19 @@ def test_the_table_has_a_row_for_every_phrase_of_the_default_policy():
 def test_the_table_lists_only_effects_that_exist():
     known = {effect.value for effect in Effect}
     assert all(set(case["effects"]) <= known for case in TABLE)
+
+
+@pytest.mark.parametrize(("label", "placement", "effects"), CASES)
+def test_a_click_on_any_placement_of_a_commit_sends_nothing(tmp_path, label, placement, effects):
+    info = info_for(J7_SERIAL)
+    phone = FakePhone(info, tapped(label, placement))
+    ctx = Context(
+        phone, info, None, POLICY, SnapshotStore(tmp_path), Ledger(tmp_path, info.identity), FakeClock()
+    )
+    taken = capture(ctx, phone.read(), settled=SettleState.SETTLED)
+    outcome = act(ctx, Request(Click(RefTarget(taken.ref(1)))))
+    if effects:
+        assert isinstance(outcome, Refused) and outcome.code is ErrorCode.COMMIT_REFUSED
+        assert set(outcome.details["effects"]) == effects and phone.permits == []
+    else:
+        assert isinstance(outcome, Acted) and len(phone.permits) == 1

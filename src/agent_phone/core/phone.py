@@ -13,13 +13,14 @@ persisted ledger spend, in that order, and through one call site.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Protocol
 
 from agent_phone.core.device import Connected, DeviceIdentity, DeviceInfo, DeviceState, Package, Power, Serial
 from agent_phone.core.geometry import Point, Rect
-from agent_phone.core.outcome import ErrorCode
+from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.screen import Screen
 
 if TYPE_CHECKING:
@@ -112,8 +113,46 @@ class Stop:
 
 @dataclass(frozen=True, slots=True)
 class OpenUri:
+    """A link, opened with the VIEW action, or an intent URI that names only an action and
+    optionally a package (`intent_of`). Nothing else an intent URI can carry, such as a
+    component, extras or flags, is accepted."""
+
     uri: str
     package: Package | None
+
+
+INTENT_PREFIX = "intent:#Intent;"
+INTENT_KEYS = frozenset({"action", "package"})
+NAME = re.compile(r"[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+")
+
+
+def intent_of(open: OpenUri) -> tuple[str, Package | None] | None:
+    """The action and package of an intent URI, or None for a link. Raises `Refusal(INVALID_ARGS)`
+    for a URI with no scheme, and for an intent URI with data or any key but action and package."""
+    scheme, colon, _ = open.uri.partition(":")
+    if not colon or not scheme or not scheme[0].isalpha():
+        raise Refusal(ErrorCode.INVALID_ARGS, f"{open.uri!r} has no scheme, such as https: or intent:.")
+    if scheme.casefold() != "intent":
+        return None
+    body = open.uri[len(INTENT_PREFIX) :].removesuffix(";end") if open.uri.endswith(";end") else None
+    pairs = (
+        [entry.partition("=") for entry in (body or "").split(";")]
+        if open.uri.startswith(INTENT_PREFIX)
+        else []
+    )
+    values = {key: value for key, eq, value in pairs if eq and key in INTENT_KEYS and NAME.fullmatch(value)}
+    if not pairs or len(values) != len(pairs) or "action" not in values:
+        raise Refusal(
+            ErrorCode.INVALID_ARGS,
+            f"{open.uri!r} is not an intent agent-phone opens. Write intent:#Intent;action=<action>;end, "
+            "with package=<package>; before end if needed, and nothing else.",
+        )
+    package = Package(values["package"]) if "package" in values else open.package
+    if open.package is not None and package != open.package:
+        raise Refusal(
+            ErrorCode.INVALID_ARGS, f"The intent names {package}, and --package names {open.package}."
+        )
+    return values["action"], package
 
 
 @dataclass(frozen=True, slots=True)

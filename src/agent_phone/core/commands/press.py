@@ -20,7 +20,8 @@ class PressCommand:
     key: KeyName
     commit: frozenset[Effect] = frozenset()
     wait_for: tuple[Predicate, ...] = ()
+    timeout_ms: int = 5000
 
 
 def run(ctx: Context, cmd: PressCommand) -> Outcome:
-    return act(ctx, Request(Key(cmd.key), Grant(cmd.commit), cmd.wait_for))
+    return act(ctx, Request(Key(cmd.key), Grant(cmd.commit), cmd.wait_for, cmd.timeout_ms))

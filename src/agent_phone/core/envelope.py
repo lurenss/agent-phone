@@ -17,7 +17,23 @@ from agent_phone.core.commands.find import Found
 from agent_phone.core.commands.skills import SkillCatalog, SkillText
 from agent_phone.core.device import DeviceList, Listed, Serial
 from agent_phone.core.outcome import Acted, Disposition, ErrorCode, Outcome, Read, Refused, Value
-from agent_phone.core.phone import ServerStatus
+from agent_phone.core.phone import (
+    Activate,
+    InputAction,
+    Key,
+    Launch,
+    LongPress,
+    OpenUri,
+    Rotate,
+    ServerStatus,
+    SetClipboard,
+    SetPower,
+    SetText,
+    Stop,
+    Swipe,
+    Tap,
+)
+from agent_phone.core.policy.engine import Clear, Commits, Denied, Verdict
 from agent_phone.core.snapshot.budget import render_line
 from agent_phone.core.snapshot.snapshot import Snapshot
 
@@ -47,7 +63,11 @@ def to_wire(command: str, device: Serial | None, outcome: Outcome) -> dict[str, 
             wire.update(delivery_keys(Disposition.NOT_DELIVERED))
             wire["error"] = error_object(outcome.code, outcome.message, outcome.details)
         case Acted():
-            raise NotImplementedError("input commands arrive in unit 4")
+            wire["ok"] = outcome.error is None
+            wire.update(delivery_keys(outcome.disposition))
+            wire["data"] = acted_data(outcome)
+            if outcome.error is not None:
+                wire["error"] = error_object(outcome.error, outcome.message, {})
     return wire
 
 
@@ -130,6 +150,65 @@ def found_data(found: Found) -> dict[str, object]:
             "matches": [render_line(line, snapshot.id) for line in snapshot.lines],
         }
     return data
+
+
+def acted_data(acted: Acted) -> dict[str, object]:
+    report = acted.report
+    target = report.target
+    return {
+        "input": input_data(report.action),
+        "target": None
+        if target is None
+        else {
+            "ref": target.ref,
+            "role": target.role.value,
+            "name": target.name,
+            "at": None if target.point is None else [target.point.x, target.point.y],
+        },
+        "gate": gate_data(report.verdict),
+        "verified_by": report.verified_by,
+        "after": None if acted.after is None else snapshot_data(acted.after),
+    }
+
+
+def input_data(action: InputAction) -> dict[str, object]:
+    """What was sent. Typed text and clipboard text are never echoed: they can be secrets."""
+    match action:
+        case Tap(point=p):
+            return {"kind": "tap", "at": [p.x, p.y]}
+        case LongPress(point=p, duration_ms=ms):
+            return {"kind": "long_press", "at": [p.x, p.y], "ms": ms}
+        case Activate():
+            return {"kind": "activate"}
+        case Swipe(start=a, end=b):
+            return {"kind": "swipe", "from": [a.x, a.y], "to": [b.x, b.y]}
+        case SetText(secret=secret):
+            return {"kind": "set_text", "secret": secret}
+        case Key(key=key):
+            return {"kind": "key", "key": key.value}
+        case Launch(package=package):
+            return {"kind": "launch", "package": package}
+        case Stop(package=package):
+            return {"kind": "stop", "package": package}
+        case OpenUri(uri=uri, package=package):
+            return {"kind": "open_uri", "uri": uri, "package": package}
+        case Rotate(orientation=orientation):
+            return {"kind": "rotate", "orientation": orientation.value}
+        case SetPower(power=power):
+            return {"kind": "power", "power": power.value}
+        case SetClipboard():
+            return {"kind": "set_clipboard"}
+
+
+def gate_data(verdict: Verdict) -> dict[str, object]:
+    """Only a clear or a granted verdict is ever sent, so a denial has no wire form here."""
+    match verdict:
+        case Clear(reason=reason):
+            return {"verdict": "clear", "reason": reason.value}
+        case Commits(effects=effects):
+            return {"verdict": "commits", "effects": sorted(effect.value for effect in effects)}
+        case Denied():
+            return {"verdict": "denied", "rule": verdict.rule}
 
 
 def device_data(row: Listed) -> dict[str, object]:

@@ -20,11 +20,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from agent_phone.core.act.intent import Direction
 from agent_phone.core.geometry import Point, Rect
 from agent_phone.core.labels import Label, own_labels
 from agent_phone.core.outcome import ErrorCode, Refusal
+from agent_phone.core.phone import Swipe
 from agent_phone.core.role import consumes_touch
 from agent_phone.core.screen import Flag, Node, NodeId, Screen, Window, WindowKind
+
+SWIPE_SPAN = 0.6
+SWIPE_STEPS = 55
+"""The steps uiautomator2 uses for a scroll, about 5 ms each, so the list scrolls and does not fling."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -154,3 +160,55 @@ def context_labels(screen: Screen, node: Node) -> tuple[Label, ...]:
         if member.id not in own
         for label in own_labels(member)
     )
+
+
+def swipe_across(screen: Screen, node: Node, direction: Direction) -> Swipe:
+    """A swipe over SWIPE_SPAN of the collection's visible area. `Direction.DOWN` shows what is
+    below, so the finger moves up. The swipe starts and ends inside the collection, under no
+    other window, and its start lands on the collection or something inside it."""
+    area = visible_area(screen, node)
+    if area.empty:
+        raise Refusal(ErrorCode.NOT_ACTIONABLE, "The element has no visible area.", {"reason": "no_area"})
+    window = screen.window_of(node.id)
+    require_active(window)
+    middle = area.center()
+    near, far = (1 - SWIPE_SPAN) / 2, (1 + SWIPE_SPAN) / 2
+    height, width = area.bottom - area.top, area.right - area.left
+    match direction:
+        case Direction.DOWN:
+            start, end = (
+                Point(middle.x, area.top + int(height * far)),
+                Point(middle.x, area.top + int(height * near)),
+            )
+        case Direction.UP:
+            start, end = (
+                Point(middle.x, area.top + int(height * near)),
+                Point(middle.x, area.top + int(height * far)),
+            )
+        case Direction.RIGHT:
+            start, end = (
+                Point(area.left + int(width * far), middle.y),
+                Point(area.left + int(width * near), middle.y),
+            )
+        case Direction.LEFT:
+            start, end = (
+                Point(area.left + int(width * near), middle.y),
+                Point(area.left + int(width * far), middle.y),
+            )
+    taker = receiver_in(screen, screen.node(window.root), start)
+    inside = taker is None or (isinstance(taker, int) and node.id <= taker < node.end)
+    if not inside:
+        raise Refusal(
+            ErrorCode.OCCLUDED,
+            "The swipe would start on an element outside the list.",
+            {"point": [start.x, start.y]},
+        )
+    for point in (start, end):
+        cover = covering_window(screen, window, point)
+        if cover is not None:
+            raise Refusal(
+                ErrorCode.OCCLUDED,
+                f"Window {cover.id} {cover.package} ({cover.kind.value}) covers the swipe.",
+                {"point": [point.x, point.y]},
+            )
+    return Swipe(start, end, SWIPE_STEPS)

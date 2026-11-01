@@ -20,11 +20,13 @@ from enum import Enum
 from agent_phone.core.device import DeviceIdentity
 from agent_phone.core.geometry import Point
 from agent_phone.core.outcome import ErrorCode, Refusal
-from agent_phone.core.query import Query
+from agent_phone.core.query import Query, matches
 from agent_phone.core.refs.fingerprint import Fingerprint, key_of
 from agent_phone.core.refs.store import SnapshotStore
 from agent_phone.core.screen import Node, NodeId, Screen
 from agent_phone.core.snapshot.snapshot import RefToken, Snapshot, SnapshotId
+from agent_phone.core.snapshot.surface import select_surface
+from agent_phone.core.snapshot.view import Mode, build_view
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,12 +114,13 @@ def locate(target: Target, observed: Snapshot, screen: Screen) -> Resolved:
     """Check 2. Searches every window of the stored package, not only the active one, so an
     element now under a dialog resolves and is then refused as OCCLUDED, not as STALE_REF.
     Raises `Refusal`."""
-    # TODO (unit 4): QueryTarget matches() over the active window; 0 -> NOT_FOUND, >1 ->
-    #   AMBIGUOUS_TARGET with the candidates as refs of a snapshot recorded for the purpose.
-    # PointTarget: hit.receiver_at(active window, point); None -> the point itself is the
-    #   target with no receiver, which the engine judges as Clear(NO_RECEIVER).
-    if not isinstance(target, RefTarget):
-        raise NotImplementedError
+    match target:
+        case QueryTarget(query):
+            return Resolved(query_match(query, screen), observed, None)
+        case PointTarget():
+            raise Refusal(
+                ErrorCode.NOT_SUPPORTED, "A point is not a target yet. Use a ref, or a query by name or id."
+            )
     number = target.token.number
     fingerprint = observed.fingerprints.get(number)
     if fingerprint is None:
@@ -136,6 +139,25 @@ def locate(target: Target, observed: Snapshot, screen: Screen) -> Resolved:
     if tuple(node.attrs.bounds for node in live) != fingerprint.twin.bounds:
         raise ambiguous(target.token, len(live))
     return Resolved(live[fingerprint.twin.ordinal].id, observed, fingerprint)
+
+
+def query_match(query: Query, screen: Screen) -> NodeId:
+    """The one element of the active window that has a ref in a compact view and matches."""
+    view = build_view(select_surface(screen), Mode.COMPACT)
+    found = [
+        node
+        for line, node in zip(view.lines, view.nodes, strict=True)
+        if line.ref is not None and matches(query, screen, screen.node(node))
+    ]
+    if not found:
+        raise Refusal(ErrorCode.NOT_FOUND, f"No element on screen matches {query.describe()}.")
+    if len(found) > 1:
+        raise Refusal(
+            ErrorCode.AMBIGUOUS_TARGET,
+            f"{len(found)} elements match {query.describe()}. Narrow the query, or use a ref from find.",
+            {"matches": len(found)},
+        )
+    return found[0]
 
 
 def matches_fingerprint(screen: Screen, node: Node, fingerprint: Fingerprint) -> bool:
