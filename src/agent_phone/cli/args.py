@@ -11,6 +11,7 @@ from typing import NoReturn
 
 from agent_phone.cli.commands import InputCommand
 from agent_phone.cli.input_args import INPUTS, add_inputs, input_command
+from agent_phone.cli.wait_args import add_wait, wait_command
 from agent_phone.core.commands.devices import DevicesCommand
 from agent_phone.core.commands.find import DEFAULT_LIMIT, FindCommand
 from agent_phone.core.commands.get import GetCommand, GetProperty
@@ -18,6 +19,7 @@ from agent_phone.core.commands.is_ import IsCommand, IsProperty
 from agent_phone.core.commands.server import ServerAction, ServerCommand
 from agent_phone.core.commands.skills import SKILLS, SkillsGetCommand, SkillsListCommand
 from agent_phone.core.commands.snapshot import SnapshotCommand
+from agent_phone.core.commands.wait import WaitCommand
 from agent_phone.core.device import Serial
 from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.query import Match, Query
@@ -35,6 +37,7 @@ Command = (
     | FindCommand
     | GetCommand
     | IsCommand
+    | WaitCommand
     | SkillsListCommand
     | SkillsGetCommand
     | InputCommand
@@ -91,6 +94,7 @@ def build() -> Parser:
     actions.add_parser("start", parents=[after], help="start the server, or confirm it runs")
     actions.add_parser("stop", parents=[after], help="stop the server so another tool can use the device")
     actions.add_parser("status", parents=[after], help="say whether the server runs and how long it is idle")
+    add_wait(commands, after)
     add_inputs(commands, after)
     add_skills(commands)
     return parser
@@ -252,6 +256,8 @@ def parse_args(argv: Sequence[str]) -> Invocation:
             command = GetCommand(parsed.ref, GetProperty(parsed.property))
         case "is":
             command = IsCommand(parsed.ref, IsProperty(parsed.property))
+        case "wait":
+            command = wait_command(parsed)
         case "server":
             command = ServerCommand(ServerAction(parsed.action))
         case "skills" if parsed.action == "list":

@@ -19,6 +19,7 @@ from agent_phone.core.commands.scroll import ScrollCommand
 from agent_phone.core.commands.set_text import SetTextCommand
 from agent_phone.core.commands.snapshot import SnapshotCommand
 from agent_phone.core.commands.stop import StopCommand
+from agent_phone.core.commands.wait import WaitCommand
 
 INPUT_TIMEOUT_MS = 5000
 
@@ -43,4 +44,4 @@ InputCommand = (
     | ClipboardSetCommand
     | ScreenshotCommand
 )
-DriverCommand = SnapshotCommand | FindCommand | GetCommand | IsCommand | InputCommand
+DriverCommand = SnapshotCommand | FindCommand | GetCommand | IsCommand | WaitCommand | InputCommand

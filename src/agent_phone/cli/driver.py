@@ -48,6 +48,7 @@ from agent_phone.core.commands import (
     set_text,
     snapshot,
     stop,
+    wait,
 )
 from agent_phone.core.commands.click import ClickCommand
 from agent_phone.core.commands.clipboard import ClipboardGetCommand, ClipboardSetCommand
@@ -62,6 +63,7 @@ from agent_phone.core.commands.scroll import ScrollCommand
 from agent_phone.core.commands.set_text import SetTextCommand
 from agent_phone.core.commands.snapshot import SnapshotCommand
 from agent_phone.core.commands.stop import StopCommand
+from agent_phone.core.commands.wait import WaitCommand
 from agent_phone.core.context import Context
 from agent_phone.core.device import Package, Serial, select_device
 from agent_phone.core.outcome import Acted, Outcome, Read, Refusal, Refused, Value
@@ -126,6 +128,8 @@ class Driver:
                 return get.run(ctx, command)
             case IsCommand():
                 return is_.run(ctx, command)
+            case WaitCommand():
+                return wait.run(ctx, command)
             case ClickCommand():
                 return click.run(ctx, command)
             case SetTextCommand():

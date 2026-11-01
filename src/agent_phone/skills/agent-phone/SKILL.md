@@ -4,9 +4,9 @@ description: >
   Read and drive an Android phone through its accessibility tree, over adb, with the agent-phone
   CLI. Use when an AI agent must see an Android screen or act on it: list the connected devices,
   snapshot the active window as compact lines with refs, outline a long screen and drill into one
-  list, find elements, read one property of an element, tap, type into a field, scroll, press back
-  or home, launch or stop an app, open a link or a Settings page, rotate the screen, read or set the
-  clipboard, or save a screenshot. Every input passes a commit gate, so a tap that would post, send,
+  list, find elements, read one property of an element, wait for a screen condition, tap, type into
+  a field, scroll, press back or home, launch or stop an app, open a link or a Settings page, rotate
+  the screen, read or set the clipboard, or save a screenshot. Every input passes a commit gate, so a tap that would post, send,
   delete or pay needs the user's grant. Triggers on "android", "phone screen", "adb", "accessibility
   tree", "snapshot the phone", "tap on the phone", "agent-phone".
 ---
@@ -72,6 +72,27 @@ A plain snapshot reads the screen once, and its `settled` is `unchecked`. Right 
 - `settled` means two reads agreed. `unsettled` means `--timeout-ms` passed first (3000 by default), and you got the last read. Settle again before you trust it.
 - `find` reads once and takes no `--settle`. Run `agent-phone snapshot --settle` first, then `find`.
 
+## Wait for the screen instead of sleeping
+
+```bash
+agent-phone wait --for 'name=Brightness'                         # until a line with that name shows
+agent-phone wait --gone 'name=Brightness' --app com.android.settings --settled
+agent-phone wait --for 'role=field name=Search' --timeout-ms 20000
+```
+
+- `wait` reads the screen until every condition holds on one read, then prints that read as a snapshot, the same object `snapshot` prints. Use it wherever you would sleep and then snapshot again.
+- `--for QUERY` waits until a line that matches shows. `--gone QUERY` waits until no line matches. `--app PACKAGE` waits until the window that has focus belongs to that app. `--settled` waits until two reads in a row print the same lines. Each of `--for` and `--gone` may repeat. A query is the one `--wait-for` takes.
+- Give at least one condition, or the call is `INVALID_ARGS` and nothing is read. With several, they must hold on the same read. Two conditions that hold on different reads never hold together.
+- `--timeout-ms` is 10000 by default. On a timeout `ok` is false, `error.code` is `TIMEOUT`, `delivery` is `not_delivered` and `retry` is `safe`. `error.details.after` is a snapshot of the last read, so you see what the screen showed instead.
+- The snapshot is recorded like any other. Its refs work for your next command, and it is the observation that the next input needs after an input: no `OBSERVE_FIRST`.
+- `wait` sends nothing. It spends no refs, has no `delivery` when it succeeds, and is safe to run again.
+- `--gone` holds at once for something that was never there, so wait for it to show with `--for` first. A read that shows no line, such as the blank frame between two screens, holds neither `--for` nor `--gone`.
+
+Choose between `wait` and `--wait-for`:
+
+- Put `--wait-for` or `--wait-for-gone` on the input when the wait is the proof that the input worked. It is one call, and `delivery` becomes `delivered_verified` when the effect appeared after the input.
+- Use `wait` when no input is involved or `--wait-for` cannot say it. That covers a page that loads by itself, a dialog that closes on its own, `--app` and `--settled`, several conditions on one read, an input you sent without `--wait-for`, and a longer wait after a `--wait-for` timed out. `--wait-for` does not take `--app` or `--settled`.
+
 ## Pick the window
 
 By default a snapshot describes the active window. That is the first window that is not the status bar, the navigation bar or the keyboard.
@@ -115,7 +136,7 @@ agent-phone scroll down @r2c8w:e5                              # swipe the list;
 agent-phone press back                                         # also home, recents and enter
 ```
 
-- An input needs a ref from the newest snapshot of its device. `press` and every other input without a ref need that snapshot too. An input with no current observation fails with `OBSERVE_FIRST`.
+- An input needs a ref from the newest snapshot of its device. `press` and every other input without a ref need that snapshot too. An input with no current observation fails with `OBSERVE_FIRST`. A `snapshot`, a `find` that lists matches, or a `wait` taken after the last input is that observation.
 - Before it sends anything, agent-phone finds the ref's element again, checks that it is visible, enabled and at the same place on two reads, and plans a point where the touch reaches exactly that element. A disabled or moving element is waited for up to `--timeout-ms` (5000 by default).
 - `NOT_ACTIONABLE` means the element cannot take this input, such as a tap on a plain text, text into a button, or a tap on a switch that its row handles. Tap the row instead. `scroll left` and `scroll right` work only on a collection that runs across, such as a pager, a horizontal scroll view, items that sit side by side, or one card of a row with its neighbor cut off at the edge, because a sideways swipe on a row can call or dismiss. The mirror holds: `scroll up` and `scroll down` on a collection that runs across, such as the recents screen, are `NOT_ACTIONABLE` with `details.reason` `wrong_axis`, because an up or down swipe on a card can dismiss the app. Scroll left or right there. A grid, which has at least two rows of at least two items, scrolls up and down, and a lone item below side-by-side items, such as a footer, does not make a grid. A sideways swipe on a pager whose page is a list keeps to a height between the rows of that list. When the rows cover the whole height, it is refused with the same reason, because it would start on a row: tap the tab or button that switches the page instead. A collection that shows one child that fills it, and nothing else that says it runs across, reads as a list that runs down, so a sideways scroll of it is refused. `UNSTABLE` means it kept moving. `OCCLUDED` means another window, such as the keyboard, or another element covers it. A list that scrolls and is drawn over the element counts, even when the screen shows it as invisible, such as a sheet that is fading in, because a scrolling view keeps the tap at any alpha.
 - `click --long` holds the touch. `set-text` replaces the whole text through the accessibility action, with no keyboard and no tap, and reads the field back.
@@ -197,10 +218,10 @@ agent-phone skills get phone      # this guide, in data.content
 
 ## Avoid these mistakes
 
-1. **A plain snapshot right after a change.** It can show the screen from before the change. Use `--settle`.
+1. **A plain snapshot right after a change.** It can show the screen from before the change. Use `--settle`, or `wait` for what you expect.
 2. **A compact or full snapshot of a long feed.** Take `--skeleton`, then `--root` on the list you need, or use `find`.
 3. **Tapping printed bounds with `adb shell input tap`.** Nothing checks that the element is still there, and a wrong tap can post, send or delete. Use `click` with a ref.
-4. **Fixed sleeps.** The screen does not change on a timer. Use `snapshot --settle`.
+4. **Fixed sleeps.** The screen does not change on a timer. Use `wait` for the condition you expect, or `snapshot --settle` when you expect any change.
 5. **Branching on `message`.** Branch on `error.code` and `retry`.
 6. **Leaving the server up when you hand the phone over.** Run `agent-phone server stop`.
 7. **Two state folders for one phone.** Each has its own lock, so two processes can drive the phone at once.

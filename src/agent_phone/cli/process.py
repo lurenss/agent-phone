@@ -29,6 +29,7 @@ from agent_phone.core.commands.server import ServerCommand
 from agent_phone.core.commands.set_text import SetTextCommand
 from agent_phone.core.commands.skills import SkillsGetCommand, SkillsListCommand
 from agent_phone.core.commands.snapshot import SnapshotCommand
+from agent_phone.core.commands.wait import WaitCommand
 from agent_phone.core.device import Serial, select_device
 from agent_phone.core.envelope import encode, exit_code, floor_envelope, to_wire
 from agent_phone.core.outcome import Outcome, Refusal, Refused
@@ -77,7 +78,7 @@ def execute(
             return devices.run(hub, profiles), None
         case SkillsListCommand() | SkillsGetCommand() as command:
             return skills.run(SKILLS_ROOT, command), None
-        case SnapshotCommand() | FindCommand() | GetCommand() | IsCommand() as command:
+        case SnapshotCommand() | FindCommand() | GetCommand() | IsCommand() | WaitCommand() as command:
             with open_phone(
                 invocation.serial,
                 hub=hub,

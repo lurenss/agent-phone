@@ -12,8 +12,6 @@ from agent_phone.core.query import Match, Q
 from agent_phone.core.role import Role
 from agent_phone.core.wait.predicate import Foreground, Gone, Present, Settled
 
-pytestmark = pytest.mark.xfail(strict=True, reason="the wait command is not in the parser yet")
-
 J7 = Connected(J7_SERIAL, "SM_J730F", ready=True)
 SETTINGS = fixture_screen("settings-home")
 BRIGHTNESS = screen_of(
