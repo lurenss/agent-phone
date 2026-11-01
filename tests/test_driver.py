@@ -58,7 +58,10 @@ def test_a_ledger_that_cannot_be_read_refuses_instead_of_restarting_at_zero(sett
     with session(FakeHub([J7], screens=[fixture_screen("settings-home")]), settings) as phone:
         with pytest.raises(PhoneError) as raised:
             phone.snapshot()
-    assert refusal_of(raised).code is ErrorCode.INTERNAL and "Delete it" in refusal_of(raised).message
+    assert (
+        refusal_of(raised).code is ErrorCode.INTERNAL
+        and "Delete the whole folder" in refusal_of(raised).message
+    )
 
 
 def test_a_session_holds_the_device_lock_and_closes_the_phone(settings):

@@ -50,8 +50,9 @@ class Ledger:
         except (OSError, ValueError, KeyError, TypeError) as error:
             raise Refusal(
                 ErrorCode.INTERNAL,
-                f"The ledger file {self._path} cannot be read. Delete it, and take new snapshots, "
-                "because every ref made before is gone.",
+                f"The ledger file {self._path} cannot be read. Delete the whole folder "
+                f"{self._path.parent}, with its snapshots, and take new ones. Deleting only the "
+                "ledger would make refs from before earlier inputs current again.",
             ) from error
         return epoch if boot_id == self._device.boot_id else 0
 
