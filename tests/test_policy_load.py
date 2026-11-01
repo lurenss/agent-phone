@@ -92,10 +92,6 @@ def test_a_caller_file_may_still_disable_a_deny_rule_that_another_caller_file_de
     assert "c.deny" not in {rule.origin.rule for rule in policy.rules}
 
 
-CONSUMER_WEAKENS_A_DENIAL = pytest.mark.xfail(
-    strict=True,
-    reason="deny rules read the effects of the rules still in force, which a consumer's file changes",
-)
 INSTALLER = "com.google.android.packageinstaller"
 PROTECTS_A_TUNNEL = f"""
 [device]
@@ -168,7 +164,6 @@ def test_the_profile_alone_denies_the_ok_of_the_uninstall_dialog_of_a_protected_
     assert sent == []
 
 
-@CONSUMER_WEAKENS_A_DENIAL
 @pytest.mark.parametrize("weakening", sorted(WEAKENINGS))
 def test_no_consumer_file_turns_the_denial_of_that_ok_into_anything_else(tmp_path, weakening):
     wire, sent = tap_ok_of_the_uninstall_dialog(
@@ -190,7 +185,6 @@ reason = "This phone never sends a message, with or without --commit."
 """
 
 
-@CONSUMER_WEAKENS_A_DENIAL
 @pytest.mark.parametrize(
     ("argv", "disabled"),
     [(["press", "enter"], "default.key.enter"), (["open-url", "sms:5551234"], "default.uri.contact")],

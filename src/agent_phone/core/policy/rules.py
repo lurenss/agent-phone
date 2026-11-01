@@ -52,15 +52,15 @@ DOCUMENT_KEYS = frozenset({"languages", "disable", *TABLE_KEYS})
 
 
 def parse_policy(
-    doc: Mapping[str, object], source: str, from_profile: bool = False
+    doc: Mapping[str, object], source: str, trusted: bool = False
 ) -> tuple[Policy, frozenset[RuleId]]:
     """Validate one parsed TOML document. Returns its rules and the ids it disables.
 
     Raises `Refusal(POLICY_INVALID)` naming the file, the table and the field: an unknown key,
     an unknown effect or window kind, an empty `words`, a duplicate id. Words are tokenized
-    here with `labels.words`, so rules and labels split text the same way. `from_profile` marks
-    the deny rules of a device profile's own tables; the profile parser strips its `[device]`
-    and `[[protected]]` tables before calling this.
+    here with `labels.words`, so rules and labels split text the same way. `trusted` marks the
+    layer as the device's own (`model.Policy`); the profile parser strips its `[device]` and
+    `[[protected]]` tables before calling this.
     """
     top = Table(source, "document", 0, doc)
     for key in doc:
@@ -73,16 +73,16 @@ def parse_policy(
             top.fail(kind, f"must be an array of tables, written [[{kind}]]")
         for n, entry in enumerate(entries):
             table = Table(source, kind, n + 1, entry)
-            rule = parse_rule(table, from_profile)
+            rule = parse_rule(table)
             if any(earlier.origin.rule == rule.origin.rule for earlier in rules):
                 table.fail("id", "is already used by another table of this file")
             rules.append(rule)
     languages = frozenset(top.texts("languages"))
     disabled = frozenset(RuleId(rule) for rule in top.texts("disable"))
-    return Policy(languages, tuple(rules)), disabled
+    return Policy(languages, tuple(rules), trusted=trusted), disabled
 
 
-def parse_rule(table: Table, from_profile: bool) -> Rule:
+def parse_rule(table: Table) -> Rule:
     for key in table.data:
         if key not in TABLE_KEYS[table.kind]:
             table.fail(key, f"is not a key of [[{table.kind}]]")
@@ -121,7 +121,6 @@ def parse_rule(table: Table, from_profile: bool) -> Rule:
                 table.phrases("context_words"),
                 table.choices("effects", Effect),
                 frozenset(Package(p) for p in table.texts("stops")),
-                from_profile,
             )
             if not (rule.words or rule.context_words or rule.effects or rule.stops):
                 table.fail(
@@ -196,13 +195,17 @@ class Table:
 
 
 def merge(layers: tuple[tuple[Policy, frozenset[RuleId]], ...]) -> Policy:
-    """Apply layers in order. Disabling a profile deny rule raises `Refusal(POLICY_INVALID)`.
+    """Apply layers in order. Disabling a deny rule of a trusted layer raises
+    `Refusal(POLICY_INVALID)`.
 
     A layer may disable only rules an earlier layer defined, and may not reuse an id that is
-    still in force: a disable that matches nothing is a mistake in that file.
+    still in force: a disable that matches nothing is a mistake in that file. `strict` keeps what a
+    consumer's disable removes and what a consumer's exempt and ignore rules would hide
+    (`model.Policy`).
     """
     rules: list[Rule] = []
-    withdrawn: list[CommitRule] = []
+    strict: list[Rule] = []
+    protected: set[RuleId] = set()
     languages: set[str] = set()
     for policy, disabled in layers:
         defined = {rule.origin.rule: rule for rule in rules}
@@ -214,17 +217,16 @@ def merge(layers: tuple[tuple[Policy, frozenset[RuleId]], ...]) -> Policy:
                     f"A policy file disables {rule_id!r}, which no earlier policy defines.",
                     {"rule": rule_id},
                 )
-            if isinstance(target, DenyRule) and target.from_profile:
+            if rule_id in protected:
                 raise Refusal(
                     ErrorCode.POLICY_INVALID,
-                    f"A policy file disables {rule_id!r}, a deny rule of the device profile "
-                    f"{target.origin.source}. No policy file can unprotect a device.",
+                    f"A policy file disables {rule_id!r}, a deny rule of {target.origin.source}, which "
+                    "belongs to the device. No policy file can unprotect a device.",
                     {"rule": rule_id, "source": target.origin.source},
                 )
-        withdrawn.extend(
-            rule for rule in rules if rule.origin.rule in disabled and isinstance(rule, CommitRule)
-        )
         rules = [rule for rule in rules if rule.origin.rule not in disabled]
+        if policy.trusted:
+            strict = [rule for rule in strict if rule.origin.rule not in disabled]
         in_force = {rule.origin.rule: rule.origin.source for rule in rules}
         for rule in policy.rules:
             if rule.origin.rule in in_force:
@@ -235,12 +237,18 @@ def merge(layers: tuple[tuple[Policy, frozenset[RuleId]], ...]) -> Policy:
                     {"rule": rule.origin.rule, "source": rule.origin.source},
                 )
         rules.extend(policy.rules)
+        strict.extend(
+            rule for rule in policy.rules if policy.trusted or isinstance(rule, CommitRule | InheritRule)
+        )
+        if policy.trusted:
+            protected |= {rule.origin.rule for rule in policy.rules if isinstance(rule, DenyRule)}
         languages |= policy.languages
-    return Policy(frozenset(languages), tuple(rules), tuple(withdrawn))
+    return Policy(frozenset(languages), tuple(rules), tuple(strict))
 
 
 def protect_rules(profile: DeviceProfile, source: str) -> tuple[DenyRule, ...]:
-    """Two deny rules per protected package, both marked as the profile's own:
+    """Two deny rules per protected package. They go in the profile's layer, which is trusted, so
+    no later layer can disable them:
 
     - `profile.protect.<package>.stop` refuses `stop <package>`;
     - `profile.protect.<package>.app-info` refuses a tap that would delete or change system
@@ -264,7 +272,6 @@ def protect_rules(profile: DeviceProfile, source: str) -> tuple[DenyRule, ...]:
                 (),
                 frozenset(),
                 frozenset({protected.package}),
-                from_profile=True,
             )
         )
         rules.append(
@@ -275,7 +282,6 @@ def protect_rules(profile: DeviceProfile, source: str) -> tuple[DenyRule, ...]:
                 names,
                 frozenset({Effect.DELETE, Effect.SYSTEM}),
                 frozenset(),
-                from_profile=True,
             )
         )
     return tuple(rules)

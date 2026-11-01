@@ -5,6 +5,7 @@ reached a device and what never did."""
 import os
 import shutil
 
+import pytest
 from fakes import EMULATOR_SERIAL, J7_SERIAL, FakeHub, FakePhone, info_for, invoke
 from support import ROOT, fixture_screen, node, screen_of
 
@@ -151,15 +152,21 @@ def test_the_j7_profile_and_the_policy_file_it_names_load_from_the_state_root(tm
         "hev.sockstun"
     ]
     policy = load_policy((), loaded)
-    denies = {rule.origin.rule: rule.from_profile for rule in policy.of_kind(DenyRule)}
+    denies = {rule.origin.rule for rule in policy.of_kind(DenyRule)}
     assert denies == {
-        "profile.protect.hev.sockstun.stop": True,
-        "profile.protect.hev.sockstun.app-info": True,
-        "j7.vpn-lockdown": True,
-        "j7.sockstun": True,
-        "j7.sockstun-screens": True,
-        "ig.no-live": True,
+        "profile.protect.hev.sockstun.stop",
+        "profile.protect.hev.sockstun.app-info",
+        "j7.vpn-lockdown",
+        "j7.sockstun",
+        "j7.sockstun-screens",
+        "ig.no-live",
     }
+    for rule_id in sorted(denies):
+        weaken = tmp_path / "weaken.toml"
+        weaken.write_text(f'disable = ["{rule_id}"]\n')
+        with pytest.raises(Refusal) as refused:
+            load_policy([weaken], loaded)
+        assert refused.value.code is ErrorCode.POLICY_INVALID, f"a caller's file disabled {rule_id}"
 
 
 def test_an_exception_after_a_spend_is_reported_as_delivery_uncertain(tmp_path):

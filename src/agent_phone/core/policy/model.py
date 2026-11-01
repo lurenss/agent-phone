@@ -116,7 +116,6 @@ class DenyRule:
     context_words: tuple[Phrase, ...]
     effects: frozenset[Effect]
     stops: frozenset[Package]
-    from_profile: bool
 
 
 Rule = CommitRule | ExemptRule | IgnoreRule | InheritRule | DenyRule
@@ -124,16 +123,25 @@ Rule = CommitRule | ExemptRule | IgnoreRule | InheritRule | DenyRule
 
 @dataclass(frozen=True, slots=True)
 class Policy:
-    """`languages` is the union the commit rules cover. A device whose locale language is not in
+    """One layer, as `parse_policy` reads it, or the merge of every layer.
+
+    `languages` is the union the commit rules cover. A device whose locale language is not in
     it gets LOCALE_UNSUPPORTED for every labeled input: the engine cannot read that screen.
 
-    `withdrawn` holds the commit rules a later layer disabled. They commit nothing, but deny
-    rules still read the effects they name, so disabling `default.system` cannot switch off a
-    profile's protection that denies system taps on a protected package's screen."""
+    `trusted` marks a layer that belongs to the device: the built-in policy, a device profile, or
+    a file the profile names. A later layer may weaken what these layers commit, and may not
+    weaken what they deny.
+
+    `strict`, set by `merge`, is what a denial reads to learn what an input would commit: every
+    commit rule and every inherit rule loaded, withdrawn or not, and the exempt and ignore rules of
+    trusted layers only. A trusted layer's own `disable` removes a rule from it, a consumer's does
+    not. Without it, a consumer's file could switch off a profile's protection by disabling
+    `default.delete` or exempting "OK", because a denial that names effects would find none."""
 
     languages: frozenset[str]
     rules: tuple[Rule, ...]
-    withdrawn: tuple[CommitRule, ...] = ()
+    strict: tuple[Rule, ...] = ()
+    trusted: bool = False
 
     def of_kind[R: Rule](self, kind: type[R]) -> tuple[R, ...]:
         return tuple(rule for rule in self.rules if isinstance(rule, kind))

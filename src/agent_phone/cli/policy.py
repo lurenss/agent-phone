@@ -5,10 +5,11 @@ Device profiles are read from `<state root>/profiles/*.toml` at the CLI boundary
 
 A profile file has a `[device]` table (`serial`, `name`, optional `policy_files`), any number of
 `[[protected]]` tables (`package`, `labels`, `reason`), and policy tables of its own. Its
-protections compile into deny rules (`rules.protect_rules`), and its own deny rules are marked as
-the profile's, so no later policy file can disable them. `policy_files` are read relative to the
-profile file and are the profile's own layers: their deny rules are marked too, and a later file,
-a caller's or another of the profile's, cannot disable them. `examples/devices/j7.toml` is one.
+protections compile into deny rules (`rules.protect_rules`). The profile and the files its
+`policy_files` name, read relative to the profile file, are trusted layers, as is the package
+default: a later file, a caller's or another of the profile's, cannot disable their deny rules,
+and what their denials read is not weakened by a caller's `disable`, `exempt` or `ignore`
+(`model.Policy`). `examples/devices/j7.toml` is one.
 
 A profile that does not parse fails every command that loads it, with POLICY_INVALID. A broken
 profile must never leave its phone unprotected.
@@ -18,7 +19,7 @@ from __future__ import annotations
 
 import tomllib
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from agent_phone.core.device import DeviceProfile, Package, ProtectedPackage, Serial
@@ -118,19 +119,19 @@ def load_profile(path: Path) -> LoadedProfile:
         packages.append(ProtectedPackage(Package(package), tuple(labels), reason))
     profile = DeviceProfile(Serial(serial), name, tuple(packages), tuple(files))
     own, disabled = parse_policy(
-        {key: value for key, value in doc.items() if key not in PROFILE_TABLES}, source, from_profile=True
+        {key: value for key, value in doc.items() if key not in PROFILE_TABLES}, source, trusted=True
     )
-    layer = Policy(own.languages, protect_rules(profile, source) + own.rules)
+    layer = replace(own, rules=protect_rules(profile, source) + own.rules)
     return LoadedProfile(profile, path, (layer, disabled))
 
 
 def load_policy(extra: Sequence[Path], profile: LoadedProfile | None = None) -> Policy:
     """The package default, then the device profile and its policy files, then the caller's."""
-    layers = [parse_policy(read_toml(DEFAULT_POLICY), str(DEFAULT_POLICY))]
+    layers = [parse_policy(read_toml(DEFAULT_POLICY), str(DEFAULT_POLICY), trusted=True)]
     if profile is not None:
         layers.append(profile.layer)
         layers.extend(
-            parse_policy(read_toml(path), str(path), from_profile=True) for path in profile.policy_files()
+            parse_policy(read_toml(path), str(path), trusted=True) for path in profile.policy_files()
         )
     layers.extend(parse_policy(read_toml(path), str(path)) for path in extra)
     return merge(tuple(layers))

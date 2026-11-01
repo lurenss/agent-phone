@@ -51,7 +51,7 @@ The exit code is 0 when `ok` is true, 1 for an error envelope, and 2 when the ar
 | Code | Meaning |
 | --- | --- |
 | `INVALID_ARGS` | The arguments do not parse. A ref without its snapshot id, such as `e12`, is one case. |
-| `POLICY_INVALID` | A policy file, or the order its layers merge in, is invalid. `details` names the `source`, the `table` and the `field`, or the `rule`. |
+| `POLICY_INVALID` | A policy file, or the order its layers merge in, is invalid. `details` names the `source`, the `table` and the `field`, or the `rule`. A file that disables a deny rule of the device profile, or of a file the profile names, is one case. |
 | `NO_DEVICE` | No device is connected and ready, or the requested one is not. |
 | `DEVICE_AMBIGUOUS` | Several devices are ready and neither `-d` nor a ref names one. |
 | `WRONG_DEVICE` | The ref belongs to another device, or `-d` contradicts the device the ref names. |

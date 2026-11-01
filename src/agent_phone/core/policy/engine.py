@@ -39,7 +39,7 @@ from agent_phone.core.phone import (
     Swipe,
     Tap,
 )
-from agent_phone.core.policy.rules import (
+from agent_phone.core.policy.model import (
     CommitRule,
     DenyRule,
     Effect,
@@ -48,6 +48,7 @@ from agent_phone.core.policy.rules import (
     InheritRule,
     Phrase,
     Policy,
+    Rule,
     RuleId,
     Scope,
 )
@@ -172,20 +173,14 @@ def classify(policy: Policy, action: InputAction, site: Site | None, locale: str
     receives the input. `site` is None only for a caller with no screen to offer, and then only
     the rules that name no app, window kind or element are read.
 
+    The verdict comes from the rules in force. A denial that names effects reads them from
+    `policy.strict` as well (`model.Policy`), on every path an input takes to an effect: the
+    receiver's words, the affirmative's context, a key and a link scheme.
+
     Raises `Refusal(LOCALE_UNSUPPORTED)` when commit rules would read an input and the device's
     language is not in `policy.languages`.
     """
     language = language_of(locale)
-
-    def rules[R: CommitRule | ExemptRule | IgnoreRule | InheritRule | DenyRule](kind: type[R]) -> list[R]:
-        return [rule for rule in policy.of_kind(kind) if in_scope(rule.scope, site, language)]
-
-    commits = rules(CommitRule)
-    found: list[Found] = []
-    raw: list[Found] = []
-    exempted: list[RuleId] = []
-    receiver: Sequence[Label] = ()
-    context: Sequence[Label] = ()
     reads = reads_of(action)
     if reads is Reads.EVERYTHING and language not in policy.languages:
         raise Refusal(
@@ -194,25 +189,12 @@ def classify(policy: Policy, action: InputAction, site: Site | None, locale: str
             f"what this input would do. The rules cover {', '.join(sorted(policy.languages))}.",
             {"locale": locale, "languages": sorted(policy.languages)},
         )
-    if reads is not Reads.NOTHING and site is not None:
-        context = site.context
-        if site.receiver is not None:
-            receiver = site.receiver.labels
-            if reads is Reads.EVERYTHING:
-                found, exempted = judge_receiver(
-                    commits, rules(IgnoreRule), rules(ExemptRule), rules(InheritRule), receiver, context
-                )
-                withdrawn = [rule for rule in policy.withdrawn if in_scope(rule.scope, site, language)]
-                raw = phrases_in([*commits, *withdrawn], receiver, Source.RECEIVER)
-    match action:
-        case Key(key=key):
-            found = [*found, *(found_by(rule, Source.KEY, key.value) for rule in commits if key in rule.keys)]
-        case OpenUri(uri=uri):
-            scheme = uri.partition(":")[0].casefold()
-            found = [found_by(rule, Source.URI, uri) for rule in commits if scheme in rule.uri_schemes]
+    found, exempted = effects_of(action, site, reads, reading_of(policy.rules, site, language))
+    strict, _ = effects_of(action, site, reads, reading_of(policy.strict, site, language))
     effects = {effect for effect, _ in found}
-    for rule in rules(DenyRule):
-        evidence = denial(rule, action, receiver, context, effects | {effect for effect, _ in raw})
+    receiver, context = seen_by(reads, site)
+    for rule in reading_of(policy.rules, site, language).denies:
+        evidence = denial(rule, action, receiver, context, effects | {effect for effect, _ in strict})
         if evidence is not None:
             return Denied(rule.origin.rule, rule.origin.reason, rule.origin.source, evidence)
     if effects:
@@ -224,6 +206,60 @@ def classify(policy: Policy, action: InputAction, site: Site | None, locale: str
     if exempted:
         return Clear(ClearReason.EXEMPT, tuple(dict.fromkeys(exempted)))
     return Clear(ClearReason.NO_COMMIT_WORDS)
+
+
+@dataclass(frozen=True, slots=True)
+class Reading:
+    """The rules of one reading of an input that apply at its site."""
+
+    commits: list[CommitRule]
+    ignores: list[IgnoreRule]
+    exempts: list[ExemptRule]
+    inherits: list[InheritRule]
+    denies: list[DenyRule]
+
+
+def reading_of(rules: Iterable[Rule], site: Site | None, language: str) -> Reading:
+    def of[R: Rule](kind: type[R]) -> list[R]:
+        return [rule for rule in rules if isinstance(rule, kind) and in_scope(rule.scope, site, language)]
+
+    return Reading(of(CommitRule), of(IgnoreRule), of(ExemptRule), of(InheritRule), of(DenyRule))
+
+
+def seen_by(reads: Reads, site: Site | None) -> tuple[Sequence[Label], Sequence[Label]]:
+    """The receiver's labels and its context, for the rules that read this input."""
+    if reads is Reads.NOTHING or site is None:
+        return (), ()
+    return (site.receiver.labels if site.receiver is not None else ()), site.context
+
+
+def effects_of(
+    action: InputAction, site: Site | None, reads: Reads, reading: Reading
+) -> tuple[list[Found], list[RuleId]]:
+    """The effects `action` carries under one reading, and the exempt rules that removed a label."""
+    found: list[Found] = []
+    exempted: list[RuleId] = []
+    if reads is Reads.EVERYTHING and site is not None and site.receiver is not None:
+        found, exempted = judge_receiver(
+            reading.commits,
+            reading.ignores,
+            reading.exempts,
+            reading.inherits,
+            site.receiver.labels,
+            site.context,
+        )
+    match action:
+        case Key(key=key):
+            found = [
+                *found,
+                *(found_by(rule, Source.KEY, key.value) for rule in reading.commits if key in rule.keys),
+            ]
+        case OpenUri(uri=uri):
+            scheme = uri.partition(":")[0].casefold()
+            found = [
+                found_by(rule, Source.URI, uri) for rule in reading.commits if scheme in rule.uri_schemes
+            ]
+    return found, exempted
 
 
 def found_by(rule: CommitRule, source: Source, label: str) -> Found:

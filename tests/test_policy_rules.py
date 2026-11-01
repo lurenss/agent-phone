@@ -25,11 +25,19 @@ BUSINESS_SUITE = "examples/business_suite/policy.toml"
 PROFILE = "examples/devices/j7.toml"
 
 
-def load(path, from_profile=False):
+def load(path, trusted=False):
     doc = tomllib.loads((ROOT / path).read_text())
-    if from_profile:
+    if trusted:
         doc = {key: value for key, value in doc.items() if key not in ("device", "protected")}
-    return parse_policy(doc, path, from_profile=from_profile)
+    return parse_policy(doc, path, trusted=trusted)
+
+
+def refuses_to_disable(layers, rule_id):
+    try:
+        merge((*layers, parse_policy({"disable": [rule_id]}, "consumer.toml")))
+    except Refusal as refused:
+        return refused.code is ErrorCode.POLICY_INVALID
+    return False
 
 
 def rule(policy, id):
@@ -58,14 +66,15 @@ def test_example_policies_scope_their_rules_to_their_app():
 
 
 def test_shipped_layers_merge_in_order_and_the_profile_deny_is_marked():
-    profile, _ = load(PROFILE, from_profile=True)
-    merged = merge((load(DEFAULT), (profile, frozenset()), load(INSTAGRAM), load(BUSINESS_SUITE)))
+    profile, _ = load(PROFILE, trusted=True)
+    layers = (load(DEFAULT), (profile, frozenset()), load(INSTAGRAM), load(BUSINESS_SUITE))
+    merged = merge(layers)
     ids = [r.origin.rule for r in merged.rules]
     sources = [r.origin.source for r in merged.rules]
     assert list(dict.fromkeys(sources)) == [DEFAULT, PROFILE, INSTAGRAM, BUSINESS_SUITE]
     assert sources == sorted(sources, key=[DEFAULT, PROFILE, INSTAGRAM, BUSINESS_SUITE].index)
     assert len(ids) == len(set(ids)) == 20
-    deny = {r.origin.rule: r.from_profile for r in merged.of_kind(DenyRule)}
+    deny = {r.origin.rule: refuses_to_disable(layers, r.origin.rule) for r in merged.of_kind(DenyRule)}
     assert deny == {
         "j7.vpn-lockdown": True,
         "j7.sockstun": True,
