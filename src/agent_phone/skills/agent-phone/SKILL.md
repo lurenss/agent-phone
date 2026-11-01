@@ -199,7 +199,7 @@ cat steps.json | agent-phone batch
 - Give `--commit` and `--policy` inside the step they serve. A grant or a file in one step does not reach the next. `--commit` on the batch itself is `INVALID_ARGS`.
 - The steps run in order, in one process, under one device lock. The batch stops at the first step that is not ok, and later steps do not run.
 - The result is one envelope with `command` `batch`. `data.steps` holds each step's own envelope, as that command alone would print it. `data.stopped_at` is the index of the failed step, or null. `data.trace` is the path of a trace file.
-- When a step fails, the batch's `error` and `delivery` are that step's. Its `retry` is `unsafe` when any earlier step sent input, because running the batch again would send that input again. Read the screen, then plan the rest as new steps.
+- When a step fails, the batch's `delivery` is that step's, and its `error` has that step's code and message with `details.step`, the step's index. Read the step's own `details`, such as the snapshot a `wait` timed out on, in `data.steps`. Its `retry` is `unsafe` when any earlier step sent input, because running the batch again would send that input again. Read the screen, then plan the rest as new steps.
 - The trace is a JSONL file, readable only by you, with one line for each step that ran and a last line for the end. A step line has its index, its arguments, `started_utc`, `ms`, `ok`, `delivery`, `retry`, the error code, and for an input its kind, its target and its gate verdict. The text of `set-text` and `clipboard set` shows as `<N chars>`. It holds no snapshot.
 - A Python caller does not need `batch`: a `Driver` from `open_phone()` already runs one step after another in one process.
 

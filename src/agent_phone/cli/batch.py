@@ -120,7 +120,11 @@ class BatchResult:
             "trace": str(self.trace),
         }
         if failed is not None:
-            wire["error"] = failed.envelope["error"]
+            error = failed.envelope["error"]
+            assert isinstance(error, dict)
+            wire["error"] = {key: error[key] for key in ("code", "message", "hint")} | {
+                "details": {"step": failed.step.index}
+            }
         return wire
 
 

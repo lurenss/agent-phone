@@ -302,7 +302,7 @@ An agent that must not send an input twice cannot rely on a ref after another in
 The envelope's own keys follow the steps:
 
 - When every step is ok, `ok` is true. A batch that sent no input, such as one of reads, has no `delivery` and no `retry`, like a read. A batch that sent input has the weakest `delivery` among its inputs, in the order `delivery_uncertain`, `delivered_unverified`, `delivered_verified`, and `retry: unsafe`.
-- When a step fails, `ok` is false, `error` is that step's `error` object, and `delivery` is that step's `delivery`. `retry` is `unsafe` when any earlier step sent an input, because running the batch again would send that input again. Otherwise it is that step's `retry`. So `delivery` can be `not_delivered` with `retry` `unsafe`: the failed step sent nothing, and an earlier one did.
+- When a step fails, `ok` is false, and `error` has that step's `code`, `message` and `hint`, with `details` `{"step": i}`, the index of the step. The step's own `details`, such as the snapshot a `wait` timed out on, stand once, in its envelope in `steps`, because an agent reads this output into its context. `delivery` is that step's `delivery`. `retry` is `unsafe` when any earlier step sent an input, because running the batch again would send that input again. Otherwise it is that step's `retry`. So `delivery` can be `not_delivered` with `retry` `unsafe`: the failed step sent nothing, and an earlier one did.
 - The exit code is the failed step's exit code, and 0 when every step is ok.
 - A failure before the first step runs, such as a step that does not parse, `NO_DEVICE`, `DEVICE_BUSY` or `POLICY_INVALID`, is an ordinary error envelope with `command` `batch`, `delivery` `not_delivered`, `retry` `safe` and no `data`. Nothing ran, and no trace was written.
 - A step that raises is the failed step. Its envelope is the `INTERNAL` envelope of an uncaught exception, with `delivery_uncertain` only when that step spent an input permit that it did not refund. The steps before it stay in `steps` and in the trace.
@@ -318,7 +318,7 @@ The envelope's own keys follow the steps:
     "hint":"Input was sent since the last snapshot. Take one and look before acting.","details":{}}}],
   "stopped_at":1,"trace":"/home/agent/.agent-phone/traces/0a1b2c3d4e5f6a7b/20261101T091500.123456Z-batch.jsonl"},
  "error":{"code":"OBSERVE_FIRST","message":"Input was sent since the latest snapshot, e8j9h. Take a new one and look first.",
-  "hint":"Input was sent since the last snapshot. Take one and look before acting.","details":{}}}
+  "hint":"Input was sent since the last snapshot. Take one and look before acting.","details":{"step":1}}}
 ```
 
 The launch had no `--wait-for`, so it left no observation for the click. The click is refused with nothing sent, and the batch's `retry` is `unsafe` because the launch went out.

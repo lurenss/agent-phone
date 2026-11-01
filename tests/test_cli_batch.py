@@ -113,7 +113,8 @@ def test_a_batch_stops_at_its_first_failed_step_and_takes_that_steps_error_and_d
     code, wire = batch(tmp_path, [LAUNCH, nowhere, BACK], hub)
     steps = wire["data"]["steps"]
     assert code == 1 and wire["ok"] is False and wire["data"]["stopped_at"] == 1 and len(steps) == 2
-    assert wire["error"] == steps[1]["error"] and wire["error"]["code"] == "NOT_FOUND"
+    assert wire["error"]["code"] == steps[1]["error"]["code"] == "NOT_FOUND"
+    assert wire["error"]["details"] == {"step": 1}
     assert wire["delivery"] == steps[1]["delivery"] == "not_delivered"
     assert wire["retry"] == "unsafe" and steps[1]["retry"] == "safe", "the launch before it went out"
     assert [type(action) for action in sent(hub)] == [Launch]
@@ -130,7 +131,6 @@ def test_a_batch_that_stops_before_any_input_is_safe_to_run_again(tmp_path):
     assert (wire["delivery"], wire["retry"]) == ("not_delivered", "safe") and sent(hub) == []
 
 
-@pytest.mark.xfail(strict=True, reason="the batch's error repeats the failed step's whole error, details too")
 def test_a_failed_batch_names_the_failed_step_and_does_not_print_its_details_twice(tmp_path):
     hub = FakeHub([J7], screens=[HOME])
     code, wire = batch(tmp_path, [["wait", "--for", "name=Nowhere", "--timeout-ms", "100"], BACK], hub)
@@ -160,7 +160,7 @@ def test_two_refs_from_one_snapshot_still_fail_as_the_second_is_spent(tmp_path):
     steps = [["click", f"@{taken}:e7", "--wait-for", "name=Brightness"], ["click", f"@{taken}:e6"]]
     code, wire = batch(tmp_path, steps, hub)
     assert code == 1 and wire["error"]["code"] == "STALE_REF" and wire["data"]["stopped_at"] == 1
-    assert wire["error"]["details"] == {"reason": "spent"} and wire["retry"] == "unsafe"
+    assert wire["data"]["steps"][1]["error"]["details"] == {"reason": "spent"} and wire["retry"] == "unsafe"
     assert [type(action) for action in sent(hub)] == [Tap]
 
 
@@ -292,7 +292,7 @@ def test_a_grant_and_a_policy_file_serve_only_the_step_that_names_them(tmp_path)
     hub = FakeHub([J7], screens=[SETTINGS], after_each=[SETTINGS, SETTINGS])
     code, wire = batch(tmp_path, [granted, ["click", "name=Display", "--policy", str(rule)]], hub)
     assert code == 1 and wire["data"]["stopped_at"] == 1 and wire["error"]["code"] == "COMMIT_REFUSED"
-    assert wire["error"]["details"]["granted"] == [] and len(sent(hub)) == 1
+    assert wire["data"]["steps"][1]["error"]["details"]["granted"] == [] and len(sent(hub)) == 1
     look(tmp_path, SETTINGS)
     hub = FakeHub([J7], screens=[SETTINGS], after_each=[SETTINGS, SETTINGS])
     code, wire = batch(tmp_path, [granted, ["click", "name=Display"]], hub, name="plain.json")
