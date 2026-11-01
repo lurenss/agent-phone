@@ -1,0 +1,8 @@
+DISPLAY MANAGER (dumpsys display)
+Logical Displays: size=1
+  Display 0:
+    mDisplayId=0
+    mLayerStack=0
+    mPrimaryDisplayDevice=Built-in Screen
+    mBaseDisplayInfo=DisplayInfo{"Built-in Screen", uniqueId "local:0", app 1080 x 1920, real 1080 x 1920, largest app 1080 x 1920, smallest app 1080 x 1920, mode 1, defaultMode 1, modes [{id=1, width=1080, height=1920, fps=60.0}], rotation 0, density 420 (420.0 x 420.0) dpi, layerStack 0, type BUILT_IN, state ON, FLAG_DEFAULT_DISPLAY, FLAG_SECURE}
+    mOverrideDisplayInfo=DisplayInfo{"Built-in Screen", uniqueId "local:0", app 1080 x 1794, real 1080 x 1920, largest app 1080 x 1920, rotation 0, state ON}

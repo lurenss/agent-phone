@@ -1,0 +1,7 @@
+Logical Displays: size=2
+  Display 0:
+    mDisplayId=0
+    mBaseDisplayInfo=DisplayInfo{"Built-in Screen", displayId 0, displayGroupId 0, FLAG_SECURE, real 1080 x 1920, largest app 1080 x 1920, smallest app 1080 x 1080, rotation 0, state ON, type INTERNAL, uniqueId "local:4630946", app 1080 x 1920, density 369 (369.0 x 369.0) dpi}
+  Display 4:
+    mDisplayId=4
+    mBaseDisplayInfo=DisplayInfo{"Built-in Screen", displayId 4, displayGroupId 0, FLAG_SECURE, real 1080 x 1240, largest app 1080 x 1240, rotation 0, state OFF, type INTERNAL, uniqueId "local:4630947", app 1080 x 1240}
