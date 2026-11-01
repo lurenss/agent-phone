@@ -14,6 +14,7 @@ import json
 from collections.abc import Mapping
 
 from agent_phone.core.commands.find import Found
+from agent_phone.core.commands.skills import SkillCatalog, SkillText
 from agent_phone.core.device import DeviceList, Listed, Serial
 from agent_phone.core.outcome import Acted, Disposition, ErrorCode, Outcome, Read, Refused, Value
 from agent_phone.core.phone import ServerStatus
@@ -73,6 +74,15 @@ def payload_data(payload: object) -> dict[str, object]:
                 "idle_limit_s": payload.idle_limit_s,
                 "idle_for_s": payload.idle_for_s,
             }
+        case SkillCatalog():
+            return {
+                "skills": [
+                    {"name": skill.name, "alias": skill.alias, "summary": skill.summary}
+                    for skill in payload.skills
+                ]
+            }
+        case SkillText():
+            return {"name": payload.skill.name, "content": payload.content}
         case Value():
             if payload.ref is None:
                 return {"value": payload.value}

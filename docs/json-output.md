@@ -113,6 +113,29 @@ The exit code is 0 when `ok` is true, 1 for an error envelope, and 2 when the ar
 | `idle_limit_s` | int or null | The idle limit the running watchdog was started with, in seconds. The default is 900. `AGENT_PHONE_IDLE_S` sets it for the next start. |
 | `idle_for_s` | int or null | Seconds since a command last used the server. Null when no server runs. |
 
+## Skills payload
+
+`agent-phone skills list` and `agent-phone skills get [name]` print the usage guides for agents that ship inside the package, under `agent_phone/skills/`. They read no device, and the envelope's `device` is null.
+
+### Skills list
+
+`list` prints `{"skills": [...]}`, one object per guide.
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `name` | string | The guide's name. Pass it, or its alias, to `skills get`. |
+| `alias` | string | A short name for the same guide, such as `phone`. |
+| `summary` | string | What the guide covers. |
+
+### Skills get
+
+`get` prints one guide. With no name it prints `agent-phone`.
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `name` | string | The guide's name, also when an alias asked for it. |
+| `content` | string | The guide's `SKILL.md`, as Markdown with its YAML front matter. |
+
 ## Find payload
 
 `agent-phone find` searches the lines a compact snapshot prints. It lists every match, up to `--limit`, and records them as a snapshot of their own, which owns their refs. `--count` records nothing and prints only `count`.

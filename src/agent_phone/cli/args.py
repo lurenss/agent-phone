@@ -13,6 +13,7 @@ from agent_phone.core.commands.find import DEFAULT_LIMIT, FindCommand
 from agent_phone.core.commands.get import GetCommand, GetProperty
 from agent_phone.core.commands.is_ import IsCommand, IsProperty
 from agent_phone.core.commands.server import ServerAction, ServerCommand
+from agent_phone.core.commands.skills import SKILLS, SkillsGetCommand, SkillsListCommand
 from agent_phone.core.commands.snapshot import SnapshotCommand
 from agent_phone.core.device import Serial
 from agent_phone.core.outcome import ErrorCode, Refusal
@@ -24,7 +25,17 @@ from agent_phone.core.snapshot.snapshot import RefToken
 from agent_phone.core.snapshot.surface import Pick
 from agent_phone.core.snapshot.view import Mode
 
-Command = DevicesCommand | ServerCommand | SnapshotCommand | FindCommand | GetCommand | IsCommand
+Command = (
+    DevicesCommand
+    | ServerCommand
+    | SnapshotCommand
+    | FindCommand
+    | GetCommand
+    | IsCommand
+    | SkillsListCommand
+    | SkillsGetCommand
+)
+SKILL_NAMES = {name: skill for skill in SKILLS for name in (skill.name, skill.alias)}
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,7 +84,25 @@ def build() -> Parser:
     actions.add_parser("start", parents=[after], help="start the server, or confirm it runs")
     actions.add_parser("stop", parents=[after], help="stop the server so another tool can use the device")
     actions.add_parser("status", parents=[after], help="say whether the server runs and how long it is idle")
+    add_skills(commands)
     return parser
+
+
+def add_skills(commands: argparse._SubParsersAction) -> None:
+    """They read only the package, so they take no device."""
+    skills = commands.add_parser(
+        "skills", help="print the usage guides for agents that ship with agent-phone"
+    )
+    actions = skills.add_subparsers(dest="action", metavar="action", required=True, parser_class=Parser)
+    actions.add_parser("list", help="list the guides, each with its name, alias and summary")
+    get = actions.add_parser("get", help="print one guide; its Markdown is data.content")
+    get.add_argument(
+        "name",
+        nargs="?",
+        choices=list(SKILL_NAMES),
+        default=SKILLS[0].name,
+        help=f"the guide's name or alias (default {SKILLS[0].name})",
+    )
 
 
 def add_scope(parser: Parser, what: str) -> None:
@@ -217,4 +246,8 @@ def parse_args(argv: Sequence[str]) -> Invocation:
             command = IsCommand(parsed.ref, IsProperty(parsed.property))
         case "server":
             command = ServerCommand(ServerAction(parsed.action))
+        case "skills" if parsed.action == "list":
+            command = SkillsListCommand()
+        case "skills":
+            command = SkillsGetCommand(SKILL_NAMES[parsed.name])
     return Invocation(parsed.command, Serial(parsed.device) if parsed.device else None, command)

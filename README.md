@@ -21,6 +21,7 @@ agent-phone find --name Wi-Fi --role button   # every match, with its ref
 agent-phone get @k3x9q:e4 --property bounds   # one property of a ref, read live
 agent-phone is @k3x9q:e4 --property enabled   # one boolean of a ref, read live
 agent-phone server stop                  # free the phone for another tool, such as an old uiautomator dump
+agent-phone skills get phone             # the usage guide for agents, as Markdown in data.content
 ```
 
 Each command prints one JSON object, described in `docs/json-output.md`. `-d <serial>` picks a device when several are ready, and a ref names its own device. The server on the phone starts when a command needs it and stops after 15 idle minutes. Input commands are not built yet. `AGENT_PHONE_HOME`, `AGENT_PHONE_IDLE_S`, `AGENT_PHONE_LOCK_WAIT_S` and `ADB` configure the state folder, the idle limit, how long a command waits for another process to let go of the device, and the adb binary.

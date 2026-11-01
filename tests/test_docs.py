@@ -111,6 +111,14 @@ def test_the_server_table_lists_exactly_the_keys_a_status_carries():
     assert set(payload_data(ServerStatus(True, True, 900, 3))) == set(first_column("## Server payload"))
 
 
+def test_the_skills_tables_list_exactly_the_keys_list_and_get_carry(tmp_path):
+    _, listed = invoke(["skills", "list"], FakeHub([]), tmp_path)
+    assert set(listed["data"]) == {"skills"}
+    assert set(listed["data"]["skills"][0]) == set(first_column("### Skills list"))
+    _, got = invoke(["skills", "get"], FakeHub([]), tmp_path)
+    assert set(got["data"]) == set(first_column("### Skills get"))
+
+
 def test_the_example_find_is_what_the_code_prints_for_its_fixture(tmp_path):
     example = next(block for block in json_blocks() if block["command"] == "find")
     assert set(example["data"]) == set(first_column("## Find payload"))

@@ -11,7 +11,7 @@ uv sync                         # install the package and the dev tools
 uv run pytest                   # every test, including the architecture and no-sleep gates
 uv run ruff check               # lint
 uv run ruff format --check .    # formatting
-uv run agent-phone devices      # the CLI; `snapshot`, `find`, `get`, `is` and `server start|stop|status` are the other commands
+uv run agent-phone devices      # the CLI; `snapshot`, `find`, `get`, `is`, `server start|stop|status` and `skills list|get` are the other commands
 probes/android/server_lifetime.sh                         # re-run a platform probe against the phone
 uv run python -I probes/android/unit2_probe.py <check>    # facts, watchdog, bench, idle, concurrent, stop, foreign
 uv run python -I probes/android/unit3_probe.py <check>    # windows, freshness, bench, commands (reading the screen)
@@ -34,8 +34,8 @@ src/agent_phone/core/       platform-neutral domain types and command logic, one
 src/agent_phone/adapters/   backends; each one translates one automation stack into core types
 src/agent_phone/cli/        argument parsing and the Driver; the only place an adapter is wired to core
 src/agent_phone/policy/     the built-in policy rules, shipped as package data
+src/agent_phone/skills/     the usage guides for agents, shipped as package data; `agent-phone skills get` prints them
 examples/                   consumers built on the public API, with their own policy files
-skills/                     agent-facing usage docs, shipped in the package
 probes/android/             phone measurements, their captures, and FINDINGS.md
 docs/                       the plan, the JSON contract, and lessons from past bugs
 tests/                      behavior tests and redacted golden fixtures

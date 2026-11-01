@@ -1,0 +1,153 @@
+---
+name: agent-phone
+description: >
+  Read what an Android phone shows through its accessibility tree, over adb, with the agent-phone
+  CLI. Use when an AI agent must see an Android screen: list the connected devices, snapshot the
+  active window as compact lines with refs, outline a long screen and drill into one list, read a
+  dialog, the keyboard or the notification shade, find elements by role, name, text or resource-id,
+  or read one property of an element. Also use to free the phone for another adb tool. Triggers on
+  "android", "phone screen", "adb", "accessibility tree", "snapshot the phone", "agent-phone".
+---
+
+# agent-phone
+
+agent-phone is a CLI that reads an Android phone's screen through the accessibility tree, over adb. It is a tool, not an agent. The loop of observe, act and observe again runs in you. Each command prints one JSON object on one line and exits.
+
+agent-phone only reads today. It sends no taps, no text and no keys. Input commands arrive in a later version.
+
+## Start here
+
+1. Run `agent-phone devices`. Use a row with `"ready": true`. A row with `"ready": false` is a phone that is offline or has not accepted USB debugging.
+2. Run `agent-phone snapshot --settle`. The first command of a session starts a server on the phone, which takes 2 to 3 s on a Samsung J7. Later commands take about 300 ms.
+3. For the flags of a command, run it with `--help`, for example `agent-phone find --help`. This guide does not list every flag.
+
+## Read the output
+
+```json
+{"v":1,"ok":true,"command":"snapshot","device":"emulator-5554","data":{
+ "id":"q7m2k","app":"com.android.settings","window":"application","mode":"compact","settled":"settled",
+ "keyboard":false,"dialog":false,"others":[],"toasts":[],"truncated":0,
+ "tree":[
+  "text \"Settings\" [63,33,277,114]",
+  "@q7m2k:e1 button \"Search\" [1648,0,1775,147]",
+  "@q7m2k:e3 list #dashboard_container (4 rows) [0,179,1920,1080]",
+  "  @q7m2k:e4 button \"Connections\" \"Wi-Fi, Bluetooth, Data usage, Airplane m…\" focused [0,179,1920,394]"]}}
+```
+
+- On an error, `ok` is false and `error` holds `code`, `message`, `hint` and `details`. Branch on `error.code`, because the message wording can change.
+- The exit code is 0 on success, 1 on an error and 2 when the arguments do not parse.
+- A tree line holds, in this order, the indent, the ref, the role, the name, the detail, `value="…"`, `#<resource-id>`, the states, `(N rows)`, `(+N)` and the bounds `[left,top,right,bottom]`. Only the role is always there.
+- A line with no ref is text that has nothing to act on.
+- `keyboard` and `dialog` say that an overlay is up. `others` lists every other window with its `id`.
+
+## Use refs
+
+- A ref is `@<snapshot id>:e<N>`, such as `@q7m2k:e4`. Pass it as printed. A ref without its snapshot id, such as `e4`, is `INVALID_ARGS`.
+- Each `snapshot` and each `find` records a new snapshot with a new id. A ref names the snapshot that made it, and through it the device, so a command that gets a ref needs no `-d`.
+- `N` counts the elements you can act on, in tree order, over the whole window. One element keeps its `N` in the compact view, the skeleton and a `--root` drill-down of the same screen, each under its own snapshot id.
+- `get` and `is` find the ref's element again on the live screen before they read it. It must be there exactly once.
+- `STALE_REF` means the ref cannot be trusted. `details.reason` is `gone` when its element left the screen and `rebooted` when the phone restarted after the snapshot. Take a new snapshot and use its refs.
+- `SNAPSHOT_NOT_FOUND` means the id was never recorded here, or it is older than the newest 64 snapshots of its device. Take a new snapshot.
+- `AMBIGUOUS_TARGET` means several live elements match the ref. Narrow the target with `find` or drill in with `--root`.
+
+## Outline a long screen, then drill in
+
+```bash
+agent-phone snapshot --skeleton           # a collection prints as one line: (12 rows) (+40)
+agent-phone snapshot --root @k3x9q:e3     # that collection only, with the same ref numbers
+```
+
+- Start with `--skeleton` on a feed, a long list or a screen you do not know. It folds the rows of each collection into one line, with `(N rows)` and `(+N)` for the lines it hides.
+- Drill into the collection you need with `--root` and its ref, then use the refs of the drill-down.
+- A snapshot stays under 8 KB. When a compact view does not fit, agent-phone drops detail first and can fall back to a skeleton. `mode` says which you got, and `truncated` counts the lines it removed. A line that shows `(+N)` lost lines, and `--root` on its ref shows them.
+- `--full` prints every node, including nodes with no words and nodes off screen. Use it only when the compact view lacks something you expected.
+
+## Settle after the screen changes
+
+A plain snapshot reads the screen once, and its `settled` is `unchecked`. Right after the screen changes, that one read can show the screen from before the change. On a Samsung J7, the first read after `adb shell am start` showed the old app in 10 of 10 tries.
+
+- After anything changes the screen, run `agent-phone snapshot --settle`. It reads until two reads in a row print the same lines.
+- `settled` means two reads agreed. `unsettled` means `--timeout-ms` passed first (3000 by default), and you got the last read. Settle again before you trust it.
+- `find` reads once and takes no `--settle`. Run `agent-phone snapshot --settle` first, then `find`.
+
+## Pick the window
+
+By default a snapshot describes the active window. That is the first window that is not the status bar, the navigation bar or the keyboard.
+
+| Flag | Window |
+| --- | --- |
+| `--surface dialog` | A window that does not cover the display, such as a permission dialog |
+| `--surface keyboard` | The keyboard |
+| `--surface shade` | The notification shade |
+| `--surface all` | Every window, each opened by a line `group "<package>" "<window kind>"` |
+| `--window N` | The window that `others` lists under the id `N` |
+
+- When `dialog` or `keyboard` is true, read that surface before the window behind it.
+- A dialog over an app hides the app. The app has no lines until the dialog closes.
+- `NO_SURFACE` means the window you asked for is not on screen, or the screen is off. The message lists the windows that are.
+- `find` takes the same `--surface`, `--window` and `--root` flags.
+
+## Find what you know
+
+```bash
+agent-phone find --name Wi-Fi --role button       # every match, each with its ref
+agent-phone find --text bluetooth --surface dialog
+agent-phone find --role button --count            # only how many, and nothing recorded
+agent-phone get @p4n8c:e4 --property bounds       # one property of the element, read live
+agent-phone is @p4n8c:e4 --property enabled       # one boolean of the element, read live
+```
+
+- Use `find` when you know the role, the name, a word it shows, the typed value or the resource-id. It prints a few lines where a snapshot prints the whole window.
+- `--name`, `--text` and `--value` match part of the words and ignore case. `--exact` matches the whole of them.
+- `find` lists up to 20 matches (`--limit`), and `count` is every match. A `count` of 0 is a success, not an error. Check `count` before you rely on one match.
+- The refs in `matches` belong to the snapshot that `find` records, whose id is `data.id`.
+- `get` reads `text`, `value`, `bounds` or `states`. `is` checks `visible`, `enabled`, `checked`, `focused` or `selected`. Neither records a snapshot.
+
+## Retry only what did not reach the phone
+
+Every error carries `delivery` and `retry`.
+
+- `retry` is `safe` only when `delivery` is `not_delivered`. Nothing reached the phone, and you can run the same command again.
+- Any other `delivery` means input may have reached the phone. Read the screen before you do anything else. Every command today only reads, so its errors are `not_delivered`, but branch on `retry` all the same.
+- `DEVICE_BUSY` means another process drives the phone. Nothing was sent. Run the command again when that process is done.
+- `SERVER_UNAVAILABLE` means the server on the phone did not answer, often because another tool holds the phone's one accessibility connection. Run `agent-phone server stop`, then the command again.
+
+## Choose the device
+
+- With one ready device, every command uses it. With several, pass `-d <serial>`, before or after the command, or pass a ref, which names its device. With neither, the command fails with `DEVICE_AMBIGUOUS`.
+- `WRONG_DEVICE` means `-d` names another device than the ref does.
+- `NO_DEVICE` means no device is ready. Run `agent-phone devices` to see why.
+- A `devices` row also carries facts read from the phone, such as `api`, `display`, `density`, `locale` and `boot_id`.
+
+## Mind the server on the phone
+
+agent-phone reads the screen through a uiautomator2 server on the phone. The first command that needs the server starts it, and the server stops itself after 15 idle minutes, even with the cable out.
+
+```bash
+agent-phone server status     # running, watchdog, idle_limit_s and idle_for_s
+agent-phone server start      # start it now, or confirm that it runs
+agent-phone server stop       # stop it and free the phone for other tools
+```
+
+- Android allows one accessibility automation client per phone. While the server runs, `uiautomator dump`, uiautomator2 scripts and similar tools fail on that phone. Run `agent-phone server stop` when you finish, or before you hand the phone to another tool.
+- `server stop` stops any uiautomator2 server on the phone, also one that another tool started.
+- One process drives a phone at a time. A second command waits up to 10 s, then fails with `DEVICE_BUSY`. The lock lives in the state folder, `~/.agent-phone` by default, so processes that share a phone must share `AGENT_PHONE_HOME`.
+- The state folder keeps every snapshot, which is what the screen showed. Treat it as private.
+- `AGENT_PHONE_IDLE_S` sets the idle limit in seconds, `AGENT_PHONE_LOCK_WAIT_S` the lock wait, and `ADB` the adb binary.
+
+## Print this guide
+
+```bash
+agent-phone skills list
+agent-phone skills get phone      # this guide, in data.content
+```
+
+## Avoid these mistakes
+
+1. **A plain snapshot right after a change.** It can show the screen from before the change. Use `--settle`.
+2. **A compact or full snapshot of a long feed.** Take `--skeleton`, then `--root` on the list you need, or use `find`.
+3. **Tapping printed bounds with `adb shell input tap`.** Nothing checks that the element is still there, and a wrong tap can post, send or delete.
+4. **Fixed sleeps.** The screen does not change on a timer. Use `snapshot --settle`.
+5. **Branching on `message`.** Branch on `error.code` and `retry`.
+6. **Leaving the server up when you hand the phone over.** Run `agent-phone server stop`.
+7. **Two state folders for one phone.** Each has its own lock, so two processes can drive the phone at once.

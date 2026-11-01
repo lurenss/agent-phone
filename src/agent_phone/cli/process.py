@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 from typing import TextIO
 
 from agent_phone.adapters.uiautomator2.adb import SubprocessAdb
@@ -15,12 +16,13 @@ from agent_phone.adapters.uiautomator2.phone import U2Hub
 from agent_phone.cli.args import Invocation, parse_args
 from agent_phone.cli.driver import PhoneError, device_lock, open_phone
 from agent_phone.cli.settings import Settings
-from agent_phone.core.commands import devices, server
+from agent_phone.core.commands import devices, server, skills
 from agent_phone.core.commands.devices import DevicesCommand
 from agent_phone.core.commands.find import FindCommand
 from agent_phone.core.commands.get import GetCommand
 from agent_phone.core.commands.is_ import IsCommand
 from agent_phone.core.commands.server import ServerCommand
+from agent_phone.core.commands.skills import SkillsGetCommand, SkillsListCommand
 from agent_phone.core.commands.snapshot import SnapshotCommand
 from agent_phone.core.device import Serial, select_device
 from agent_phone.core.envelope import encode, exit_code, floor_envelope, to_wire
@@ -28,6 +30,8 @@ from agent_phone.core.outcome import Outcome, Refusal, Refused
 from agent_phone.core.phone import PhoneHub
 from agent_phone.core.snapshot.snapshot import RefToken
 from agent_phone.core.wait.clock import Clock, SystemClock
+
+SKILLS_ROOT = Path(__file__).resolve().parents[1] / "skills"
 
 
 def run(
@@ -58,6 +62,8 @@ def execute(
     match invocation.command:
         case DevicesCommand():
             return devices.run(hub, profiles=()), None
+        case SkillsListCommand() | SkillsGetCommand() as command:
+            return skills.run(SKILLS_ROOT, command), None
         case SnapshotCommand() | FindCommand() | GetCommand() | IsCommand() as command:
             with open_phone(
                 invocation.serial,
