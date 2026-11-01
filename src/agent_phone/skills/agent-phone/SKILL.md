@@ -71,6 +71,7 @@ A plain snapshot reads the screen once, and its `settled` is `unchecked`. Right 
 - After anything changes the screen, run `agent-phone snapshot --settle`. It reads until two reads in a row print the same lines.
 - `settled` means two reads agreed. `unsettled` means `--timeout-ms` passed first (3000 by default), and you got the last read. Settle again before you trust it.
 - `find` reads once and takes no `--settle`. Run `agent-phone snapshot --settle` first, then `find`.
+- An app that opens animates in. A `--wait-for` after `launch` can hold on a frame where the window is still scaled or off the edge, and a tap sent then can be lost. Before the first tap after `launch`, wait for the app, an element and two equal reads together, as in `agent-phone wait --app com.google.android.youtube --for 'name=Cerca' --settled`.
 
 ## Wait for the screen instead of sleeping
 
@@ -107,6 +108,8 @@ By default a snapshot describes the active window. That is the first window that
 
 - When `dialog` or `keyboard` is true, read that surface before the window behind it.
 - A dialog over an app hides the app. The app has no lines until the dialog closes.
+- In landscape, a keyboard can take the whole screen. The app then has no lines, and a query for its field is `NOT_FOUND`. `press back` hides the keyboard and leaves the field on screen. `set-text` needs no keyboard.
+- A popup menu is a second window of the app, listed after the window that has focus, so it appears in `others` and the snapshot shows the window under it. Its items cannot be tapped, and the window under it is `OCCLUDED`. Close it with `press back`.
 - `NO_SURFACE` means the window you asked for is not on screen, or the screen is off. The message lists the windows that are.
 - `find` takes the same `--surface`, `--window` and `--root` flags.
 
@@ -257,3 +260,4 @@ agent-phone skills get phone      # this guide, in data.content
 8. **A `--commit` your user did not ask for.** The gate exists because a wrong commit cannot be undone. Grant the one effect the user asked for, for the one input that does it.
 9. **Retrying an input whose `delivery` is not `not_delivered`.** Take a snapshot and look first.
 10. **A batch whose later steps use refs.** Each input spends the refs before it. Name later targets by query, and give each input a `--wait-for` or a `wait` step after it.
+11. **Tapping the moment an app opens.** The window can still be animating, and the tap is lost. Wait with `--settled` first.
