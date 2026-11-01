@@ -67,3 +67,26 @@ def test_two_traces_never_share_a_file(tmp_path):
 )
 def test_the_text_of_set_text_and_clipboard_set_is_replaced_by_its_length(argv, shown):
     assert redacted(argv, parse_args(argv).command) == shown
+
+
+@pytest.mark.xfail(strict=True, reason="only a word equal to the text is redacted, not one that holds it")
+@pytest.mark.parametrize(
+    ("argv", "shown"),
+    [
+        (
+            ["set-text", "role=field", "hunter2", "--wait-for", "value=hunter2"],
+            ["set-text", "role=field", "<7 chars>", "--wait-for", "value=<7 chars>"],
+        ),
+        (
+            ["set-text", "role=field", "hunter2", "--wait-for=value=hunter2"],
+            ["set-text", "role=field", "<7 chars>", "--wait-for=value=<7 chars>"],
+        ),
+        (
+            ["set-text", "@k3x9q:e3", "it", "--wait-for", "name*=it", "--timeout-ms", "900"],
+            ["set-text", "@k3x9q:e3", "<2 chars>", "--wait-for", "name*=<2 chars>", "--timeout-ms", "900"],
+        ),
+    ],
+    ids=["in-a-query", "in-a-flag-value", "a-short-text-leaves-the-flag-names"],
+)
+def test_the_typed_text_is_redacted_inside_every_word_that_holds_it(argv, shown):
+    assert redacted(argv, parse_args(argv).command) == shown
