@@ -5,6 +5,7 @@ received, so "sends no input" is an observation and not a claim."""
 
 import tomllib
 
+import pytest
 from fakes import EMULATOR_SERIAL, J7_SERIAL, FakePhone, info_for
 from support import FakeClock, consumer_of, fixture_screen, labelled, node, screen_of
 
@@ -366,3 +367,12 @@ def test_a_sideways_scroll_of_a_pager_or_of_rows_side_by_side_is_sent(tmp_path):
     ctx, phone = context(tmp_path, carousel)
     done = act(ctx, Request(Scroll(RefTarget(look(ctx, SettleState.SETTLED).ref(1)), Direction.RIGHT)))
     assert isinstance(done, Acted) and isinstance(phone.permits[0].action, Swipe)
+
+
+@pytest.mark.xfail(strict=True, reason="a blank frame between two screens makes a gone predicate hold")
+def test_a_blank_frame_between_two_screens_proves_nothing_gone(tmp_path):
+    blank = window(node("android.widget.FrameLayout", bounds="[0,0][1080,1920]"))
+    ctx, _ = context(tmp_path, SETTINGS, after_input=[blank, DISPLAY_PAGE])
+    done = act(ctx, click(look(ctx), DISPLAY_TILE, wait_for=(Gone(Q("Display")),)))
+    assert isinstance(done, Acted) and done.after is not None
+    assert any("Brightness" in line.name for line in done.after.lines), "the wait stopped on the blank frame"
