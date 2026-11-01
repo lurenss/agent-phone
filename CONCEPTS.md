@@ -60,7 +60,7 @@ A list, pager or scroll view (`COLLECTIONS`). A row is one child of a collection
 
 ### Snapshot surface
 
-The window a snapshot describes, and what it notes about the rest (`snapshot.surface.Surface`, `select_surface`): whether a keyboard is up, whether the window is a dialog that does not cover the display, and one entry for every other window. It is the active window unless the caller names another one, with a `Pick` (`dialog`, `keyboard`, `shade` or `all`), a window id from `others`, or a drill-down root. A surface that is not on screen is `NO_SURFACE`.
+The window a snapshot describes, and what it notes about the rest (`snapshot.surface.Surface`, `select_surface`): whether a keyboard is up, whether the window is a dialog that does not fill the display (`Rect.fills`, `core/geometry.py`: no edge inset by more than a bar's 8%), and one entry for every other window. It is the active window unless the caller names another one, with a `Pick` (`dialog`, `keyboard`, `shade` or `all`), a window id from `others`, or a drill-down root. A surface that is not on screen is `NO_SURFACE`.
 
 ### View and line
 

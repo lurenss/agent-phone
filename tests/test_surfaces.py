@@ -187,24 +187,17 @@ def test_each_j7_dump_has_its_active_window_dialog_flag_and_other_windows(name):
     )
 
 
-IN_BUG_3 = pytest.mark.xfail(
-    strict=True, reason="a window that misses the display by a bar or less is not seen as filling it"
-)
-
-
 def one_window(bounds, rotation=0, package="test.app"):
     return screen_of(node("android.widget.FrameLayout", package=package, bounds=bounds), rotation=rotation)
 
 
 FILLS = [
     pytest.param("[0,0][1080,1920]", 0, id="whole display"),
-    pytest.param("[1,0][1079,1919]", 0, id="one pixel short on every side", marks=IN_BUG_3),
-    pytest.param(
-        "[0,63][1080,1794]", 0, id="J7 app between the status bar and the navigation bar", marks=IN_BUG_3
-    ),
-    pytest.param("[0,25][1920,1080]", 1, id="Thor app starting below a 25 px strip", marks=IN_BUG_3),
-    pytest.param("[1,0][1920,1079]", 1, id="Thor app one pixel short", marks=IN_BUG_3),
-    pytest.param("[80,150][1000,1770]", 0, id="dialog with every margin under 8 percent", marks=IN_BUG_3),
+    pytest.param("[1,0][1079,1919]", 0, id="one pixel short on every side"),
+    pytest.param("[0,63][1080,1794]", 0, id="J7 app between the status bar and the navigation bar"),
+    pytest.param("[0,25][1920,1080]", 1, id="Thor app starting below a 25 px strip"),
+    pytest.param("[1,0][1920,1079]", 1, id="Thor app one pixel short"),
+    pytest.param("[80,150][1000,1770]", 0, id="dialog with every margin under 8 percent"),
 ]
 DOES_NOT_FILL = [
     pytest.param("[1,1530][1073,1914]", 0, id="J7 Bluetooth dialog, A2-7"),
@@ -229,14 +222,12 @@ def test_a_window_that_misses_the_display_by_more_than_a_bar_is_a_dialog(bounds,
     assert dialog is True
 
 
-@IN_BUG_3
 def test_the_dialog_surface_does_not_take_an_app_that_the_bars_inset(tmp_path):
     inset = one_window("[0,63][1080,1794]")
     code, wire = snapshot(["--surface", "dialog"], [inset], tmp_path)
     assert code == 1 and wire["error"]["code"] == "NO_SURFACE"
 
 
-@IN_BUG_3
 def test_the_shade_surface_takes_a_system_window_that_is_a_pixel_short_of_the_display(tmp_path):
     shade = one_window("[1,0][1079,1919]", package="com.android.systemui")
     code, wire = snapshot(["--surface", "shade"], [shade], tmp_path)

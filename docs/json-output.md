@@ -374,7 +374,7 @@ Each batch writes one JSONL file, `<state root>/traces/<serial>/<UTC timestamp>-
 | `mode` | string | `compact`, `skeleton` or `full`. Budget fitting can turn `compact` into `skeleton`. |
 | `settled` | string | See [Settle states](#settle-states). |
 | `keyboard` | bool | `true` when a keyboard window is on screen. |
-| `dialog` | bool | `true` when the described window does not cover the display. |
+| `dialog` | bool | `true` when the described window does not fill the display. A window fills it when none of its edges is inset from the display's edge by more than 8% of the display's width (left and right) or height (top and bottom). A full-screen app lying between the status bar and the navigation bar, or a pixel short of the display, fills it, and a dialog whose margins are all under 8% reads as `false`. |
 | `others` | array | Every other window, in dump order, as `{"id", "app", "window", "bounds", "nodes"}`. `bounds` is `[left, top, right, bottom]`, and `nodes` is the window's node count. |
 | `toasts` | array of strings | Toast texts the backend saw. |
 | `truncated` | int | The number of lines that budget fitting removed. |

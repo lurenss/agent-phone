@@ -18,6 +18,11 @@ class Size:
     height: int
 
 
+STRIP_FRACTION = 0.08
+"""The most a status or navigation bar takes of the display across its thin side. The J7's status
+bar takes 3.3%, a three-button navigation bar is about 7.5%, and the Thor's status bar is 5.1%."""
+
+
 class Rotation(Enum):
     """Surface.ROTATION_* as the dump's `rotation` attribute reports it."""
 
@@ -58,10 +63,20 @@ class Rect:
             min(self.bottom, other.bottom),
         )
 
-    def covers(self, other: Rect) -> bool:
+    def fills(self, display: Size) -> bool:
+        """True when none of the four edges is inset from the display's edge by more than a bar's
+        thickness (`STRIP_FRACTION` of the display's length along that axis). A full-screen app
+        qualifies without covering the display exactly: the bars can lie outside its window (a J7 app
+        at `[0,63][1080,1794]`), a backend can report bounds a pixel inside the display, and an app can
+        start below a thin strip (YouTube at `[0,25][1920,1080]`).
+
+        The limit is that a dialog whose margins are all under 8% fills the display by this rule, so
+        `dialog` is false for it and `--surface dialog` does not find it. The J7's Bluetooth dialog
+        is inset 1530 px from the top (A2-7), far over the limit."""
+        across, down = STRIP_FRACTION * display.width, STRIP_FRACTION * display.height
         return (
-            self.left <= other.left
-            and self.top <= other.top
-            and self.right >= other.right
-            and self.bottom >= other.bottom
+            self.left <= across
+            and self.top <= down
+            and display.width - self.right <= across
+            and display.height - self.bottom <= down
         )

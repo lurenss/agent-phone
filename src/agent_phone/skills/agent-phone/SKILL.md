@@ -99,7 +99,7 @@ By default a snapshot describes the active window. That is the first window that
 
 | Flag | Window |
 | --- | --- |
-| `--surface dialog` | A window that does not cover the display, such as a permission dialog |
+| `--surface dialog` | A window that does not fill the display, such as a permission dialog |
 | `--surface keyboard` | The keyboard |
 | `--surface shade` | The notification shade |
 | `--surface all` | Every window, each opened by a line `group "<package>" "<window kind>"` |

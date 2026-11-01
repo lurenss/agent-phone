@@ -33,13 +33,9 @@ import re
 import xml.etree.ElementTree as ET
 
 from agent_phone.core.device import Package
-from agent_phone.core.geometry import Rect, Rotation, Size
+from agent_phone.core.geometry import STRIP_FRACTION, Rect, Rotation, Size
 from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.screen import Attrs, Flag, NodeSpec, Screen, WindowKind, WindowSpec
-
-STRIP_FRACTION = 0.08
-"""The most a status or navigation bar takes of the display across its thin side. The J7's status
-bar takes 3.3%, and a three-button navigation bar is about 7.5%."""
 
 EDGE_SLACK = 2
 """Pixels by which a window may stop short of a display edge and still be along it. The Thor reports
