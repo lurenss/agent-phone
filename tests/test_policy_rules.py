@@ -155,7 +155,6 @@ def test_a_scope_applies_where_every_set_it_names_holds():
     assert not one_app.applies(Package("test.app"), WindowKind.APPLICATION, "it")
 
 
-@pytest.mark.xfail(strict=True, reason="R2-4: an inherit rule cannot name a resource-id")
 def test_an_inherit_rule_names_words_or_resource_ids_and_may_name_both():
     by_id = {"id": "t.id", "reason": "r", "node_ids": ["android:id/button1"]}
     by_both = {"id": "t.both", "reason": "r", "words": ["ok"], "node_ids": ["android:id/button1"]}

@@ -418,9 +418,6 @@ VERBS = [
 ]
 
 
-@pytest.mark.xfail(
-    strict=True, reason="R2-4: a verb that takes its object from the question is no affirmative"
-)
 @pytest.mark.parametrize(("title", "label"), VERBS)
 def test_a_verb_that_takes_its_object_from_its_question_is_denied_when_the_question_names_the_network(
     title, label
@@ -454,7 +451,6 @@ def positive_button(title, label, **attrs):
     )
 
 
-@pytest.mark.xfail(strict=True, reason="R2-4: the platform's positive button is not named an affirmative")
 def test_the_positive_button_of_a_platform_dialog_does_what_its_question_says_whatever_it_is_called():
     asked = "Delete this post?"
     named = positive_button(asked, "Proceed", resource_id="android:id/button1")
@@ -479,6 +475,11 @@ def test_on_the_j7_wi_fi_and_any_screen_that_shows_sockstun_are_denied():
     wifi = screen_of(node("android.widget.Switch", content_desc="Wi-Fi", checkable=True, clickable=True))
     assert isinstance(tap_on(wifi, wifi.nodes[0], policy), Denied)
     vpn = dialog("SocksTun", "Disconnect", "Forget")
-    for label in ("Disconnect", "Forget"):
-        verdict = tap_on(vpn, button(vpn, label), policy)
-        assert isinstance(verdict, Denied) and verdict.rule == "j7.sockstun-screens"
+    forget = tap_on(vpn, button(vpn, "Forget"), policy)
+    assert isinstance(forget, Denied) and forget.rule == "j7.sockstun-screens"
+    disconnect = tap_on(vpn, button(vpn, "Disconnect"), policy)
+    assert isinstance(disconnect, Denied) and disconnect.rule == "j7.sockstun", (
+        "Disconnect takes its object from the question, so j7.sockstun, which comes before the screen "
+        "rule and names the word in that question, denies it first"
+    )
+    assert {e.source for e in disconnect.evidence} == {Source.CONTEXT}

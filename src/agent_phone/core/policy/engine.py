@@ -297,10 +297,15 @@ def judge_receiver(
 
 
 def is_affirmative(inherits: Sequence[InheritRule], labels: Sequence[Label]) -> bool:
-    """True when a naming label is, as a whole, one of the inherit rules' words. It is compared as
-    the snapshot prints it, so a description "OK, Button" is the affirmative the agent reads."""
+    """True when a naming label is, as a whole, one of the inherit rules' words, or a label comes
+    from a node with one of their resource-ids. A label is compared as the snapshot prints it, so a
+    description "OK, Button" is the affirmative the agent reads."""
     affirmatives = {phrase.words for rule in inherits for phrase in rule.words}
-    return any(label.naming and words(cleaned(label), label.field) in affirmatives for label in labels)
+    ids = {node_id for rule in inherits for node_id in rule.node_ids}
+    return any(
+        label.node_resource_id in ids or (label.naming and words(cleaned(label), label.field) in affirmatives)
+        for label in labels
+    )
 
 
 def phrases_in(rules: Sequence[CommitRule], labels: Sequence[Label], source: Source) -> list[Found]:

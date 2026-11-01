@@ -78,5 +78,8 @@ reason = "A preference summary lists what its screen contains (\"Block, Allow, D
 [[inherit]]
 id = "default.affirmative"
 words = ["ok", "okay", "yes", "done", "continue", "accept", "agree", "allow", "apply", "got it",
-         "sì", "fatto", "continua", "accetta", "consenti", "applica"]
-reason = "A neutral button does what its dialog says."
+         "turn off", "turn on", "disable", "enable", "stop", "disconnect", "remove",
+         "sì", "fatto", "continua", "accetta", "consenti", "applica",
+         "disattiva", "attiva", "interrompi", "disconnetti", "rimuovi"]
+node_ids = ["android:id/button1"]
+reason = "A neutral button, or a verb that takes its object from the question, does what its dialog says. android:id/button1 is the positive button of a platform dialog, whatever it is called."

@@ -353,9 +353,6 @@ def test_on_the_j7_the_ok_of_a_question_about_the_network_is_never_sent(tmp_path
     assert outcome.details["rule"] == "j7.vpn-lockdown"
 
 
-@pytest.mark.xfail(
-    strict=True, reason="R2-4: a verb that takes its object from the question is no affirmative"
-)
 @pytest.mark.parametrize("title", ["Turn off mobile data?", "Turn off Wi-Fi?"])
 def test_on_the_j7_turn_off_under_a_question_about_the_network_is_never_sent(tmp_path, title):
     outcome, sent = tap_positive(tmp_path, title, "Turn off")

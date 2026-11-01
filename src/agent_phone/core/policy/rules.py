@@ -45,7 +45,7 @@ TABLE_KEYS: Mapping[str, frozenset[str]] = {
     "commit": SCOPE_KEYS | {"effect", "words", "keys", "uri_schemes"},
     "exempt": SCOPE_KEYS | {"labels"},
     "ignore": SCOPE_KEYS | {"node_ids"},
-    "inherit": SCOPE_KEYS | {"words"},
+    "inherit": SCOPE_KEYS | {"words", "node_ids"},
     "deny": SCOPE_KEYS | {"words", "context_words", "effects", "stops"},
 }
 DOCUMENT_KEYS = frozenset({"languages", "disable", *TABLE_KEYS})
@@ -112,7 +112,10 @@ def parse_rule(table: Table) -> Rule:
         case "ignore":
             return IgnoreRule(origin, scope, frozenset(table.texts("node_ids", True)))
         case "inherit":
-            return InheritRule(origin, scope, table.phrases("words", True))
+            rule = InheritRule(origin, scope, table.phrases("words"), frozenset(table.texts("node_ids")))
+            if not (rule.words or rule.node_ids):
+                table.fail("words", "is missing, and so is node_ids: the rule matches nothing")
+            return rule
         case _:
             rule = DenyRule(
                 origin,

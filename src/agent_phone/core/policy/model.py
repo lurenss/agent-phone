@@ -6,8 +6,9 @@ them):
 - `commit`: words, keys or URI schemes that make an input carry an `Effect`.
 - `exempt`: exact labels known to navigate, removed before commit words are read.
 - `ignore`: labels from nodes with these resource-ids are descriptive and not read.
-- `inherit`: a receiver whose name is one of these words ("OK", "Yes") takes the effects of
-  its context, so "OK" under "Delete this post?" deletes.
+- `inherit`: a receiver whose name is one of these words ("OK", "Yes", "Turn off"), or that has
+  one of these resource-ids (`android:id/button1`), takes the effects of its context, so "OK"
+  under "Delete this post?" deletes.
 - `deny`: refused whatever the caller grants.
 """
 
@@ -97,9 +98,13 @@ class IgnoreRule:
 
 @dataclass(frozen=True, slots=True)
 class InheritRule:
+    """A receiver is an affirmative when a naming label of it is, as a whole, one of `words`, or
+    when a label of it comes from a node with one of `node_ids`."""
+
     origin: Origin
     scope: Scope
     words: tuple[Phrase, ...]
+    node_ids: frozenset[str]
 
 
 @dataclass(frozen=True, slots=True)

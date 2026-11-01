@@ -127,20 +127,6 @@ def test_a_click_on_any_placement_of_a_commit_sends_nothing(tmp_path, label, pla
 
 AFFIRMATIVES = TABLE_DOC["affirmative"]
 NAMING_PLACEMENTS = ("text", "content_desc", "hint", "child_text")
-NEW_AFFIRMATIVES = {
-    "Turn off",
-    "Turn on",
-    "Disable",
-    "Enable",
-    "Stop",
-    "Disconnect",
-    "Remove",
-    "Disattiva",
-    "Attiva",
-    "Interrompi",
-    "Disconnetti",
-    "Rimuovi",
-}
 AFFIRMATIVE_CASES = [
     pytest.param(
         row["label"],
@@ -148,9 +134,6 @@ AFFIRMATIVE_CASES = [
         row["question"],
         set(row["effects"]),
         id=f"{row['label']}-{placement}",
-        marks=[pytest.mark.xfail(strict=True, reason="R2-4: not yet an affirmative")]
-        if row["label"] in NEW_AFFIRMATIVES
-        else [],
     )
     for row in AFFIRMATIVES
     for placement in NAMING_PLACEMENTS
