@@ -1,24 +1,31 @@
 """What an element says: its label surface, its display name, its stable name, and their words.
 
-One function, `surface_of`, decides which strings belong to an element. The snapshot's name,
-the ref fingerprint and the policy engine all read from it, so the gate judges the same words
-the agent sees, plus the resource-ids and class names the agent does not see.
+Label ownership decides which strings belong to an element. It is read two ways, and they differ
+in one case: a node that is checkable and not clickable.
 
-The surface of a node is its own label fields plus those of every descendant that is not inside
-a nested touch consumer. A clickable `Button` with empty text owns the words of the plain
-`ViewGroup` inside it. A child `Button` inside a clickable row owns its own words, not the row.
+- The gate reads `surface_of`. The policy engine judges the words of the node that receives the
+  touch, so ownership stops at a node that takes the touch (`role.takes_touch`), the predicate
+  the hit plan uses. A switch that is not clickable passes the touch to its row, so its words
+  belong to the row.
+- The snapshot reads `display_name` and `display_detail`. Ownership stops at any touch consumer
+  (`role.consumes_touch`), because a checkable node prints a line of its own.
+
+Both read the same label fields, so the gate judges the words the agent sees, plus the
+resource-ids and class names the agent does not see. A clickable `Button` with empty text owns
+the words of the plain `ViewGroup` inside it. A child `Button` inside a clickable row owns its own
+words, not the row.
 """
 
 from __future__ import annotations
 
 import re
 import unicodedata
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import Enum
 
-from agent_phone.core.role import VALUE_ROLES, Role, consumes_touch, role_of, shows_surface
-from agent_phone.core.screen import Flag, Node, NodeId, Screen
+from agent_phone.core.role import VALUE_ROLES, Role, consumes_touch, role_of, shows_surface, takes_touch
+from agent_phone.core.screen import Attrs, Flag, Node, NodeId, Screen
 
 
 class LabelField(Enum):
@@ -73,13 +80,13 @@ lower-case letter splits too: `ModalitàAereo` -> Modalità Aereo."""
 WORD = re.compile(r"[^\W_]+")
 
 
-def owned(screen: Screen, node: Node) -> list[Node]:
-    """The node and every descendant that is not inside a nested touch consumer."""
+def owned(screen: Screen, node: Node, stops: Callable[[Attrs], bool] = takes_touch) -> list[Node]:
+    """The node and every descendant that is not inside a nested node for which `stops` holds."""
     members: list[Node] = []
     i = node.id
     while i < node.end:
         member = screen.nodes[i]
-        if member.id != node.id and consumes_touch(member.attrs):
+        if member.id != node.id and stops(member.attrs):
             i = member.end
             continue
         members.append(member)
@@ -88,6 +95,8 @@ def owned(screen: Screen, node: Node) -> list[Node]:
 
 
 def surface_of(screen: Screen, node: Node) -> Surface:
+    """What a touch on `node` acts on, for the gate: the labels of the node and of the descendants
+    that do not take a touch themselves."""
     return Surface(node.id, tuple(label for member in owned(screen, node) for label in own_labels(member)))
 
 
@@ -133,7 +142,12 @@ def stable_name(screen: Screen, node: Node, role: Role) -> str | None:
 def shown_values(screen: Screen, node: Node, role: Role) -> tuple[str, ...]:
     """The naming values a snapshot line shows for the node, in name order, cleaned and
     without repeats. The first is the name, the rest are the detail."""
-    labels = surface_of(screen, node).labels if shows_surface(node.attrs, role) else own_labels(node)
+    if shows_surface(node.attrs, role):
+        labels = tuple(
+            label for member in owned(screen, node, consumes_touch) for label in own_labels(member)
+        )
+    else:
+        labels = own_labels(node)
     return naming_values(screen, labels)
 
 

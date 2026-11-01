@@ -166,7 +166,7 @@ def labels_outside(screen: Screen, row: Node, node: Node) -> tuple[Label, ...]:
 
 def context_labels(screen: Screen, node: Node) -> tuple[Label, ...]:
     """The engine's `Site.context`: the labels of the node's whole window minus the labels of its
-    own surface, which are the node and its descendants outside nested touch consumers."""
+    own surface, which are the node and its descendants outside nested nodes that take a touch."""
     return outside_labels(screen, screen.window_of(node.id), {member.id for member in owned(screen, node)})
 
 

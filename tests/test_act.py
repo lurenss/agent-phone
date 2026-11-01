@@ -5,7 +5,6 @@ received, so "sends no input" is an observation and not a claim."""
 
 import tomllib
 
-import pytest
 from fakes import EMULATOR_SERIAL, J7_SERIAL, FakePhone, info_for
 from support import ROOT, FakeClock, checkbox_row, consumer_of, fixture_screen, labelled, node, screen_of
 
@@ -330,7 +329,6 @@ def test_a_toggle_is_judged_with_the_title_of_its_row(tmp_path):
 ROW, CHECKBOX = 1, 2
 
 
-@pytest.mark.xfail(strict=True, reason="a checkable child that takes no touch owns words that nobody judges")
 def test_the_words_of_a_toggle_that_takes_no_touch_are_judged_for_the_row_that_takes_it(tmp_path):
     ctx, phone = context(tmp_path, checkbox_row("Delete all"))
     taken = look(ctx, SettleState.SETTLED)
@@ -346,7 +344,6 @@ def test_the_words_of_a_toggle_that_takes_no_touch_are_judged_for_the_row_that_t
     assert outcome.details["effects"] == ["delete"] and phone.permits == []
 
 
-@pytest.mark.xfail(strict=True, reason="a checkable child that takes no touch owns words that nobody judges")
 def test_a_deny_rule_reads_the_words_of_a_toggle_that_its_row_receives(tmp_path):
     j7 = merge((DEFAULT, load_profile(ROOT / "examples" / "devices" / "j7.toml").layer))
     ctx, phone = context(tmp_path, checkbox_row("Mobile data"), policy=j7)

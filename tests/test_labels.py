@@ -46,7 +46,6 @@ def test_the_surface_stops_at_a_nested_touch_consumer():
     assert avatar.attrs.content_desc in avatar_values and "Your story" not in avatar_values
 
 
-@pytest.mark.xfail(strict=True, reason="label ownership stops at a checkable node that takes no touch")
 def test_a_toggle_that_takes_no_touch_hands_its_words_to_the_row_that_takes_it():
     screen = checkbox_row("Delete all")
     checkbox = labelled(screen, "Delete all")

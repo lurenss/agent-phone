@@ -122,7 +122,6 @@ def test_the_context_of_a_button_is_the_rest_of_its_window():
     assert "Delete this post?" in said and "OK" not in said
 
 
-@pytest.mark.xfail(strict=True, reason="the context of a row still holds the words of its checkable child")
 def test_the_context_of_a_row_leaves_out_the_words_of_a_toggle_it_receives_the_touch_for():
     screen = checkbox_row("Delete all")
     row = next(screen.ancestors(labelled(screen, "Delete all").id))

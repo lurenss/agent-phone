@@ -92,8 +92,9 @@ def consumes_touch(attrs: Attrs) -> bool:
 def takes_touch(attrs: Attrs) -> bool:
     """True when Android hands a touch to this node: `View.onTouchEvent` keeps a touch only for a
     clickable or long-clickable view. A checkable view that is not clickable, such as the switch
-    of a preference row, passes the touch to its row. The hit plan uses this, not
-    `consumes_touch`, which also decides whose words a label belongs to."""
+    of a preference row, passes the touch to its row. The hit plan and the gate's label ownership
+    use this. `consumes_touch`, which also counts a checkable node, decides refs, roles and the
+    names a snapshot prints."""
     return bool(attrs.flags & {Flag.CLICKABLE, Flag.LONG_CLICKABLE})
 
 
