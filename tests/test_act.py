@@ -5,10 +5,11 @@ received, so "sends no input" is an observation and not a claim."""
 
 import tomllib
 
+import pytest
 from fakes import EMULATOR_SERIAL, J7_SERIAL, FakePhone, info_for
-from support import FakeClock, consumer_of, fixture_screen, labelled, node, screen_of
+from support import ROOT, FakeClock, checkbox_row, consumer_of, fixture_screen, labelled, node, screen_of
 
-from agent_phone.cli.policy import DEFAULT_POLICY
+from agent_phone.cli.policy import DEFAULT_POLICY, load_profile
 from agent_phone.core.act.act import act
 from agent_phone.core.act.intent import Click, Direction, Fill, Request, Scroll
 from agent_phone.core.act.ledger import Ledger
@@ -324,6 +325,36 @@ def test_a_toggle_is_judged_with_the_title_of_its_row(tmp_path):
     ctx, phone = context(tmp_path, window(row))
     commit = refused(act(ctx, click(look(ctx, SettleState.SETTLED), 1)), ErrorCode.COMMIT_REFUSED)
     assert commit.details["effects"] == ["system"] and phone.permits == []
+
+
+ROW, CHECKBOX = 1, 2
+
+
+@pytest.mark.xfail(strict=True, reason="a checkable child that takes no touch owns words that nobody judges")
+def test_the_words_of_a_toggle_that_takes_no_touch_are_judged_for_the_row_that_takes_it(tmp_path):
+    ctx, phone = context(tmp_path, checkbox_row("Delete all"))
+    taken = look(ctx, SettleState.SETTLED)
+    assert [(line.ref, line.role.value, line.name) for line in taken.lines] == [
+        (ROW, "button", ""),
+        (CHECKBOX, "checkbox", "Delete all"),
+    ], "the printed snapshot is left alone"
+    refused(act(ctx, click(taken, CHECKBOX)), ErrorCode.NOT_ACTIONABLE)
+    outcome = act(ctx, click(taken, ROW))
+    assert isinstance(outcome, Refused) and outcome.code is ErrorCode.COMMIT_REFUSED, (
+        f"the touch lands on the row, and the checkbox in it says 'Delete all': {outcome}"
+    )
+    assert outcome.details["effects"] == ["delete"] and phone.permits == []
+
+
+@pytest.mark.xfail(strict=True, reason="a checkable child that takes no touch owns words that nobody judges")
+def test_a_deny_rule_reads_the_words_of_a_toggle_that_its_row_receives(tmp_path):
+    j7 = merge((DEFAULT, load_profile(ROOT / "examples" / "devices" / "j7.toml").layer))
+    ctx, phone = context(tmp_path, checkbox_row("Mobile data"), policy=j7)
+    outcome = act(ctx, click(look(ctx, SettleState.SETTLED), ROW))
+    assert isinstance(outcome, Refused) and outcome.code is ErrorCode.DENIED, (
+        f"'mobile data' is on the element the tap toggles, and the J7 profile denies it: {outcome}"
+    )
+    assert phone.permits == []
 
 
 def test_a_sideways_scroll_of_a_list_that_runs_down_is_refused(tmp_path):

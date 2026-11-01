@@ -2,7 +2,7 @@
 whose receiver is exactly the target, in the window that has focus, under no other window."""
 
 import pytest
-from support import consumer_of, fixture_screen, labelled, node, screen_of
+from support import checkbox_row, consumer_of, fixture_screen, labelled, node, screen_of
 
 from agent_phone.core.act.hit import Ambiguous, context_labels, plan_point, receiver_at
 from agent_phone.core.geometry import Point
@@ -120,6 +120,14 @@ def test_the_context_of_a_button_is_the_rest_of_its_window():
     ok = consumer_of(screen, labelled(screen, "OK"))
     said = {label.value for label in context_labels(screen, ok)}
     assert "Delete this post?" in said and "OK" not in said
+
+
+@pytest.mark.xfail(strict=True, reason="the context of a row still holds the words of its checkable child")
+def test_the_context_of_a_row_leaves_out_the_words_of_a_toggle_it_receives_the_touch_for():
+    screen = checkbox_row("Delete all")
+    row = next(screen.ancestors(labelled(screen, "Delete all").id))
+    said = {label.value for label in context_labels(screen, row)}
+    assert "Delete all" not in said, "those words are the row's own now, and the context is the rest"
 
 
 def test_a_full_screen_window_without_focus_still_covers_the_target():

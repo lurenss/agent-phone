@@ -87,6 +87,32 @@ def encode(value: object) -> str:
     return str(value)
 
 
+def checkbox_row(label: str) -> Screen:
+    """A clickable row whose only words sit in a checkable child that takes no touch itself, the
+    layout of a preference whose row toggles its widget. The checkbox sits on the left, so the row's
+    center is the row's own and the row keeps its ref: it prints as a nameless button."""
+    return screen_of(
+        node(
+            "android.widget.FrameLayout",
+            node(
+                "android.widget.LinearLayout",
+                node(
+                    "android.widget.CheckBox",
+                    text=label,
+                    checkable=True,
+                    clickable=False,
+                    bounds="[0,500][400,600]",
+                ),
+                resource_id="com.android.settings:id/pref_row",
+                clickable=True,
+                bounds="[0,500][1080,600]",
+            ),
+            package="com.android.settings",
+            bounds="[0,0][1080,1920]",
+        )
+    )
+
+
 def dump(*windows: str, rotation: int = 0) -> str:
     return f'<hierarchy rotation="{rotation}">{"".join(windows)}</hierarchy>'
 

@@ -1,5 +1,5 @@
 import pytest
-from support import consumer_of, fixture_screen, labelled, node, screen_of
+from support import checkbox_row, consumer_of, fixture_screen, labelled, node, screen_of
 
 from agent_phone.core.labels import (
     LabelField,
@@ -44,6 +44,24 @@ def test_the_surface_stops_at_a_nested_touch_consumer():
     avatar_values = {label.value for label in surface_of(ig, avatar).labels}
     assert "Your story" in row_values and avatar.attrs.content_desc not in row_values
     assert avatar.attrs.content_desc in avatar_values and "Your story" not in avatar_values
+
+
+@pytest.mark.xfail(strict=True, reason="label ownership stops at a checkable node that takes no touch")
+def test_a_toggle_that_takes_no_touch_hands_its_words_to_the_row_that_takes_it():
+    screen = checkbox_row("Delete all")
+    checkbox = labelled(screen, "Delete all")
+    row = next(screen.ancestors(checkbox.id))
+    assert {label.value for label in surface_of(screen, row).labels} >= {"Delete all"}, (
+        "the touch lands on the row, so the gate reads the checkbox's words as the row's"
+    )
+    assert "Delete all" in {label.value for label in surface_of(screen, checkbox).labels}
+
+
+def test_the_snapshot_still_prints_a_checkbox_under_its_row_with_its_own_name():
+    screen = checkbox_row("Delete all")
+    checkbox = labelled(screen, "Delete all")
+    row = next(screen.ancestors(checkbox.id))
+    assert (name_of(screen, row), name_of(screen, checkbox)) == ("", "Delete all")
 
 
 def test_a_comma_joined_system_description_reads_as_words():
