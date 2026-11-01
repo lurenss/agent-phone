@@ -189,5 +189,5 @@ The SDK lives in `~/Library/Android/sdk` (`ANDROID_HOME`). The emulator refuses 
 - **Popup menus.** A popup is a second window that cannot be tapped (A6-8). Back closes it.
 - **Window bounds.** A device can report a window's bounds a pixel inside the display (A6-2). The parser allows 2 px.
 - **Two displays.** A second display's windows are dropped from the screen (A6-1). Only display 0 is read and tapped.
-- **A flaky facts read.** The facts read can miss a line once in a while (A6-11, A6-12). A retry is safe.
+- **A flaky facts read.** The facts read can glue two lines or drop one once in a while (A6-11, A6-12). agent-phone reads once more before it refuses with `TRANSPORT`, so a refusal that remains came from two bad reads in a row. A retry of the command is safe.
 - **Hardware keys.** A device's hardware can press keys by itself, as the J7's power key did (A7-5). Read `logcat -d` for `notifyKey` before you suspect the code.

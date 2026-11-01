@@ -3,7 +3,9 @@
 Facts come from one shell round trip per process. The shell starts each read as a background
 job and waits, which takes 116 ms against 225 ms in sequence (A3-7). Output lines are matched
 by what they say, and a fact that does not parse is a Refusal(TRANSPORT) naming it, never a
-default. `wm size` and `wm density` print an override line when one is set, and it wins.
+default. A line that is none of the forms the script prints means two jobs wrote into each
+other, and that read is refused whole. `wm size` and `wm density` print an override line when
+one is set, and it wins.
 """
 
 from __future__ import annotations
@@ -37,26 +39,54 @@ PROPERTIES = (
 )
 FACTS_TIMEOUT_S = 10.0
 FACTS_SCRIPT = (
-    '(getprop | grep -E "^\\[({})\\]") & '.format("|".join(re.escape(name) for name in PROPERTIES))
+    '(echo "$(getprop | grep -E "^\\[({})\\]")") & '.format("|".join(re.escape(name) for name in PROPERTIES))
     + '(echo "boot=$(cat /proc/sys/kernel/random/boot_id)") & '
     + '(echo "size=$(wm size)") & (echo "density=$(wm density)") & '
     + '(echo "ime=$(settings get secure default_input_method)") & wait'
 )
+"""The jobs share one stdout, so each prints with one `echo`, which is one write.
+
+A pipeline is not one write. `getprop | grep` can print a property's text and its newline
+apart, and another job's whole line lands between them. The emulator did that in 5 of 300
+reads (1.7%), as `[ro.build.version.sdk]: [35]ime=com.google...LatinIME` and as
+`[persist.sys.locale]: [de-DE]ime=com.google...LatinIME`. The Thor showed it as "did not report
+its default keyboard" (A6-11, A6-12). In the second case the lost property made `parse_facts` use
+`ro.product.locale`, which is `en-US` on that German device. An `echo` of the whole output prints
+once, and a write under 4 KB to a pipe is atomic. `parse_facts` also refuses a glued read, so a
+job that breaks this rule gives no fact.
+"""
 
 
 def facts_script(also: str = "") -> str:
-    """`also` runs beside the reads in the same round trip and its output is ignored."""
+    """`also` runs beside the reads in the same round trip. It must print nothing, because
+    `parse_facts` refuses a line that the script does not print."""
     return FACTS_SCRIPT if not also else FACTS_SCRIPT.removesuffix("wait") + f"({also}) & wait"
 
 
 PROPERTY_LINE = re.compile(r"\[([^\]]+)\]: \[(.*)\]")
 SIZE_LINE = re.compile(r"(Physical|Override) size: (\d+)x(\d+)")
 DENSITY_LINE = re.compile(r"(Physical|Override) density: (\d+)")
+PREFIXES = ("boot=", "size=", "density=", "ime=")
+
+
+def is_a_line_the_script_prints(line: str) -> bool:
+    """`wm` prints its Override line second, so the second line of a size or density has no prefix."""
+    return line.startswith(PREFIXES) or any(
+        pattern.fullmatch(line) for pattern in (PROPERTY_LINE, SIZE_LINE, DENSITY_LINE)
+    )
 
 
 def parse_facts(serial: Serial, output: str) -> DeviceInfo:
-    """Raise `Refusal(TRANSPORT)` naming the first fact the output does not carry."""
-    properties = {m[1]: m[2] for line in output.splitlines() if (m := PROPERTY_LINE.fullmatch(line.strip()))}
+    """Raise `Refusal(TRANSPORT)` naming the first fact the output does not carry, or
+    `{"fact": "garbled"}` when a line is none of the forms the script prints."""
+    lines = [stripped for line in output.splitlines() if (stripped := line.strip())]
+    if garbled := next((line for line in lines if not is_a_line_the_script_prints(line)), None):
+        raise Refusal(
+            ErrorCode.TRANSPORT,
+            f"Device {serial} sent facts that ran together: {garbled[:80]!r}.",
+            {"fact": "garbled"},
+        )
+    properties = {m[1]: m[2] for line in lines if (m := PROPERTY_LINE.fullmatch(line))}
 
     def missing(fact: str) -> Refusal:
         return Refusal(ErrorCode.TRANSPORT, f"Device {serial} did not report its {fact}.", {"fact": fact})
@@ -75,12 +105,8 @@ def parse_facts(serial: Serial, output: str) -> DeviceInfo:
     densities = {m[1]: int(m[2]) for m in DENSITY_LINE.finditer(output)}
     display = sizes.get("Override") or sizes.get("Physical")
     density = densities.get("Override") or densities.get("Physical")
-    boot = next(
-        (line.removeprefix("boot=").strip() for line in output.splitlines() if line.startswith("boot=")), ""
-    )
-    ime = next(
-        (line.removeprefix("ime=").strip() for line in output.splitlines() if line.startswith("ime=")), None
-    )
+    boot = next((line.removeprefix("boot=").strip() for line in lines if line.startswith("boot=")), "")
+    ime = next((line.removeprefix("ime=").strip() for line in lines if line.startswith("ime=")), None)
     if display is None:
         raise missing("display size")
     if density is None:
@@ -108,11 +134,21 @@ class Shell:
         self._adb = adb
 
     def facts(self, also: str = "") -> DeviceInfo:
-        result = shell(self._adb, self._serial, facts_script(also), FACTS_TIMEOUT_S)
+        """A read refused as garbled or short of a fact is read once more, without `also`: that read
+        got as far as `wait`, so its `also` has run. A second refusal stands. An adb failure is not
+        retried."""
+        output = self._facts_output(facts_script(also))
+        try:
+            return parse_facts(self._serial, output)
+        except Refusal:
+            return parse_facts(self._serial, self._facts_output(facts_script()))
+
+    def _facts_output(self, script: str) -> str:
+        result = shell(self._adb, self._serial, script, FACTS_TIMEOUT_S)
         if result.status != 0:
             reason = first_line(result.stderr) or first_line(result.stdout) or f"exit status {result.status}"
             raise Refusal(ErrorCode.TRANSPORT, f"adb could not read the facts of {self._serial}: {reason}.")
-        return parse_facts(self._serial, result.stdout)
+        return result.stdout
 
     def state(self) -> DeviceState:
         """`dumpsys power` for power, `dumpsys window` for keyguard; Lock.UNKNOWN when the

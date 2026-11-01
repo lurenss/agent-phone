@@ -133,13 +133,7 @@ GLUES = [
     for job in ("boot=", "size=", "density=", "ime=")
 ]
 
-garbled_read_is_accepted = pytest.mark.xfail(
-    strict=True,
-    reason="parse_facts skips a line it does not know, so a glued read gives a fact or a wrong one",
-)
 
-
-@garbled_read_is_accepted
 @pytest.mark.parametrize("output", [*RECORDED_GLUES, *GLUES])
 def test_a_read_with_glued_lines_is_refused_as_garbled_and_gives_no_fact(output):
     with pytest.raises(Refusal) as raised:
@@ -181,12 +175,7 @@ class ScriptedAdb:
 TOUCH = "echo touched-the-last-use-file"
 MISSING_KEYBOARD = without(CLEAN_EMULATOR, "ime=")
 
-reads_once = pytest.mark.xfail(
-    strict=True, reason="Shell.facts reads once and raises or returns whatever it parsed"
-)
 
-
-@reads_once
 @pytest.mark.parametrize("first", [*RECORDED_GLUES, pytest.param(MISSING_KEYBOARD, id="no-ime")])
 def test_a_read_that_is_refused_is_read_once_more_and_the_clean_read_wins(first):
     adb = ScriptedAdb(first, CLEAN_EMULATOR)
@@ -196,7 +185,6 @@ def test_a_read_that_is_refused_is_read_once_more_and_the_clean_read_wins(first)
     assert sum(TOUCH in script for script in adb.scripts) == 1, "the touch ran in the first read"
 
 
-@reads_once
 def test_a_second_garbled_read_refuses_after_exactly_two_reads():
     adb = ScriptedAdb(GLUED_SDK_AND_IME, GLUED_LOCALE_AND_IME)
     with pytest.raises(Refusal) as raised:
@@ -205,7 +193,6 @@ def test_a_second_garbled_read_refuses_after_exactly_two_reads():
     assert len(adb.scripts) == 2
 
 
-@reads_once
 def test_a_second_missing_fact_refuses_by_name_after_exactly_two_reads():
     adb = ScriptedAdb(MISSING_KEYBOARD, MISSING_KEYBOARD)
     with pytest.raises(Refusal) as raised:
@@ -227,9 +214,6 @@ def test_an_adb_failure_is_not_retried_because_it_is_not_a_transient_garble():
     assert raised.value.code is ErrorCode.TRANSPORT and len(adb.scripts) == 1
 
 
-@pytest.mark.xfail(
-    strict=True, reason="the property job is a pipeline, so its lines can reach the shared stdout in pieces"
-)
 def test_every_job_of_the_facts_script_prints_in_one_write():
     *jobs, last = FACTS_SCRIPT.split(" & ")
     assert last == "wait" and len(jobs) == 5
