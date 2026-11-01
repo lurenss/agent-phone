@@ -5,7 +5,6 @@ received, so "sends no input" is an observation and not a claim."""
 
 import tomllib
 
-import pytest
 from fakes import EMULATOR_SERIAL, J7_SERIAL, FakePhone, info_for
 from support import FakeClock, consumer_of, fixture_screen, labelled, node, screen_of
 
@@ -369,7 +368,6 @@ def test_a_sideways_scroll_of_a_pager_or_of_rows_side_by_side_is_sent(tmp_path):
     assert isinstance(done, Acted) and isinstance(phone.permits[0].action, Swipe)
 
 
-@pytest.mark.xfail(strict=True, reason="a blank frame between two screens makes a gone predicate hold")
 def test_a_blank_frame_between_two_screens_proves_nothing_gone(tmp_path):
     blank = window(node("android.widget.FrameLayout", bounds="[0,0][1080,1920]"))
     ctx, _ = context(tmp_path, SETTINGS, after_input=[blank, DISPLAY_PAGE])

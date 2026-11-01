@@ -59,7 +59,8 @@ rendered under the same one."""
 
 def holds(predicate: Predicate, previous: Screen | None, current: Screen) -> bool:
     """Present and Gone match the lines of a compact view of the active window, as `find` does.
-    A read with no active window decides neither, so Gone does not hold during a transition.
+    A read with no active window, or with no line, decides neither, so Gone does not hold on a
+    frame between two screens.
     Gone by ref needs the ref's stored fingerprint and arrives with the wait command (unit 5)."""
     match predicate:
         case Settled():
@@ -81,10 +82,13 @@ def holds(predicate: Predicate, previous: Screen | None, current: Screen) -> boo
 
 
 def shown(query: Query, screen: Screen) -> bool | None:
-    """Whether a line of the active window matches, or None when no window has focus."""
+    """Whether a line of the active window matches, or None when the read cannot say: no window
+    has focus, or the window prints no line, as the blank frame between two screens does."""
     try:
         view = build_view(select_surface(screen), Mode.COMPACT)
     except Refusal:
+        return None
+    if not view.lines:
         return None
     return any(matches(query, screen, screen.node(node)) for node in view.nodes)
 
