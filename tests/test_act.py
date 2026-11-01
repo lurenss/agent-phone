@@ -483,3 +483,30 @@ def test_a_blank_frame_between_two_screens_proves_nothing_gone(tmp_path):
     done = act(ctx, click(look(ctx), DISPLAY_TILE, wait_for=(Gone(Q("Display")),)))
     assert isinstance(done, Acted) and done.after is not None
     assert any("Brightness" in line.name for line in done.after.lines), "the wait stopped on the blank frame"
+
+
+@pytest.mark.xfail(
+    strict=True, reason="R2-3: scrolls_over requires the dump to call the scrolling view visible"
+)
+def test_a_tap_under_a_sheet_the_dump_calls_invisible_is_occluded_and_sends_nothing(tmp_path):
+    """The sheet's list is fading in over Save. It takes the touch, so the tap would be swallowed
+    while the report says that Save received it."""
+    sheet = node(
+        "androidx.recyclerview.widget.RecyclerView",
+        node("android.widget.TextView", text="Sheet", bounds="[0,400][1080,450]"),
+        scrollable=True,
+        visible_to_user=False,
+        drawing_order=2,
+        bounds="[0,400][1080,1920]",
+    )
+    save = node(
+        "android.widget.Button", text="Save", clickable=True, drawing_order=1, bounds="[0,500][1080,600]"
+    )
+    ctx, phone = context(tmp_path, window(save, sheet))
+    taken = look(ctx, SettleState.SETTLED)
+    [line] = [line for line in taken.lines if line.name == "Save"]
+    outcome = act(ctx, click(taken, line.ref))
+    assert phone.permits == [] and isinstance(outcome, Refused) and outcome.code is ErrorCode.OCCLUDED, (
+        f"the intent requires OCCLUDED with nothing sent; the backend received {phone.permits} and the "
+        f"agent was told {outcome}"
+    )

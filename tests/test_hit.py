@@ -213,13 +213,38 @@ def test_a_row_inside_a_list_inside_a_scroll_view_is_tapped_at_its_center():
     assert plan_point(screen, target) == target.attrs.bounds.center()
 
 
-def test_a_scrollable_view_drawn_under_the_target_or_not_visible_does_not_take_its_touch():
+def test_a_scrollable_view_drawn_under_the_target_does_not_take_its_touch():
     under = screen_of(app(sheet(1), button("Save", "[0,500][1080,600]", drawing_order=2)))
     assert plan_point(under, labelled(under, "Save")) == Point(540, 550)
-    hidden = screen_of(
+
+
+ALPHA_0 = (
+    "a view at alpha 0 is not visible to the user and still takes touches: ScrollView and RecyclerView "
+    "keep ACTION_DOWN whatever their alpha, as the clickable view above it does"
+)
+
+
+@pytest.mark.xfail(
+    strict=True, reason="R2-3: scrolls_over requires the dump to call the scrolling view visible"
+)
+def test_a_scrolling_view_the_dump_calls_invisible_takes_the_touch_when_drawn_over_the_target():
+    fading = screen_of(
         app(button("Save", "[0,500][1080,600]", drawing_order=1), sheet(2, visible_to_user=False))
     )
-    assert plan_point(hidden, labelled(hidden, "Save")) == Point(540, 550)
+    blocked = refused(lambda: plan_point(fading, labelled(fading, "Save")))
+    assert blocked.code is ErrorCode.OCCLUDED, ALPHA_0
+    assert blocked.details["blocked_by"] == ["another element ('androidx.recyclerview.widget.RecyclerView')"]
+
+
+@pytest.mark.xfail(
+    strict=True, reason="R2-3: scrolls_over requires the dump to call the scrolling view visible"
+)
+def test_a_swipe_that_starts_on_a_scrolling_view_the_dump_calls_invisible_is_occluded():
+    below = node(SCROLLER, scrollable=True, drawing_order=1, bounds="[0,200][1080,1700]")
+    screen = screen_of(app(below, sheet(2, visible_to_user=False)))
+    assert (
+        refused(lambda: swipe_across(screen, screen.nodes[1], Direction.DOWN)).code is ErrorCode.OCCLUDED
+    ), ALPHA_0
 
 
 def test_a_swipe_that_starts_on_another_scrolling_view_drawn_above_the_list_is_occluded():
