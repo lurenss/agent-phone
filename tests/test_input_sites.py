@@ -250,3 +250,49 @@ def test_enter_with_nothing_in_focus_still_lets_a_rule_read_the_screen(tmp_path)
     outcome = act(ctx, Request(Key(KeyName.ENTER), SEND))
     assert phone.permits == [], "Enter was sent with no focused view on a screen the rule names"
     assert isinstance(outcome, Refused) and outcome.code is ErrorCode.DENIED
+
+
+def test_enter_reads_every_node_that_reports_focus(tmp_path):
+    def two_focused(second):
+        return screen_of(
+            node(
+                "android.widget.FrameLayout",
+                focused_button("Save"),
+                node(
+                    "android.widget.Button",
+                    text=second,
+                    clickable=True,
+                    focused=True,
+                    bounds="[0,1700][540,1800]",
+                ),
+                bounds="[0,1400][1080,1900]",
+            )
+        )
+
+    ctx, phone, _ = start(tmp_path / "plant", two_focused("plant"), denying(words=["plant"]))
+    outcome = act(ctx, Request(Key(KeyName.ENTER), SEND))
+    assert phone.permits == [] and isinstance(outcome, Refused) and outcome.code is ErrorCode.DENIED
+    ctx, phone, _ = start(tmp_path / "plain", two_focused("Cancel"), denying(words=["plant"]))
+    assert isinstance(act(ctx, Request(Key(KeyName.ENTER), SEND)), Acted)
+
+
+def test_enter_with_no_active_window_keeps_the_key_rule_and_the_snapshots_site(tmp_path):
+    status_bar_only = screen_of(
+        node("android.widget.FrameLayout", package="com.android.systemui", bounds="[0,0][1080,63]")
+    )
+    assert status_bar_only.active_window() is None
+    info = info_for(J7_SERIAL)
+    phone = FakePhone(info, form(), status_bar_only)
+    ctx = Context(
+        phone,
+        info,
+        None,
+        merge((DEFAULT,)),
+        SnapshotStore(tmp_path),
+        Ledger(tmp_path, info.identity),
+        FakeClock(),
+    )
+    capture(ctx, phone.read(), settled=SettleState.SETTLED)
+    refused = act(ctx, Request(Key(KeyName.ENTER)))
+    assert isinstance(refused, Refused) and refused.code is ErrorCode.COMMIT_REFUSED
+    assert refused.details["effects"] == ["send"] and phone.permits == []
