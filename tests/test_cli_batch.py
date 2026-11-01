@@ -130,6 +130,20 @@ def test_a_batch_that_stops_before_any_input_is_safe_to_run_again(tmp_path):
     assert (wire["delivery"], wire["retry"]) == ("not_delivered", "safe") and sent(hub) == []
 
 
+@pytest.mark.xfail(strict=True, reason="the batch's error repeats the failed step's whole error, details too")
+def test_a_failed_batch_names_the_failed_step_and_does_not_print_its_details_twice(tmp_path):
+    hub = FakeHub([J7], screens=[HOME])
+    code, wire = batch(tmp_path, [["wait", "--for", "name=Nowhere", "--timeout-ms", "100"], BACK], hub)
+    step = wire["data"]["steps"][0]["error"]
+    assert step["details"]["after"] is not None, "the step keeps the snapshot it timed out on"
+    assert wire["error"] == {
+        "code": step["code"],
+        "message": step["message"],
+        "hint": step["hint"],
+        "details": {"step": 0},
+    }, "the batch's error points at the step, and the step holds the details once"
+
+
 def test_a_step_that_went_out_and_then_failed_keeps_its_own_delivery(tmp_path):
     look(tmp_path)
     hub = flow()
