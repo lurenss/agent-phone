@@ -8,7 +8,7 @@ import json
 import re
 from pathlib import Path
 
-from agent_phone.cli.driver import INPUT_TIMEOUT_MS, ScreenshotCommand
+from agent_phone.cli.commands import INPUT_TIMEOUT_MS, InputCommand, ScreenshotCommand
 from agent_phone.core.act.intent import Direction
 from agent_phone.core.commands.click import ClickCommand
 from agent_phone.core.commands.clipboard import ClipboardGetCommand, ClipboardSetCommand
@@ -28,19 +28,6 @@ from agent_phone.core.role import Role
 from agent_phone.core.snapshot.snapshot import RefToken
 from agent_phone.core.wait.predicate import Gone, Predicate, Present
 
-InputCommand = (
-    ClickCommand
-    | SetTextCommand
-    | ScrollCommand
-    | PressCommand
-    | LaunchCommand
-    | StopCommand
-    | OpenUrlCommand
-    | RotateCommand
-    | ClipboardGetCommand
-    | ClipboardSetCommand
-    | ScreenshotCommand
-)
 INPUTS = (
     "click",
     "set-text",

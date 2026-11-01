@@ -210,7 +210,7 @@ agent_phone/core/
   commands/  snapshot.py click.py set_text.py press.py stop.py wait.py screenshot.py devices.py server.py
 agent_phone/adapters/uiautomator2/  phone.py parse.py rpc.py delivery.py address.py shell.py adb.py server.py
 agent_phone/cli/driver.py           the one wiring point, for main() and in-process consumers
-agent_phone/cli/                    args.py (arguments), process.py (envelope and exit code), settings.py (environment)
+agent_phone/cli/                    args.py (arguments), commands.py (the command dataclasses a Driver runs), process.py (envelope and exit code), settings.py (environment)
 agent_phone/policy/default.toml     built-in rules, package data, no app names
 examples/business_suite/  examples/instagram/policy.toml  examples/devices/j7.toml
 ```

@@ -9,7 +9,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import NoReturn
 
-from agent_phone.cli.input_args import INPUTS, InputCommand, add_inputs, input_command
+from agent_phone.cli.commands import InputCommand
+from agent_phone.cli.input_args import INPUTS, add_inputs, input_command
 from agent_phone.core.commands.devices import DevicesCommand
 from agent_phone.core.commands.find import DEFAULT_LIMIT, FindCommand
 from agent_phone.core.commands.get import GetCommand, GetProperty

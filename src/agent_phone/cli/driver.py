@@ -21,12 +21,13 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
 from contextlib import ExitStack, contextmanager
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
 from agent_phone.adapters.uiautomator2.adb import SubprocessAdb
 from agent_phone.adapters.uiautomator2.phone import U2Hub
+from agent_phone.cli.commands import INPUT_TIMEOUT_MS, DriverCommand, ScreenshotCommand
 from agent_phone.cli.policy import load_policy, load_profiles, profile_for
 from agent_phone.cli.request import TargetLike, effects, predicates, target_of
 from agent_phone.cli.settings import Settings
@@ -75,34 +76,6 @@ from agent_phone.core.snapshot.surface import Pick
 from agent_phone.core.snapshot.view import Mode
 from agent_phone.core.wait.clock import Clock, SystemClock
 from agent_phone.core.wait.predicate import Predicate
-
-INPUT_TIMEOUT_MS = 5000
-
-
-@dataclass(frozen=True, slots=True)
-class ScreenshotCommand:
-    """`path` None writes under the state root, in the device's own folder."""
-
-    path: Path | None = None
-
-
-DriverCommand = (
-    SnapshotCommand
-    | FindCommand
-    | GetCommand
-    | IsCommand
-    | ClickCommand
-    | SetTextCommand
-    | ScrollCommand
-    | PressCommand
-    | LaunchCommand
-    | StopCommand
-    | OpenUrlCommand
-    | RotateCommand
-    | ClipboardGetCommand
-    | ClipboardSetCommand
-    | ScreenshotCommand
-)
 
 
 def acted(outcome: Outcome) -> Acted:
