@@ -23,7 +23,7 @@ from agent_phone.core.device import Package
 from agent_phone.core.phone import NAME, KeyName, Orientation
 from agent_phone.core.policy.rules import Effect
 from agent_phone.core.query import Match, Query
-from agent_phone.core.refs.resolve import RefTarget
+from agent_phone.core.refs.resolve import QueryTarget, RefTarget, Target
 from agent_phone.core.role import Role
 from agent_phone.core.snapshot.snapshot import RefToken
 from agent_phone.core.wait.predicate import Gone, Predicate, Present
@@ -82,6 +82,17 @@ def query_text(text: str) -> Query:
     )
 
 
+def target_arg(text: str) -> Target:
+    """`@k3x9q:e7` is a ref. Anything else is a query, in the syntax `--wait-for` takes, so a
+    query means one thing wherever it is written. A bare word is neither."""
+    if text.startswith("@"):
+        return RefTarget(RefToken.parse(text))
+    try:
+        return QueryTarget(query_text(text))
+    except argparse.ArgumentTypeError as error:
+        raise argparse.ArgumentTypeError(f"{error}. A ref starts with @, such as @k3x9q:e7") from error
+
+
 def package_name(text: str) -> Package:
     if not NAME.fullmatch(text):
         raise argparse.ArgumentTypeError(f"{text!r} is not a package name as pm list packages prints one")
@@ -95,18 +106,23 @@ def positive(text: str) -> int:
 
 
 def add_inputs(commands: argparse._SubParsersAction, after: argparse.ArgumentParser) -> None:
-    ref = dict(type=RefToken.parse, metavar="REF", help="a ref such as @k3x9q:e12, from a snapshot or find")
+    target = dict(
+        type=target_arg,
+        metavar="TARGET",
+        help="a ref such as @k3x9q:e12 from a snapshot or find, or a query such as name=Display "
+        "that must match one element. After a look, a ref is the safer target",
+    )
     click = command(commands, after, "click", "tap an element; a commit needs --commit", commit=True)
-    click.add_argument("ref", **ref)
+    click.add_argument("target", **target)
     click.add_argument("--long", action="store_true", help="hold the touch, as a long press")
     set_text = command(
         commands, after, "set-text", "replace the text of a field, with no keyboard and no tap"
     )
-    set_text.add_argument("ref", **ref)
+    set_text.add_argument("target", **target)
     set_text.add_argument("text", help="the text the field holds afterwards")
     scroll = command(commands, after, "scroll", "swipe a list; down shows what is below")
     scroll.add_argument("direction", choices=[d.value for d in Direction])
-    scroll.add_argument("ref", nargs="?", **ref)
+    scroll.add_argument("target", nargs="?", **target)
     press = command(commands, after, "press", "press a key; enter needs --commit send", commit=True)
     press.add_argument("key", choices=[k.value for k in KeyName])
     for name, about in (("launch", "start an app's launcher screen"), ("stop", "force-stop an app")):
@@ -195,12 +211,11 @@ def input_command(parsed: argparse.Namespace) -> InputCommand:
     granted = frozenset(Effect(e) for e in getattr(parsed, "commit", []))
     match parsed.command:
         case "click":
-            return ClickCommand(RefTarget(parsed.ref), parsed.long, granted, **timing)
+            return ClickCommand(parsed.target, parsed.long, granted, **timing)
         case "set-text":
-            return SetTextCommand(RefTarget(parsed.ref), parsed.text, **timing)
+            return SetTextCommand(parsed.target, parsed.text, **timing)
         case "scroll":
-            aimed = None if parsed.ref is None else RefTarget(parsed.ref)
-            return ScrollCommand(Direction(parsed.direction), aimed, **timing)
+            return ScrollCommand(Direction(parsed.direction), parsed.target, **timing)
         case "press":
             return PressCommand(KeyName(parsed.key), granted, **timing)
         case "launch":

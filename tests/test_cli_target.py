@@ -21,7 +21,9 @@ BRIGHTNESS = screen_of(
         bounds="[0,0][1080,1920]",
     )
 )
-NO_QUERY = pytest.mark.xfail(strict=True, reason="the CLI takes only a ref as a target")
+NO_CANDIDATES = pytest.mark.xfail(
+    strict=True, reason="the hint names details.candidates, which a query refusal never carries"
+)
 
 
 def search(text=""):
@@ -51,7 +53,6 @@ def sent(hub):
     return [permit.action for phone in hub.phones for permit in phone.permits]
 
 
-@NO_QUERY
 def test_a_query_taps_the_one_element_it_matches_where_its_ref_would(tmp_path):
     by_ref, by_query = tmp_path / "ref", tmp_path / "query"
     taken = snapshot(by_ref)
@@ -69,7 +70,6 @@ def test_a_query_taps_the_one_element_it_matches_where_its_ref_would(tmp_path):
     assert [type(action) for action in sent(hub)] == [Tap]
 
 
-@NO_QUERY
 def test_a_query_that_matches_two_elements_is_ambiguous_and_sends_nothing(tmp_path):
     snapshot(tmp_path)
     hub = FakeHub([J7], screens=[SETTINGS])
@@ -79,7 +79,6 @@ def test_a_query_that_matches_two_elements_is_ambiguous_and_sends_nothing(tmp_pa
     assert wire["error"]["details"]["matches"] > 1 and sent(hub) == []
 
 
-@NO_QUERY
 def test_a_query_with_no_observation_is_refused_before_the_screen_is_read(tmp_path):
     hub = FakeHub([J7], screens=[SETTINGS])
     code, wire = invoke(["click", "name=Display"], hub, tmp_path)
@@ -87,7 +86,6 @@ def test_a_query_with_no_observation_is_refused_before_the_screen_is_read(tmp_pa
     assert hub.phones[0].reads == 0 and sent(hub) == []
 
 
-@NO_QUERY
 def test_a_query_after_an_input_needs_a_new_observation(tmp_path):
     taken = snapshot(tmp_path)
     hub = FakeHub([J7], screens=[SETTINGS], after_input=[BRIGHTNESS])
@@ -102,7 +100,6 @@ def test_a_query_after_an_input_needs_a_new_observation(tmp_path):
     assert code == 0 and wire["data"]["target"]["name"] == "Display"
 
 
-@NO_QUERY
 def test_set_text_and_scroll_find_their_element_by_query(tmp_path):
     snapshot(tmp_path, search())
     hub = FakeHub([J7], screens=[search()], after_input=[search("display")])
@@ -132,7 +129,7 @@ def test_a_target_that_is_neither_a_ref_nor_a_query_is_refused_before_any_device
         assert code == 2 and wire["error"]["code"] == "INVALID_ARGS" and hub.phones == [], argv
 
 
-@NO_QUERY
+@NO_CANDIDATES
 def test_an_ambiguous_target_hint_names_only_details_the_error_carries(tmp_path):
     snapshot(tmp_path)
     code, wire = invoke(["click", "role=button"], FakeHub([J7], screens=[SETTINGS]), tmp_path)
