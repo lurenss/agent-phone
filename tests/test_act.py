@@ -327,7 +327,6 @@ def test_a_toggle_is_judged_with_the_title_of_its_row(tmp_path):
     assert commit.details["effects"] == ["system"] and phone.permits == []
 
 
-@pytest.mark.xfail(strict=True, reason="a sideways swipe on a list that runs down is sent")
 def test_a_sideways_scroll_of_a_list_that_runs_down_is_refused(tmp_path):
     ctx, phone = context(tmp_path, SETTINGS)
     taken = look(ctx)
@@ -354,3 +353,18 @@ def test_a_backend_that_fails_inside_inject_reports_the_input_as_uncertain(tmp_p
     done = act(ctx, click(look(ctx), DISPLAY_TILE))
     assert isinstance(done, Acted) and done.disposition is Disposition.DELIVERY_UNCERTAIN
     assert done.error is ErrorCode.TRANSPORT and ctx.ledger.epoch() == 1
+
+
+def test_a_sideways_scroll_of_a_pager_or_of_rows_side_by_side_is_sent(tmp_path):
+    carousel = window(
+        node(
+            "androidx.recyclerview.widget.RecyclerView",
+            node("android.widget.Button", text="Card 1", clickable=True, bounds="[0,500][400,700]"),
+            node("android.widget.Button", text="Card 2", clickable=True, bounds="[400,500][800,700]"),
+            scrollable=True,
+            bounds="[0,500][1080,700]",
+        )
+    )
+    ctx, phone = context(tmp_path, carousel)
+    done = act(ctx, Request(Scroll(RefTarget(look(ctx, SettleState.SETTLED).ref(1)), Direction.RIGHT)))
+    assert isinstance(done, Acted) and isinstance(phone.permits[0].action, Swipe)

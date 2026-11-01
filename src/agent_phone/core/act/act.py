@@ -11,8 +11,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from agent_phone.core.act.hit import context_labels, plan_point, require_active, row_labels, swipe_across
-from agent_phone.core.act.intent import ActionReport, Click, Fill, Request, Scroll, TargetReport
+from agent_phone.core.act.hit import (
+    context_labels,
+    plan_point,
+    require_active,
+    row_labels,
+    runs_across,
+    swipe_across,
+)
+from agent_phone.core.act.intent import ActionReport, Click, Direction, Fill, Request, Scroll, TargetReport
 from agent_phone.core.context import Context
 from agent_phone.core.labels import Surface, display_name, surface_of, typed_text
 from agent_phone.core.outcome import Acted, ErrorCode, Outcome, Refusal, Refused, SentState
@@ -155,7 +162,7 @@ def _plan(
     node = screen.node(resolved.node)
     seen_before = previous[-1].attrs.bounds if previous else None
     previous[:] = [node]
-    ready(intent, node)
+    ready(intent, node, screen)
     fingerprint = resolved.fingerprint
     settled_here = (
         observed.settled is SettleState.SETTLED
@@ -194,7 +201,7 @@ def _plan(
     return Planned(action, site, report, screen, resolved)
 
 
-def ready(intent: Click | Fill | Scroll, node: Node) -> None:
+def ready(intent: Click | Fill | Scroll, node: Node, screen: Screen) -> None:
     """A hidden or disabled element may become ready; one of the wrong kind never does."""
     if not node.has(Flag.VISIBLE):
         raise NotYet(ErrorCode.NOT_ACTIONABLE, "The element is not visible.", {"reason": "hidden"})
@@ -210,6 +217,12 @@ def ready(intent: Click | Fill | Scroll, node: Node) -> None:
         case Scroll() if not node.has(Flag.SCROLLABLE):
             raise Refusal(
                 ErrorCode.NOT_ACTIONABLE, "The element does not scroll.", {"reason": "not_scrollable"}
+            )
+        case Scroll(direction=Direction.LEFT | Direction.RIGHT) if not runs_across(screen, node):
+            raise Refusal(
+                ErrorCode.NOT_ACTIONABLE,
+                "The list runs down, so a sideways swipe would land on one row. Scroll up or down.",
+                {"reason": "wrong_axis"},
             )
 
 

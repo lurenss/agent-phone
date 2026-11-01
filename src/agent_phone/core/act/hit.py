@@ -26,7 +26,7 @@ from agent_phone.core.geometry import Point, Rect
 from agent_phone.core.labels import Label, own_labels
 from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.phone import Swipe
-from agent_phone.core.role import COLLECTIONS, consumes_touch, role_of, takes_touch
+from agent_phone.core.role import COLLECTIONS, Role, consumes_touch, role_of, simple_name, takes_touch
 from agent_phone.core.screen import Flag, Node, NodeId, Screen, Window, WindowKind
 
 SWIPE_SPAN = 0.6
@@ -184,6 +184,17 @@ def context_labels(screen: Screen, node: Node) -> tuple[Label, ...]:
         if member.id not in own
         for label in own_labels(member)
     )
+
+
+def runs_across(screen: Screen, node: Node) -> bool:
+    """A pager, a horizontal scroll view, or a collection with two rows side by side. A sideways
+    swipe on a list that runs down lands on one row, and a row can act on a swipe: Samsung's
+    Phone and Contacts call on one, and a notification is dismissed by one."""
+    if role_of(node.attrs) is Role.PAGER or simple_name(node.attrs.class_name) == "HorizontalScrollView":
+        return True
+    rows = [b for child in node.children if not (b := screen.node(child).attrs.bounds).empty]
+    pairs = zip(rows, rows[1:], strict=False)
+    return any(a.left != b.left and a.top < b.bottom and b.top < a.bottom for a, b in pairs)
 
 
 def swipe_across(screen: Screen, node: Node, direction: Direction) -> Swipe:
