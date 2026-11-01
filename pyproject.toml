@@ -3,6 +3,8 @@ name = "agent-phone"
 version = "0.1.0"
 description = "Drive an Android phone from an AI agent through compact accessibility snapshots and refs."
 requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 dependencies = ["uiautomator2==3.7.1"]
 
 [project.scripts]

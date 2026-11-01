@@ -46,3 +46,7 @@ uv run ruff check && uv run ruff format --check .
 ```
 
 `AGENTS.md` has the architecture rules, the coding standards and the phone safety rules.
+
+## License
+
+Apache-2.0. See `LICENSE`.
