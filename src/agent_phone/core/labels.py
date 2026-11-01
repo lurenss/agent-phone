@@ -67,7 +67,9 @@ class Surface:
 ROLE_WORDS = frozenset({"button", "switch", "checkbox", "check box", "toggle button", "radio button", "tab"})
 """Trailing parts that system UIs append to a comma-joined description."""
 
-CAMEL_HUMP = re.compile(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
+CAMEL_HUMP = re.compile(r"(?<=[^\W_A-Z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
+"""A hump follows any letter or digit that is not an upper-case ASCII letter, so a non-ASCII
+lower-case letter splits too: `ModalitàAereo` -> Modalità Aereo."""
 WORD = re.compile(r"[^\W_]+")
 
 

@@ -63,21 +63,14 @@ def effects_of(verdict) -> set[str]:
     return {effect.value for effect in verdict.effects} if isinstance(verdict, Commits) else set()
 
 
-CLASS_NAME_HUMP_AFTER_A_NON_ASCII_LETTER = {"Modalità aereo"}
+CASES = [
+    pytest.param(case["label"], placement, set(case["effects"]), id=f"{case['label']}-{placement}")
+    for case in TABLE
+    for placement in PLACEMENTS
+]
 
 
-def cases():
-    for case in TABLE:
-        for placement in PLACEMENTS:
-            marks = []
-            if placement == "class_name" and case["label"] in CLASS_NAME_HUMP_AFTER_A_NON_ASCII_LETTER:
-                marks = [pytest.mark.xfail(strict=True, reason="ModalitàAereo is not split after the à")]
-            yield pytest.param(
-                case["label"], placement, set(case["effects"]), id=f"{case['label']}-{placement}", marks=marks
-            )
-
-
-@pytest.mark.parametrize(("label", "placement", "effects"), list(cases()))
+@pytest.mark.parametrize(("label", "placement", "effects"), CASES)
 def test_every_placement_of_a_label_gives_the_effects_of_its_row(label, placement, effects):
     assert effects_of(verdict_of(tapped(label, placement))) == effects
 
