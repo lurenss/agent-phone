@@ -108,6 +108,54 @@ def test_a_neutral_affirmative_does_what_its_dialog_says():
     assert tap_on(harmless, button(harmless, "Allow")) == Clear(ClearReason.NO_COMMIT_WORDS)
 
 
+@pytest.mark.xfail(strict=True, reason="is_affirmative compares the raw tokens, role suffix included")
+@pytest.mark.parametrize("description", ["OK, Button", "Allow,Button"])
+def test_an_affirmative_described_with_a_role_suffix_does_what_its_dialog_says(description):
+    screen = screen_of(
+        node(
+            "android.widget.FrameLayout",
+            node("android.widget.TextView", text="Delete this post?", bounds="[0,1500][1080,1600]"),
+            node("android.widget.Button", text="Cancel", clickable=True, bounds="[0,1700][540,1800]"),
+            node(
+                "android.widget.Button",
+                content_desc=description,
+                clickable=True,
+                bounds="[540,1700][1080,1800]",
+            ),
+            bounds="[0,1400][1080,1900]",
+        )
+    )
+    verdict = tap_on(screen, labelled_by_description(screen, description))
+    shown = description.partition(",")[0]
+    assert isinstance(verdict, Commits) and verdict.effects == {Effect.DELETE}, (
+        f"the agent sees button {shown!r}, as it does for the text, and so should the gate: {verdict}"
+    )
+    assert {e.source for e in verdict.evidence} == {Source.CONTEXT}
+
+
+def labelled_by_description(screen: Screen, description: str) -> Node:
+    return next(n for n in screen.nodes if n.attrs.content_desc == description)
+
+
+def test_a_role_word_beside_other_words_does_not_make_an_affirmative():
+    screen = screen_of(
+        node(
+            "android.widget.FrameLayout",
+            node("android.widget.TextView", text="Delete this post?", bounds="[0,1500][1080,1600]"),
+            node(
+                "android.widget.Button",
+                content_desc="Not OK, Button",
+                clickable=True,
+                bounds="[0,1700][1080,1800]",
+            ),
+            bounds="[0,1400][1080,1900]",
+        )
+    )
+    assert tap_on(screen, labelled_by_description(screen, "Not OK, Button")) == Clear(
+        ClearReason.NO_COMMIT_WORDS
+    )
+
+
 def test_an_element_with_no_words_commits_unlabeled():
     screen = screen_of(node("android.widget.FrameLayout", node("android.widget.ImageButton", clickable=True)))
     verdict = tap_on(screen, screen.nodes[1])
