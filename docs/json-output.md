@@ -11,11 +11,11 @@ The envelope is UTF-8 JSON with no escaping of non-ASCII characters and no space
 | `v` | int | always | Contract version, `1`. |
 | `ok` | bool | always | `true` when the command did what it was asked. |
 | `command` | string | always | The command name, such as `snapshot` or `click`. |
-| `mode` | string or null | always | The [permission mode](#permission-modes) the process ran in. Null only when `AGENT_PHONE_PERMISSION_MODE` named a mode that does not exist, so none was in force. |
+| `permission_mode` | string or null | always | The [permission mode](#permission-modes) the process ran in. Null only when `AGENT_PHONE_PERMISSION_MODE` named a mode that does not exist, so none was in force. |
 | `device` | string or null | always | The adb serial the command ran against, or null when no device was chosen. |
 | `delivery` | string | input commands and every error | Whether input reached the device. See [Delivery](#delivery). |
 | `retry` | string | with `delivery` | `safe` when `delivery` is `not_delivered`, otherwise `unsafe`. |
-| `data` | object | success, and an input that went out | The command's result. A snapshot is described in [Snapshot payload](#snapshot-payload). A snapshot's own `mode` key is its view mode, `compact`, `skeleton` or `full`, and has nothing to do with the envelope's. |
+| `data` | object | success, and an input that went out | The command's result. A snapshot is described in [Snapshot payload](#snapshot-payload). |
 | `error` | object | failure | `code`, `message`, `hint` and `details`. |
 
 The outcome type decides which keys appear, and no command writes `delivery` or `retry` itself:
@@ -37,10 +37,10 @@ The mode is a setting of the process, read once from the environment variable `A
 | `ask` | The caller's `--commit` for every effect it names. This is the default, and it is the mode when the variable is unset or empty. |
 | `dangerously-skip` | Nothing. A commit goes out with no `--commit`, and the [gate](#input-payload) lists the effects the mode let through as `skipped`. |
 
-The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNSUPPORTED` and every other refusal are the same in both modes, and a `--commit` that an agent passes in `dangerously-skip` is still accepted and changes nothing. Any other value of the variable is `INVALID_ARGS` before a device is opened, and its envelope has `"mode": null` and an empty `command`:
+The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNSUPPORTED` and every other refusal are the same in both modes, and a `--commit` that an agent passes in `dangerously-skip` is still accepted and changes nothing. Any other value of the variable is `INVALID_ARGS` before a device is opened, and its envelope has `"permission_mode": null` and an empty `command`:
 
 ```json
-{"v":1,"ok":false,"command":"","mode":null,"device":null,"delivery":"not_delivered","retry":"safe",
+{"v":1,"ok":false,"command":"","permission_mode":null,"device":null,"delivery":"not_delivered","retry":"safe",
  "error":{"code":"INVALID_ARGS","message":"AGENT_PHONE_PERMISSION_MODE is 'skip'. It must be `ask` or `dangerously-skip`, or unset for `ask`.","hint":null,"details":{}}}
 ```
 
@@ -113,7 +113,7 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
 | `profile` | string or null | always | The `name` of the device profile in `<state root>/profiles/` whose `serial` is this device's, or null when none is. |
 
 ```json
-{"v":1,"ok":true,"command":"devices","mode":"ask","device":null,"data":{"devices":[
+{"v":1,"ok":true,"command":"devices","permission_mode":"ask","device":null,"data":{"devices":[
  {"serial":"0a1b2c3d4e5f6a7b","model":"SM-J730F","ready":true,"api":28,"abi":"armeabi-v7a","display":[1080,1920],
   "density":420,"locale":"en-US","ime":"com.sec.android.inputmethod","boot_id":"8d3f6c1e-0b5a-4c2e-9f1d-2a7b3c4d5e6f",
   "profile":null},
@@ -168,7 +168,7 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
 | `matches` | array of strings | without `--count` | The matching lines in tree order, each as [a tree line](#tree-lines) at depth 0. A match with no ref is text with no action target. |
 
 ```json
-{"v":1,"ok":true,"command":"find","mode":"ask","device":"0a1b2c3d4e5f6a7b","data":{
+{"v":1,"ok":true,"command":"find","permission_mode":"ask","device":"0a1b2c3d4e5f6a7b","data":{
  "count":1,"id":"p4n8c","app":"com.android.settings","window":"application","truncated":0,
  "matches":["@p4n8c:e4 button \"Connections\" \"Wi-Fi, Bluetooth, Data usage, Airplane m…\" focused [0,179,1920,394]"]}}
 ```
@@ -184,7 +184,7 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
 | `value` | string, bool, array or null | The answer. `null` means the element has no such property, such as the value of a button. |
 
 ```json
-{"v":1,"ok":true,"command":"get","mode":"ask","device":"0a1b2c3d4e5f6a7b","data":{
+{"v":1,"ok":true,"command":"get","permission_mode":"ask","device":"0a1b2c3d4e5f6a7b","data":{
  "ref":"@p4n8c:e4","property":"bounds","value":[0,179,1920,394]}}
 ```
 
@@ -217,7 +217,7 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
 - When the deadline comes first, the result is an error with `code` `TIMEOUT`, `delivery` `not_delivered` and `retry` `safe`. `error.details.after` is the snapshot of the last read, recorded the same way, so the agent sees what the screen showed instead. Its `settled` is `unsettled` when `--settled` was asked.
 
 ```json
-{"v":1,"ok":false,"command":"wait","mode":"ask","device":"0a1b2c3d4e5f6a7b","delivery":"not_delivered","retry":"safe",
+{"v":1,"ok":false,"command":"wait","permission_mode":"ask","device":"0a1b2c3d4e5f6a7b","delivery":"not_delivered","retry":"safe",
  "error":{"code":"TIMEOUT","message":"present name=\"Brightness\" did not hold within 200 ms.","hint":null,
   "details":{"after":{
    "id":"q7m2k","app":"com.android.settings","window":"application","mode":"compact","settled":"unchecked",
@@ -248,7 +248,7 @@ Every condition has to hold on the same read. `--for` holds when a line of the a
 | `after` | object or null | The snapshot the wait ended on, with fresh refs, as in [Snapshot payload](#snapshot-payload). Null when nothing was waited for. |
 
 ```json
-{"v":1,"ok":true,"command":"click","mode":"ask","device":"0a1b2c3d4e5f6a7b","delivery":"delivered_unverified","retry":"unsafe",
+{"v":1,"ok":true,"command":"click","permission_mode":"ask","device":"0a1b2c3d4e5f6a7b","delivery":"delivered_unverified","retry":"unsafe",
  "data":{"input":{"kind":"tap","at":[960,995]},
   "target":{"ref":"@q7m2k:e7","role":"button","name":"Display","at":[960,995]},
   "gate":{"verdict":"clear","reason":"no_commit_words"},"verified_by":null,"after":null}}
@@ -257,7 +257,7 @@ Every condition has to hold on the same read. `--for` holds when a line of the a
 A refused commit lists what the input would do, what was granted, and the labels that said so:
 
 ```json
-{"v":1,"ok":false,"command":"click","mode":"ask","device":"0a1b2c3d4e5f6a7b","delivery":"not_delivered","retry":"safe",
+{"v":1,"ok":false,"command":"click","permission_mode":"ask","device":"0a1b2c3d4e5f6a7b","delivery":"not_delivered","retry":"safe",
  "error":{"code":"COMMIT_REFUSED",
   "message":"This input would schedule ('Schedule reel'). It is sent only with --commit schedule. Grant it only when your user asked for this commit.",
   "hint":"Grant the listed effect with --commit only when your user asked for it.",
@@ -267,7 +267,7 @@ A refused commit lists what the input would do, what was granted, and the labels
 The same tap under `dangerously-skip` goes out with no grant, and the gate says which effects the mode let through:
 
 ```json
-{"v":1,"ok":true,"command":"click","mode":"dangerously-skip","device":"0a1b2c3d4e5f6a7b","delivery":"delivered_unverified","retry":"unsafe",
+{"v":1,"ok":true,"command":"click","permission_mode":"dangerously-skip","device":"0a1b2c3d4e5f6a7b","delivery":"delivered_unverified","retry":"unsafe",
  "data":{"input":{"kind":"tap","at":[540,1750]},
   "target":{"ref":"@m9q4t:e1","role":"button","name":"Schedule reel","at":[540,1750]},
   "gate":{"verdict":"commits","effects":["schedule"],"granted":[],"skipped":["schedule"]},"verified_by":null,"after":null}}
@@ -326,7 +326,7 @@ An agent that must not send an input twice cannot rely on a ref after another in
 | `stopped_at` | int or null | The index, from 0, of the first step that is not ok, or null when every step is ok. Steps after it did not run. |
 | `trace` | string | The path of the [trace](#batch-trace) file. |
 
-The envelope's own keys follow the steps. `mode` is the batch process's, and every step ran under it, so each step's envelope and each step line of the trace carry the same value.
+The envelope's own keys follow the steps. `permission_mode` is the batch process's, and every step ran under it, so each step's envelope and each step line of the trace carry the same value.
 
 - When every step is ok, `ok` is true. A batch that sent no input, such as one of reads, has no `delivery` and no `retry`, like a read. A batch that sent input has the weakest `delivery` among its inputs, in the order `delivery_uncertain`, `delivered_unverified`, `delivered_verified`, and `retry: unsafe`.
 - When a step fails, `ok` is false, and `error` has that step's `code`, `message` and `hint`, with `details` `{"step": i}`, the index of the step. The step's own `details`, such as the snapshot a `wait` timed out on, stand once, in its envelope in `steps`, because an agent reads this output into its context. `delivery` is that step's `delivery`. `retry` is `unsafe` when any earlier step sent an input, because running the batch again would send that input again. Otherwise it is that step's `retry`. So `delivery` can be `not_delivered` with `retry` `unsafe`: the failed step sent nothing, and an earlier one did.
@@ -335,12 +335,12 @@ The envelope's own keys follow the steps. `mode` is the batch process's, and eve
 - A step that raises is the failed step. Its envelope is the `INTERNAL` envelope of an uncaught exception, with `delivery_uncertain` only when that step spent an input permit that it did not refund. The steps before it stay in `steps` and in the trace.
 
 ```json
-{"v":1,"ok":false,"command":"batch","mode":"ask","device":"0a1b2c3d4e5f6a7b","delivery":"not_delivered","retry":"unsafe",
+{"v":1,"ok":false,"command":"batch","permission_mode":"ask","device":"0a1b2c3d4e5f6a7b","delivery":"not_delivered","retry":"unsafe",
  "data":{"steps":[
-  {"v":1,"ok":true,"command":"launch","mode":"ask","device":"0a1b2c3d4e5f6a7b","delivery":"delivered_unverified","retry":"unsafe",
+  {"v":1,"ok":true,"command":"launch","permission_mode":"ask","device":"0a1b2c3d4e5f6a7b","delivery":"delivered_unverified","retry":"unsafe",
    "data":{"input":{"kind":"launch","package":"com.android.settings"},"target":null,
     "gate":{"verdict":"clear","reason":"not_labeled_input"},"verified_by":null,"after":null}},
-  {"v":1,"ok":false,"command":"click","mode":"ask","device":"0a1b2c3d4e5f6a7b","delivery":"not_delivered","retry":"safe",
+  {"v":1,"ok":false,"command":"click","permission_mode":"ask","device":"0a1b2c3d4e5f6a7b","delivery":"not_delivered","retry":"safe",
    "error":{"code":"OBSERVE_FIRST","message":"Input was sent since the latest snapshot, e8j9h. Take a new one and look first.",
     "hint":"Input was sent since the last snapshot. Take one and look before acting.","details":{}}}],
   "stopped_at":1,"trace":"/home/agent/.agent-phone/traces/0a1b2c3d4e5f6a7b/20261101T091500.123456Z-batch.jsonl"},
@@ -361,7 +361,7 @@ Each batch writes one JSONL file, `<state root>/traces/<serial>/<UTC timestamp>-
 | `line` | string | `step`. |
 | `i` | int | The step's index, from 0. |
 | `argv` | array of strings | The step's arguments. The text that `set-text` or `clipboard set` typed is replaced by `<N chars>` wherever it stands, also inside a longer word such as the query `value=hunter2`. Command words and flag names stay. |
-| `mode` | string | The step's `mode`, the permission mode of the batch's process. |
+| `permission_mode` | string | The step's `permission_mode`, the permission mode of the batch's process. |
 | `started_utc` | string | When the step started, in UTC with milliseconds. |
 | `ms` | int | How long the step took. |
 | `ok` | bool | The step's `ok`. |
@@ -381,8 +381,8 @@ Each batch writes one JSONL file, `<state root>/traces/<serial>/<UTC timestamp>-
 | `ms` | int | The steps' total time, from the start of the first to the end of the last. |
 
 ```jsonl
-{"line":"step","i":0,"argv":["launch","com.android.settings"],"mode":"ask","started_utc":"2026-11-01T09:15:00.211Z","ms":412,"ok":true,"delivery":"delivered_unverified","retry":"unsafe","error":null,"input":"launch","target":null,"gate":{"verdict":"clear","reason":"not_labeled_input"}}
-{"line":"step","i":1,"argv":["click","name=Nowhere","--timeout-ms","100"],"mode":"ask","started_utc":"2026-11-01T09:15:00.624Z","ms":3,"ok":false,"delivery":"not_delivered","retry":"safe","error":"OBSERVE_FIRST","input":null,"target":{"ref":null,"query":"name=\"Nowhere\"","role":null,"name":null},"gate":null}
+{"line":"step","i":0,"argv":["launch","com.android.settings"],"permission_mode":"ask","started_utc":"2026-11-01T09:15:00.211Z","ms":412,"ok":true,"delivery":"delivered_unverified","retry":"unsafe","error":null,"input":"launch","target":null,"gate":{"verdict":"clear","reason":"not_labeled_input"}}
+{"line":"step","i":1,"argv":["click","name=Nowhere","--timeout-ms","100"],"permission_mode":"ask","started_utc":"2026-11-01T09:15:00.624Z","ms":3,"ok":false,"delivery":"not_delivered","retry":"safe","error":"OBSERVE_FIRST","input":null,"target":{"ref":null,"query":"name=\"Nowhere\"","role":null,"name":null},"gate":null}
 {"line":"end","stopped_at":1,"ms":416}
 ```
 
@@ -413,7 +413,7 @@ Each batch writes one JSONL file, `<state root>/traces/<serial>/<UTC timestamp>-
 The Settings home fixture (`tests/fixtures/dumps/settings-home.xml`), in landscape:
 
 ```json
-{"v":1,"ok":true,"command":"snapshot","mode":"ask","device":"0a1b2c3d4e5f6a7b","data":{
+{"v":1,"ok":true,"command":"snapshot","permission_mode":"ask","device":"0a1b2c3d4e5f6a7b","data":{
  "id":"q7m2k","app":"com.android.settings","window":"application","mode":"compact","settled":"unchecked",
  "keyboard":false,"dialog":false,"others":[],"toasts":[],"truncated":0,
  "tree":[

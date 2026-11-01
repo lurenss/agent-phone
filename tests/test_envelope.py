@@ -33,7 +33,10 @@ INFO = DeviceInfo(
 def test_a_snapshot_read_prints_the_goldens_lines_under_its_id():
     snapshot = snapshot_of(fixture_screen("settings-home"), SnapshotId("q7m2k"), J7)
     wire = to_wire("snapshot", J7.serial, Read(snapshot), mode=PermissionMode.ASK)
-    assert list(wire) == ["v", "ok", "command", "mode", "device", "data"] and wire["mode"] == "ask"
+    assert (
+        list(wire) == ["v", "ok", "command", "permission_mode", "device", "data"]
+        and wire["permission_mode"] == "ask"
+    )
     assert wire["device"] == J7.serial and wire["ok"] is True
     golden = (GOLDEN / "settings-home.compact.txt").read_text().splitlines()
     assert [line.replace("@q7m2k:", "@t0000:") for line in wire["data"]["tree"]] == golden
@@ -42,7 +45,9 @@ def test_a_snapshot_read_prints_the_goldens_lines_under_its_id():
 def test_the_encoding_has_no_spaces_between_tokens_and_keeps_non_ascii():
     snapshot = snapshot_of(fixture_screen("settings-home"), SnapshotId("q7m2k"), J7)
     text = encode(to_wire("snapshot", J7.serial, Read(snapshot), mode=PermissionMode.ASK))
-    start = '{"v":1,"ok":true,"command":"snapshot","mode":"ask","device":"0a1b2c3d4e5f6a7b","data":{'
+    start = (
+        '{"v":1,"ok":true,"command":"snapshot","permission_mode":"ask","device":"0a1b2c3d4e5f6a7b","data":{'
+    )
     assert text.startswith(start)
     assert encode({"name": "Aeroplane mode…"}) == '{"name":"Aeroplane mode…"}'
 
@@ -130,9 +135,12 @@ def test_the_mode_follows_the_command_in_every_kind_of_envelope_and_is_null_when
         refused = to_wire("snapshot", None, Refused(ErrorCode.NO_DEVICE, "none"), mode=mode)
         floor = floor_envelope("click", None, ValueError("boom"), False, mode=mode)
         for wire in (refused, floor, to_wire("click", J7.serial, acted(SentState.UNVERIFIED), mode=mode)):
-            assert list(wire)[:4] == ["v", "ok", "command", "mode"] and wire["mode"] == mode.value
+            assert (
+                list(wire)[:4] == ["v", "ok", "command", "permission_mode"]
+                and wire["permission_mode"] == mode.value
+            )
     unread = to_wire("", None, Refused(ErrorCode.INVALID_ARGS, "bad"), mode=None)
-    assert list(unread)[:4] == ["v", "ok", "command", "mode"] and unread["mode"] is None
+    assert list(unread)[:4] == ["v", "ok", "command", "permission_mode"] and unread["permission_mode"] is None
 
 
 def test_a_commit_that_went_out_lists_what_the_grant_named_and_what_the_mode_let_through():

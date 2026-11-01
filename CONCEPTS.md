@@ -156,7 +156,7 @@ What the policy engine says about one input (`Verdict`: `Clear`, `Commits` or `D
 
 ### Permission mode
 
-Whether a commit needs a grant (`PermissionMode`, `core/policy/mode.py`). In `ask`, the default, it does, so the agent comes back to its user for the effects it lacks. In `dangerously-skip` a `Commits` verdict goes out with no grant, and the result's `data.gate` lists the effects the mode let through as `skipped`. Nothing else changes: a `Denied` verdict, a protected package, `LOCALE_UNSUPPORTED` and every other refusal hold in both. The mode is process configuration. It comes only from the environment variable `AGENT_PHONE_PERMISSION_MODE`, read once into `Settings`, and every envelope reports it as `mode`. No policy file, device profile, flag or batch step can set it, and an agent never does. *Avoid:* "mode" alone, which also means a snapshot's view mode.
+Whether a commit needs a grant (`PermissionMode`, `core/policy/mode.py`). In `ask`, the default, it does, so the agent comes back to its user for the effects it lacks. In `dangerously-skip` a `Commits` verdict goes out with no grant, and the result's `data.gate` lists the effects the mode let through as `skipped`. Nothing else changes: a `Denied` verdict, a protected package, `LOCALE_UNSUPPORTED` and every other refusal hold in both. The mode is process configuration. It comes only from the environment variable `AGENT_PHONE_PERMISSION_MODE`, read once into `Settings`, and every envelope reports it as `permission_mode`. No policy file, device profile, flag or batch step can set it, and an agent never does. *Avoid:* "mode" alone, which also means a snapshot's view mode.
 
 ### Ledger, epoch and permit
 

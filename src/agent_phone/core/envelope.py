@@ -1,14 +1,14 @@
 """The JSON contract (`docs/json-output.md`): one envelope per command, built from an Outcome.
 
-    {"v": 1, "ok": bool, "command": str, "mode": "ask" | "dangerously-skip" | null,
+    {"v": 1, "ok": bool, "command": str, "permission_mode": "ask" | "dangerously-skip" | null,
      "device": serial | null,
      "delivery": <Disposition>, "retry": "safe" | "unsafe",     # only for Refused and Acted
      "data": {...} | "error": {"code", "message", "hint", "details"}}
 
 `delivery` and `retry` are computed here from the outcome type and nowhere else, and `retry`
-from `delivery` (`Disposition.retry_safe`). No caller can write them. `mode` is the permission
-mode the process ran in, and null only when the environment named one that does not exist, so no
-mode was ever in force.
+from `delivery` (`Disposition.retry_safe`). No caller can write them. `permission_mode` is the
+permission mode the process ran in, and null only when the environment named one that does not
+exist, so no mode was ever in force. It is not `mode`, the key a snapshot's data uses for its view.
 """
 
 from __future__ import annotations
@@ -64,7 +64,7 @@ def to_wire(
         "v": VERSION,
         "ok": True,
         "command": command,
-        "mode": mode_value(mode),
+        "permission_mode": mode_value(mode),
         "device": device,
     }
     match outcome:
@@ -278,7 +278,7 @@ def floor_envelope(
         "v": VERSION,
         "ok": False,
         "command": command,
-        "mode": mode_value(mode),
+        "permission_mode": mode_value(mode),
         "device": device,
         **delivery_keys(disposition),
         "error": error_object(ErrorCode.INTERNAL, message, {"exception": type(error).__name__}),

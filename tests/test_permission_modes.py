@@ -87,26 +87,26 @@ def tap(root, screen, label, *flags, env=None, locale="en-US"):
 def skip_sends_a_plain_commit(root):
     """The control for every test below: under `dangerously-skip`, a send goes out with no grant."""
     code, wire, out = tap(root / "control", SEND, "Send", env=SKIP)
-    assert code == 0 and len(out) == 1 and wire["mode"] == "dangerously-skip", wire
+    assert code == 0 and len(out) == 1 and wire["permission_mode"] == "dangerously-skip", wire
 
 
 @pytest.mark.parametrize("env", ASK_ENVIRONMENTS, ids=["unset", "empty", "ask"])
 def test_ask_is_the_mode_when_the_variable_is_unset_empty_or_ask(tmp_path, env):
     code, wire, out = tap(tmp_path, SEND, "Send", env=env)
     assert code == 1 and wire["error"]["code"] == "COMMIT_REFUSED" and out == []
-    assert wire["mode"] == "ask" and wire["error"]["details"]["granted"] == []
+    assert wire["permission_mode"] == "ask" and wire["error"]["details"]["granted"] == []
 
 
 def test_dangerously_skip_sends_a_commit_with_no_grant_and_reports_what_it_skipped(tmp_path):
     code, wire, out = tap(tmp_path, SEND, "Send", env=SKIP)
     assert code == 0 and out != [] and [type(action) for action in out] == [Tap]
-    assert wire["mode"] == "dangerously-skip"
+    assert wire["permission_mode"] == "dangerously-skip"
     assert wire["data"]["gate"] == SEND_GATE | {"granted": [], "skipped": ["send"]}
 
 
 def test_the_same_send_in_ask_mode_is_refused_and_sends_nothing(tmp_path):
     code, wire, out = tap(tmp_path, SEND, "Send")
-    assert code == 1 and out == [] and wire["mode"] == "ask"
+    assert code == 1 and out == [] and wire["permission_mode"] == "ask"
     assert wire["error"]["code"] == "COMMIT_REFUSED" and wire["error"]["details"]["effects"] == ["send"]
     assert wire["delivery"] == "not_delivered" and wire["retry"] == "safe" and "data" not in wire
 
@@ -140,7 +140,7 @@ def test_skip_lifts_only_the_effects_the_grant_leaves_and_a_grant_for_another_ef
 def test_a_clear_tap_has_a_clear_gate_and_the_mode_in_both_modes(tmp_path):
     for env, mode in (({}, "ask"), (SKIP, "dangerously-skip")):
         code, wire, out = tap(tmp_path / mode, buttons("Search"), "Search", env=env)
-        assert code == 0 and len(out) == 1 and wire["mode"] == mode
+        assert code == 0 and len(out) == 1 and wire["permission_mode"] == mode
         assert wire["data"]["gate"] == {"verdict": "clear", "reason": "no_commit_words"}
 
 
@@ -168,7 +168,7 @@ def test_an_invalid_value_stops_the_process_before_any_device_is_opened(monkeypa
     assert process.main() == 2
     wire = json.loads(capsys.readouterr().out)
     assert wire["ok"] is False and wire["error"]["code"] == "INVALID_ARGS"
-    assert wire["mode"] is None and list(wire)[:4] == ["v", "ok", "command", "mode"]
+    assert wire["permission_mode"] is None and list(wire)[:4] == ["v", "ok", "command", "permission_mode"]
     assert "ask" in wire["error"]["message"] and "dangerously-skip" in wire["error"]["message"]
 
 
@@ -180,8 +180,8 @@ def test_an_invalid_value_stops_the_process_before_any_device_is_opened(monkeypa
 def test_every_envelope_names_its_mode_right_after_the_command(tmp_path, argv):
     for env, mode in (({}, "ask"), (SKIP, "dangerously-skip")):
         _, wire = invoke(argv, hub_for(SEND), tmp_path / mode, env=env)
-        assert list(wire)[:4] == ["v", "ok", "command", "mode"], wire
-        assert wire["mode"] == mode
+        assert list(wire)[:4] == ["v", "ok", "command", "permission_mode"], wire
+        assert wire["permission_mode"] == mode
 
 
 def test_a_failure_the_process_did_not_expect_still_names_its_mode(tmp_path):
@@ -190,7 +190,7 @@ def test_a_failure_the_process_did_not_expect_still_names_its_mode(tmp_path):
             raise RuntimeError("the hub fell over")
 
     _, wire = invoke(["snapshot"], Breaks([J7]), tmp_path, env=SKIP)
-    assert wire["error"]["code"] == "INTERNAL" and wire["mode"] == "dangerously-skip"
+    assert wire["error"]["code"] == "INTERNAL" and wire["permission_mode"] == "dangerously-skip"
 
 
 def test_a_batch_runs_its_steps_under_its_own_mode_and_every_record_of_it_names_it(tmp_path):
@@ -201,11 +201,15 @@ def test_a_batch_runs_its_steps_under_its_own_mode_and_every_record_of_it_names_
         invoke(["snapshot"], hub_for(SEND), root, env=env)
         hub = hub_for(SEND)
         code, wire = invoke(["batch", str(steps)], hub, root, env=env)
-        assert wire["ok"] is ok and wire["mode"] == mode and list(wire)[:4] == ["v", "ok", "command", "mode"]
-        assert [step["mode"] for step in wire["data"]["steps"]] == [mode]
+        assert (
+            wire["ok"] is ok
+            and wire["permission_mode"] == mode
+            and list(wire)[:4] == ["v", "ok", "command", "permission_mode"]
+        )
+        assert [step["permission_mode"] for step in wire["data"]["steps"]] == [mode]
         assert len(sent(hub)) == int(ok)
         trace = [json.loads(line) for line in open(wire["data"]["trace"]).read().splitlines()]
-        assert [line["mode"] for line in trace if line["line"] == "step"] == [mode]
+        assert [line["permission_mode"] for line in trace if line["line"] == "step"] == [mode]
 
 
 def test_the_python_api_reads_the_mode_from_the_settings_it_is_given(tmp_path):
@@ -232,7 +236,7 @@ def test_a_policy_file_cannot_set_the_mode(tmp_path):
         assert refused.value.code is ErrorCode.POLICY_INVALID and refused.value.details["field"] == key
         code, wire, out = tap(tmp_path / key, SEND, "Send", "--policy", str(file))
         assert code == 1 and wire["error"]["code"] == "POLICY_INVALID" and out == []
-        assert wire["mode"] == "ask"
+        assert wire["permission_mode"] == "ask"
 
 
 @pytest.mark.parametrize("where", ["top", "device"])
@@ -243,18 +247,18 @@ def test_a_device_profile_cannot_set_the_mode(tmp_path, where):
     (tmp_path / "profiles" / "phone.toml").write_text(device + (extra if where == "top" else ""))
     hub = hub_for(SEND)
     code, wire = invoke(["snapshot"], hub, tmp_path)
-    assert code == 1 and wire["error"]["code"] == "POLICY_INVALID" and wire["mode"] == "ask"
+    assert code == 1 and wire["error"]["code"] == "POLICY_INVALID" and wire["permission_mode"] == "ask"
     assert hub.phones == []
 
 
 @pytest.mark.parametrize("flag", ["--mode", "--permission-mode"])
 def test_no_command_flag_and_no_batch_step_can_set_the_mode(tmp_path, flag):
     code, wire = invoke(["click", "name=Send", flag, "dangerously-skip"], hub_for(SEND), tmp_path)
-    assert code == 2 and wire["error"]["code"] == "INVALID_ARGS" and wire["mode"] == "ask"
+    assert code == 2 and wire["error"]["code"] == "INVALID_ARGS" and wire["permission_mode"] == "ask"
     steps = tmp_path / "steps.json"
     steps.write_text(json.dumps([["click", "name=Send", flag, "dangerously-skip"]]))
     code, wire = invoke(["batch", str(steps)], hub_for(SEND), tmp_path)
-    assert code == 2 and wire["error"]["code"] == "INVALID_ARGS" and wire["mode"] == "ask"
+    assert code == 2 and wire["error"]["code"] == "INVALID_ARGS" and wire["permission_mode"] == "ask"
 
 
 def test_a_deny_rule_still_refuses_in_skip_mode_with_or_without_a_grant(tmp_path):
@@ -263,7 +267,7 @@ def test_a_deny_rule_still_refuses_in_skip_mode_with_or_without_a_grant(tmp_path
     for flags in ([], ["--commit", "publish"]):
         code, wire, out = tap(tmp_path, GO_LIVE, "Go live", *flags, env=SKIP)
         assert wire["error"]["code"] == "DENIED" and wire["error"]["details"]["rule"] == "ig.no-live"
-        assert out == [] and wire["mode"] == "dangerously-skip"
+        assert out == [] and wire["permission_mode"] == "dangerously-skip"
 
 
 def test_a_protected_package_is_still_never_stopped_in_skip_mode(tmp_path):
@@ -278,7 +282,7 @@ def test_a_protected_package_is_still_never_stopped_in_skip_mode(tmp_path):
     code, wire = invoke(["stop", "hev.sockstun"], hub, tmp_path, env=SKIP)
     assert code == 1 and wire["error"]["code"] == "DENIED" and sent(hub) == []
     assert wire["error"]["details"]["rule"] == "profile.protect.hev.sockstun.stop"
-    assert wire["mode"] == "dangerously-skip"
+    assert wire["permission_mode"] == "dangerously-skip"
     code, _ = invoke(["stop", "com.android.settings"], hub, tmp_path, env=SKIP)
     assert code == 0 and sent(hub) == [Stop("com.android.settings")]
 
@@ -287,7 +291,7 @@ def test_a_language_the_policy_cannot_read_is_still_refused_in_skip_mode(tmp_pat
     skip_sends_a_plain_commit(tmp_path)
     code, wire, out = tap(tmp_path, SEND, "Send", env=SKIP, locale="de-DE")
     assert code == 1 and wire["error"]["code"] == "LOCALE_UNSUPPORTED" and out == []
-    assert wire["mode"] == "dangerously-skip"
+    assert wire["permission_mode"] == "dangerously-skip"
 
 
 def test_every_other_refusal_holds_in_skip_mode(tmp_path):
@@ -299,7 +303,7 @@ def test_every_other_refusal_holds_in_skip_mode(tmp_path):
             assert invoke(["snapshot"], ahead, root, env=SKIP)[0] == 0
         _, wire = invoke(argv, hub, root, env=SKIP)
         assert wire["error"]["code"] == code and sent(hub) == [], (code, wire)
-        assert wire["mode"] == "dangerously-skip"
+        assert wire["permission_mode"] == "dangerously-skip"
 
     refused(tmp_path / "a", "OBSERVE_FIRST", ["click", "name=Send"], hub_for(SEND))
     refused(tmp_path / "b", "AMBIGUOUS_TARGET", ["click", "name=Send"], hub_for(two), hub_for(two))

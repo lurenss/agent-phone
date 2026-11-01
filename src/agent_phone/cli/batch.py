@@ -107,7 +107,7 @@ class BatchResult:
             "v": VERSION,
             "ok": failed is None,
             "command": "batch",
-            "mode": self.mode.value,
+            "permission_mode": self.mode.value,
             "device": self.device,
         }
         if failed is not None:

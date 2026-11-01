@@ -190,7 +190,7 @@ def test_the_example_refused_commit_is_what_the_code_prints(tmp_path):
 
 
 def test_the_example_skipped_commit_is_what_the_code_prints(tmp_path):
-    example = next(block for block in json_blocks() if block.get("mode") == "dangerously-skip")
+    example = next(block for block in json_blocks() if block.get("permission_mode") == "dangerously-skip")
     schedule = screen_of(
         node(
             "android.widget.FrameLayout",
@@ -208,7 +208,11 @@ def test_the_example_skipped_commit_is_what_the_code_prints(tmp_path):
 
 
 def test_the_example_invalid_mode_is_what_the_code_prints():
-    example = next(block for block in json_blocks() if block.get("mode") is None and "mode" in block)
+    example = next(
+        block
+        for block in json_blocks()
+        if block.get("permission_mode") is None and "permission_mode" in block
+    )
     with pytest.raises(Refusal) as refused:
         Settings.from_environment({"AGENT_PHONE_PERMISSION_MODE": "skip"})
     assert to_wire("", None, Refused.of(refused.value), mode=None) == example

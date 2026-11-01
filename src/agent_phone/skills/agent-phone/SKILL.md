@@ -26,7 +26,7 @@ agent-phone reads the screen and sends input. Every input names what it acts on 
 ## Read the output
 
 ```json
-{"v":1,"ok":true,"command":"snapshot","mode":"ask","device":"emulator-5554","data":{
+{"v":1,"ok":true,"command":"snapshot","permission_mode":"ask","device":"emulator-5554","data":{
  "id":"q7m2k","app":"com.android.settings","window":"application","mode":"compact","settled":"settled",
  "keyboard":false,"dialog":false,"others":[],"toasts":[],"truncated":0,
  "tree":[
@@ -37,7 +37,7 @@ agent-phone reads the screen and sends input. Every input names what it acts on 
 ```
 
 - On an error, `ok` is false and `error` holds `code`, `message`, `hint` and `details`. Branch on `error.code`, because the message wording can change.
-- `mode` is the permission mode you run in, `ask` or `dangerously-skip`. See [Know your permission mode](#know-your-permission-mode).
+- `permission_mode` is the permission mode you run in, `ask` or `dangerously-skip`. A snapshot's own `mode` is its view. See [Know your permission mode](#know-your-permission-mode).
 - The exit code is 0 on success, 1 on an error and 2 when the arguments do not parse.
 - A tree line holds, in this order, the indent, the ref, the role, the name, the detail, `value="…"`, `#<resource-id>`, the states, `(N rows)`, `(+N)` and the bounds `[left,top,right,bottom]`. Only the role is always there.
 - A line with no ref is text that has nothing to act on.
@@ -168,7 +168,7 @@ agent-phone click @m9q4t:e21 --commit schedule  # sent, because the user asked t
 
 ## Know your permission mode
 
-agent-phone runs in one of two permission modes. The environment variable `AGENT_PHONE_PERMISSION_MODE` sets it for the whole process, and your user sets it when launching you. Every envelope names the mode in `mode`.
+agent-phone runs in one of two permission modes. The environment variable `AGENT_PHONE_PERMISSION_MODE` sets it for the whole process, and your user sets it when launching you. Every envelope names the mode in `permission_mode`.
 
 - `ask` is the default, and it is the mode when the variable is unset or empty. A commit needs your `--commit` for each effect it names, so `COMMIT_REFUSED` sends you back to your user.
 - `dangerously-skip` sends a commit with no `--commit`. `data.gate` then lists `granted`, the effects your `--commit` named, and `skipped`, the effects the mode let through with no grant. `skipped` is always empty in `ask`.
