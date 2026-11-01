@@ -5,11 +5,13 @@ reached a device and what never did."""
 import os
 import shutil
 
+import pytest
 from fakes import EMULATOR_SERIAL, J7_SERIAL, FakeHub, FakePhone, info_for, invoke
 from support import ROOT, fixture_screen, node, screen_of
 
 from agent_phone.cli.policy import load_policy, load_profiles
 from agent_phone.core.device import BootId, Connected
+from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.phone import Stop, Tap
 from agent_phone.core.policy.rules import DenyRule
 
@@ -233,3 +235,20 @@ def test_an_intent_with_anything_but_an_action_and_a_package_is_refused_before_i
     uri = "intent:#Intent;action=android.intent.action.CALL;component=x/y;end"
     code, wire = invoke(["open-url", uri], hub, tmp_path)
     assert code == 2 and wire["error"]["code"] == "INVALID_ARGS" and sent(hub) == []
+
+
+@pytest.mark.xfail(strict=True, reason="a refusal after the input went out is printed as not_delivered")
+def test_a_failure_after_an_input_went_out_is_never_reported_as_not_delivered(tmp_path):
+    class ClosesBadly(FakePhone):
+        def close(self):
+            raise Refusal(ErrorCode.TRANSPORT, "the forward would not close")
+
+    class Hub(FakeHub):
+        def open(self, serial, first_read=False):
+            phone = ClosesBadly(info_for(serial), SETTINGS)
+            self.phones.append(phone)
+            return phone
+
+    taken = snapshot(tmp_path)
+    code, wire = invoke(["click", f"@{taken}:e7"], Hub([J7]), tmp_path)
+    assert code == 1 and wire["delivery"] != "not_delivered" and wire["retry"] == "unsafe"

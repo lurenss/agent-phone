@@ -120,3 +120,28 @@ def test_the_context_of_a_button_is_the_rest_of_its_window():
     ok = consumer_of(screen, labelled(screen, "OK"))
     said = {label.value for label in context_labels(screen, ok)}
     assert "Delete this post?" in said and "OK" not in said
+
+
+@pytest.mark.xfail(strict=True, reason="a full-screen window without focus is assumed to lie below")
+def test_a_full_screen_window_without_focus_still_covers_the_target():
+    screen = screen_of(app(button("Here", "[0,500][1080,600]")), app(node("android.widget.FrameLayout")))
+    assert refused(lambda: plan_point(screen, labelled(screen, "Here"))).code is ErrorCode.OCCLUDED
+
+
+@pytest.mark.xfail(
+    strict=True, reason="a view the dump calls invisible is skipped, but alpha 0 still takes touches"
+)
+def test_a_view_that_is_invisible_to_the_user_still_takes_the_touch_at_its_point():
+    screen = screen_of(
+        app(
+            button("Save", "[0,500][1080,600]", drawing_order=1),
+            node(
+                "android.widget.FrameLayout",
+                clickable=True,
+                visible_to_user=False,
+                drawing_order=2,
+                bounds="[0,0][1080,1920]",
+            ),
+        )
+    )
+    assert refused(lambda: plan_point(screen, labelled(screen, "Save"))).code is ErrorCode.OCCLUDED

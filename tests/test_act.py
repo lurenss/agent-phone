@@ -5,6 +5,7 @@ received, so "sends no input" is an observation and not a claim."""
 
 import tomllib
 
+import pytest
 from fakes import EMULATOR_SERIAL, J7_SERIAL, FakePhone, info_for
 from support import FakeClock, consumer_of, fixture_screen, labelled, node, screen_of
 
@@ -14,7 +15,7 @@ from agent_phone.core.act.intent import Click, Direction, Fill, Request, Scroll
 from agent_phone.core.act.ledger import Ledger
 from agent_phone.core.context import Context
 from agent_phone.core.device import BootId, DeviceProfile, Package, ProtectedPackage
-from agent_phone.core.outcome import Acted, Disposition, ErrorCode, Refused
+from agent_phone.core.outcome import Acted, Disposition, ErrorCode, Refusal, Refused
 from agent_phone.core.phone import Ack, Key, KeyName, Launch, NotSent, Sent, SetText, Stop, Swipe, Tap
 from agent_phone.core.policy.engine import Clear, ClearReason, Grant
 from agent_phone.core.policy.rules import Effect, Policy, merge, parse_policy, protect_rules
@@ -283,3 +284,75 @@ def test_a_labeled_input_on_a_device_whose_language_has_no_rules_is_refused(tmp_
     ctx, phone = context(tmp_path, SETTINGS, info=info_for(J7_SERIAL, locale="de-DE"))
     refused(act(ctx, click(look(ctx), DISPLAY_TILE)), ErrorCode.LOCALE_UNSUPPORTED)
     assert phone.permits == []
+
+
+def settings_row(title: str, switch_clickable: bool) -> str:
+    """A preference row: a clickable row whose switch widget is checkable, and clickable only
+    when an app sets it so. AOSP's widget layout sets `android:clickable="false"`."""
+    return node(
+        "android.widget.LinearLayout",
+        node(
+            "android.widget.TextView", text=title, resource_id="android:id/title", bounds="[0,500][800,600]"
+        ),
+        node(
+            "android.widget.Switch",
+            text="Off",
+            checkable=True,
+            clickable=switch_clickable,
+            resource_id="android:id/switch_widget",
+            bounds="[880,500][1080,600]",
+        ),
+        clickable=True,
+        bounds="[0,500][1080,600]",
+    )
+
+
+@pytest.mark.xfail(strict=True, reason="a checkable view that is not clickable is taken for the receiver")
+def test_a_switch_that_takes_no_touch_is_never_tapped_for_its_row(tmp_path):
+    ctx, phone = context(tmp_path, window(settings_row("Airplane mode", switch_clickable=False)))
+    refused(act(ctx, click(look(ctx, SettleState.SETTLED), 2)), ErrorCode.NOT_ACTIONABLE)
+    assert phone.permits == []
+
+
+@pytest.mark.xfail(strict=True, reason="a toggle is judged without the words of its row")
+def test_a_toggle_is_judged_with_the_title_of_its_row(tmp_path):
+    row = node(
+        "android.widget.LinearLayout",
+        node("android.widget.TextView", text="Mobile data", bounds="[0,500][800,600]"),
+        node(
+            "android.widget.Switch", text="Off", checkable=True, clickable=True, bounds="[880,500][1080,600]"
+        ),
+        bounds="[0,500][1080,600]",
+    )
+    ctx, phone = context(tmp_path, window(row))
+    commit = refused(act(ctx, click(look(ctx, SettleState.SETTLED), 1)), ErrorCode.COMMIT_REFUSED)
+    assert commit.details["effects"] == ["system"] and phone.permits == []
+
+
+@pytest.mark.xfail(strict=True, reason="a sideways swipe on a list that runs down is sent")
+def test_a_sideways_scroll_of_a_list_that_runs_down_is_refused(tmp_path):
+    ctx, phone = context(tmp_path, SETTINGS)
+    taken = look(ctx)
+    for direction in (Direction.LEFT, Direction.RIGHT):
+        sideways = refused(
+            act(ctx, Request(Scroll(RefTarget(taken.ref(3)), direction))), ErrorCode.NOT_ACTIONABLE
+        )
+        assert sideways.details == {"reason": "wrong_axis"}
+    assert phone.permits == []
+
+
+@pytest.mark.xfail(strict=True, reason="an exception from inject escapes act() after the spend")
+def test_a_backend_that_fails_inside_inject_reports_the_input_as_uncertain(tmp_path):
+    class Fails(FakePhone):
+        def inject(self, permit):
+            super().inject(permit)
+            raise Refusal(ErrorCode.TRANSPORT, "adb timed out while it sent the tap")
+
+    info = info_for(J7_SERIAL)
+    phone = Fails(info, SETTINGS)
+    ctx = Context(
+        phone, info, None, POLICY, SnapshotStore(tmp_path), Ledger(tmp_path, info.identity), FakeClock()
+    )
+    done = act(ctx, click(look(ctx), DISPLAY_TILE))
+    assert isinstance(done, Acted) and done.disposition is Disposition.DELIVERY_UNCERTAIN
+    assert done.error is ErrorCode.TRANSPORT and ctx.ledger.epoch() == 1

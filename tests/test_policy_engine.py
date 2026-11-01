@@ -198,3 +198,26 @@ def test_on_the_j7_the_connections_tile_is_denied_because_its_summary_names_airp
     assert isinstance(verdict, Denied) and verdict.rule == "j7.vpn-lockdown"
     for title in ("Notifications", "Display", "Sounds and vibration"):
         assert tap_on(settings, button(settings, title), policy) == Clear(ClearReason.NO_COMMIT_WORDS)
+
+
+@pytest.mark.xfail(
+    strict=True, reason="disabling the default commit rules empties the effects the protection reads"
+)
+def test_disabling_the_default_commit_rules_does_not_unprotect_a_package():
+    weakening = parse_policy({"disable": ["default.system", "default.delete"]}, "consumer.toml")
+    policy = merge((DEFAULT, PROFILE, weakening))
+    info = dialog("SocksTun", "Force stop", "Uninstall")
+    for label in ("Force stop", "Uninstall"):
+        verdict = tap_on(info, button(info, label), policy)
+        assert isinstance(verdict, Denied) and verdict.rule == "profile.protect.hev.sockstun.app-info"
+
+
+@pytest.mark.xfail(strict=True, reason="the J7 profile names no Wi-Fi words and no SocksTun screens")
+def test_on_the_j7_wi_fi_and_any_screen_that_shows_sockstun_are_denied():
+    policy = merge((DEFAULT, PROFILE))
+    wifi = screen_of(node("android.widget.Switch", content_desc="Wi-Fi", checkable=True, clickable=True))
+    assert isinstance(tap_on(wifi, wifi.nodes[0], policy), Denied)
+    vpn = dialog("SocksTun", "Disconnect", "Forget")
+    for label in ("Disconnect", "Forget"):
+        verdict = tap_on(vpn, button(vpn, label), policy)
+        assert isinstance(verdict, Denied) and verdict.rule == "j7.sockstun-screens"
