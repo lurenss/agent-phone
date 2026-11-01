@@ -17,7 +17,7 @@ evidence.py() { uv run python -I .claude/skills/verify-agent-phone/scripts/evide
 
 The phone runs live accounts. A wrong input can post, send or delete, and that cannot be undone.
 
-- Send only the inputs your task names. Reading is always allowed. That covers agent-phone's read commands (`devices`, `snapshot`, `find`, `get`, `is`, `wait`, `server`, `skills`, `clipboard get` and `screenshot`) and the adb reads that `evidence.py` knows, such as `dumpsys`, `getprop` and `screencap`. A tap, text, a key, `am start`, opening an app and every other agent-phone command are inputs.
+- Send only the inputs your task names. Reading is always allowed. That covers agent-phone's read commands (`devices`, `snapshot`, `find`, `get`, `is`, `wait`, `server`, `skills`, `clipboard get` and `screenshot`) and the adb reads that `evidence.py` knows, such as `dumpsys`, `getprop`, `logcat -d` and `screencap`. A tap, text, a key, `am start`, opening an app and every other agent-phone command are inputs.
 - Send every input through `evidence.py run --input`, so the record lists it. AGENTS.md requires every app a run opened and every input it sent in `decisions.tsv`. Put the input list from `evidence.py list` there, or in your report when another agent owns that file.
 - Never stop, start or change a package that its device profile in `examples/devices/` protects. On the J7 that is SocksTun (`hev.sockstun`). With always-on lockdown VPN, a dead tunnel takes the phone offline. `evidence.py` refuses an input that names a protected package.
 - Leave the phone on the screen your task names. On the J7 that is the home screen.
@@ -76,7 +76,7 @@ Doctor is read-only. Each line is `ok`, `note` or `stop`, then the check. Drive 
 The scripts in `scripts/` import this checkout's `agent_phone`, so run them with `uv run python -I` from the repo root.
 
 - `evidence.py new <feature>` makes a run folder, mode 700, and prints its path.
-- `evidence.py run <run> <label> [--input] [--env NAME=VALUE]... [--out FILE] [--timeout S] -- <command>...` runs one command, prints its stdout, writes the record and exits with the command's exit code. `agent-phone` and `python` mean this checkout's. Without `--input` it runs only agent-phone's read commands and known adb reads, and it refuses the rest. `--out` saves stdout to a file in the run folder, for binary output such as a screenshot.
+- `evidence.py run <run> <label> [--input] [--env NAME=VALUE]... [--out FILE] [--timeout S] -- <command>...` runs one command, prints its stdout, writes the record and exits with the command's exit code. `agent-phone` and `python` mean this checkout's. Without `--input` it runs only agent-phone's read commands, known adb reads and `probes/android/raw_dump.py`, and it refuses the rest. `logcat` is a known read with `-d` and without `-c`, `-G` or `-b all`, and every other `python` needs `--input`. `--out` saves stdout to a file in the run folder, for binary output such as a screenshot.
 - `evidence.py list <run>` prints each record in time order, then every input.
 - `doctor.py [--serial SERIAL]` is the check above. It exits 1 when a line says `stop`.
 - `hold_lock.py` holds the device lock like a second agent-phone process, until it gets SIGTERM. Start it in the background, and it prints `held <serial> <pid>` once it holds the lock. `features/server-lifetime.md` uses it.

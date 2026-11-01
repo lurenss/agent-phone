@@ -5,7 +5,7 @@
 Writes `probes/android/raw/<label>.raw.xml`, which git ignores because it holds private screen
 content. It reads through agent-phone's own adapter and holds the device lock, so it never runs
 beside another agent-phone process. Run it through the verify skill's `evidence.py` so the read is
-recorded (`python` needs `--input` there, though this sends nothing).
+recorded. `evidence.py` knows this script as a read, so it needs no `--input`.
 """
 
 import sys

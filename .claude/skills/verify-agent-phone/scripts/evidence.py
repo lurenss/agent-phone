@@ -10,7 +10,9 @@ holds what the phone's screen showed. Run it from the repo root:
 `run` drops every AGENT_PHONE_* variable, so the CLI runs its defaults as from a plain shell,
 then adds the `--env` pairs. `agent-phone` and `python` mean this checkout's. A command that can
 change the phone needs `--input`, and an input that names a package a device profile protects
-is refused.
+is refused. The reads it knows without `--input` are agent-phone's read commands, adb's
+`devices`, `dumpsys`, `getprop`, `logcat -d` and a few more, and `probes/android/raw_dump.py`. Every
+other `python` needs `--input`.
 """
 
 import argparse
@@ -28,7 +30,9 @@ from pathlib import Path
 from agent_phone.cli.settings import DEFAULT_STATE_ROOT
 
 VERIFY_ROOT = DEFAULT_STATE_ROOT / "verify"
-PROFILES = Path(__file__).resolve().parents[4] / "examples" / "devices"
+REPO = Path(__file__).resolve().parents[4]
+PROFILES = REPO / "examples" / "devices"
+RAW_DUMP = REPO / "probes" / "android" / "raw_dump.py"
 AGENT_PHONE_READS = {"devices", "snapshot", "find", "get", "is", "wait", "server", "skills", "screenshot"}
 AGENT_PHONE_READ_PAIRS = {("clipboard", "get")}
 ADB_READS = {"devices", "get-state", "get-serialno", "version"}
@@ -37,6 +41,10 @@ SHELL_READS = set(
     "cat date dumpsys echo getprop grep head id ls pgrep pidof ps screencap stat tail wc".split()
 )
 SHELL_READ_PAIRS = {("settings", "get"), ("uiautomator", "dump")}
+LOGCAT_CHANGES = {"-c", "-G", "-P", "-f", "--clear", "--buffer-size", "--prune", "--file"}
+LOGCAT_BUFFERS = {"main", "system", "radio", "events", "crash", "kernel", "default"}
+SERIAL_WORD = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]*")
+LABEL_WORD = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 RECORD_KEYS = {"label", "argv", "input", "started_utc", "ms", "exit"}
 SEPARATORS = re.compile(r"&&|\|\||[;\n|]|(?<![>&\d])&(?!>)")
 
@@ -64,7 +72,39 @@ def shell_reads(script: list[str]) -> bool:
     return True
 
 
+def logcat_reads(words: list[str]) -> bool:
+    """`logcat -d` prints the buffers and exits. It stays a read unless a flag clears a buffer (-c),
+    resizes it (-G), sets the prune list (-P) or writes a file on the phone (-f), or a buffer other
+    than the named ones is asked for, such as `-b all`. A short flag may be clustered, as `-dc`, so
+    every letter counts."""
+    flags, buffers = set(), []
+    for at, word in enumerate(words):
+        following = words[at + 1] if at + 1 < len(words) else ""
+        if word.startswith("--"):
+            name, _, value = word.partition("=")
+            flags.add(name)
+            if name == "--buffer":
+                buffers.append(value or following)
+        elif word.startswith("-") and word[1:2].isalpha():
+            flags.update(f"-{letter}" for letter in word[1:])
+            if "b" in word:
+                buffers.append(word.partition("b")[2] or following)
+    dumps = bool(flags & {"-d", "--dump"})
+    return dumps and not flags & LOGCAT_CHANGES and all(set(b.split(",")) <= LOGCAT_BUFFERS for b in buffers)
+
+
+def raw_dump_reads(words: list[str]) -> bool:
+    """`probes/android/raw_dump.py SERIAL LABEL` holds the device lock, reads the screen through
+    agent-phone's adapter and saves one file under `probes/android/raw/`. The label becomes part of
+    that path, so it may not climb out of the folder."""
+    if len(words) != 3 or not SERIAL_WORD.fullmatch(words[1]) or not LABEL_WORD.fullmatch(words[2]):
+        return False
+    return Path(words[0]).resolve() == RAW_DUMP
+
+
 def is_read(argv: list[str]) -> bool:
+    if argv[0] == "python":
+        return raw_dump_reads(argv[1:])
     if argv[0] == "agent-phone":
         words = argv[1:]
         while words and words[0] in ("-d", "--device"):
@@ -80,6 +120,8 @@ def is_read(argv: list[str]) -> bool:
         return False
     if rest[0] in ("shell", "exec-out"):
         return shell_reads(rest[1:])
+    if rest[0] == "logcat":
+        return logcat_reads(rest[1:])
     return rest[0] in ADB_READS
 
 

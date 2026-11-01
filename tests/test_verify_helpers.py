@@ -9,6 +9,7 @@ import pytest
 from support import ROOT
 
 SCRIPT = ROOT / ".claude" / "skills" / "verify-agent-phone" / "scripts" / "evidence.py"
+RAW_DUMP = str(ROOT / "probes" / "android" / "raw_dump.py")
 spec = importlib.util.spec_from_file_location("evidence", SCRIPT)
 evidence = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(evidence)
@@ -26,6 +27,11 @@ READS = [
     ["agent-phone", "screenshot"],
     ["agent-phone", "clipboard", "get"],
     ["agent-phone", "wait", "--for", "name=Brightness", "--timeout-ms", "1500"],
+    ["adb", "logcat", "-d"],
+    ["adb", "-s", "0a1b2c3d4e5f6a7b", "logcat", "-d", "-t", "200", "*:E"],
+    ["adb", "logcat", "-d", "-b", "crash"],
+    ["adb", "-s", "8c9d0e1f", "logcat", "-d", "-v", "threadtime", "ActivityManager:I", "*:S"],
+    ["python", RAW_DUMP, "0a1b2c3d4e5f6a7b", "thor-launcher"],
 ]
 CHANGES = [
     ["agent-phone", "click", "@k3x9q:e1"],
@@ -40,6 +46,25 @@ CHANGES = [
     ["adb", "shell", "monkey -p com.android.settings 1"],
     ["adb", "reboot"],
     ["python", "-c", "print(1)"],
+    ["adb", "logcat"],
+    ["adb", "logcat", "-c"],
+    ["adb", "logcat", "--clear", "-d"],
+    ["adb", "logcat", "-d", "-c"],
+    ["adb", "logcat", "-dc"],
+    ["adb", "logcat", "-d", "-G", "16M"],
+    ["adb", "logcat", "-d", "-b", "all"],
+    ["adb", "logcat", "-b", "main,all", "-d"],
+    ["adb", "logcat", "-d", "--buffer=all"],
+    ["adb", "logcat", "-d", "-f", "/sdcard/log.txt"],
+    ["adb", "logcat", "-d", "-P", "com.example"],
+    ["adb", "shell", "logcat", "-d"],
+    ["python", "probes/android/redact.py", "a.xml", "b.xml"],
+    ["python", RAW_DUMP, "0a1b2c3d4e5f6a7b"],
+    ["python", RAW_DUMP, "0a1b2c3d4e5f6a7b", "thor-launcher", "extra"],
+    ["python", RAW_DUMP, "0a1b2c3d4e5f6a7b", "../../.zshrc"],
+    ["python", RAW_DUMP, "0a1b2c3d4e5f6a7b", "/tmp/stolen"],
+    ["python", RAW_DUMP, "--help", "thor-launcher"],
+    ["python", "-I", RAW_DUMP, "0a1b2c3d4e5f6a7b", "thor-launcher"],
 ]
 
 
@@ -193,3 +218,29 @@ def test_the_evidence_helper_drops_the_permission_mode_unless_a_journey_passes_i
     passed = ["--env", "AGENT_PHONE_PERMISSION_MODE=ask"]
     assert evidence.main(["run", str(tmp_path), "named", "--input", *passed, "--", *show]) == 0
     assert capsys.readouterr().out == "ask\n"
+
+
+def test_the_raw_dump_is_a_read_by_its_relative_path_from_the_repo_root(monkeypatch):
+    monkeypatch.chdir(ROOT)
+    assert evidence.is_read(["python", "probes/android/raw_dump.py", "0a1b2c3d4e5f6a7b", "j7-feed"])
+    monkeypatch.chdir(ROOT / "tests")
+    assert not evidence.is_read(["python", "probes/android/raw_dump.py", "0a1b2c3d4e5f6a7b", "j7-feed"])
+
+
+def test_a_logcat_dump_and_the_raw_dump_are_recorded_without_the_input_claim(tmp_path, monkeypatch):
+    seen = []
+
+    def fake_run(argv, **kwargs):
+        seen.append(argv)
+        return evidence.subprocess.CompletedProcess(argv, 0, b"canned\n", b"")
+
+    monkeypatch.setattr(evidence.subprocess, "run", fake_run)
+    code = evidence.main(["run", str(tmp_path), "log", "--", "adb", "logcat", "-d", "-t", "5"])
+    assert code == 0 and json.loads((tmp_path / "log.json").read_text())["input"] is False
+    dump = ["python", RAW_DUMP, "0a1b2c3d4e5f6a7b", "j7-feed"]
+    assert evidence.main(["run", str(tmp_path), "dump", "--", *dump]) == 0
+    assert json.loads((tmp_path / "dump.json").read_text())["input"] is False
+    assert [argv[0] for argv in seen] == ["adb", evidence.sys.executable]
+    with pytest.raises(SystemExit, match="may change the phone"):
+        evidence.main(["run", str(tmp_path), "clear", "--", "adb", "logcat", "-c"])
+    assert len(seen) == 2
