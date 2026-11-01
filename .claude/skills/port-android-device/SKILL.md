@@ -58,7 +58,7 @@ uv run python -I $S/facts.py "$RUN" <serial>
 
 Read `$RUN/facts.json` and every hint in it:
 - The language: is it covered?
-- The displays: more than one, and which one has focus? Android 15 names no focused display in any dump. On a phone with one display, `top_focused_display` is then 0 with `top_focused_display_inferred` true. With several displays it is null, and a hint says it is unknown.
+- The displays: more than one, and which one has focus? Android 13 (the Thor) and Android 15 (the emulator) print `mTopFocusedDisplayId` in `dumpsys window`, not in `dumpsys window displays`. Android 9 (the J7) prints it nowhere. When no dump names it, a phone with one display gets `top_focused_display` 0 with `top_focused_display_inferred` true. With several displays it is null, and a hint says it is unknown.
 - The brand: does it need a developer switch?
 - Is it an emulator?
 - Is Bluetooth on? That decides the dialog the survey uses.
@@ -151,6 +151,7 @@ Commit in an order that reads as an argument: the measurements (FINDINGS, fixtur
 ### 9. Cleanup
 
 ```bash
+evidence.py run "$RUN" look --  agent-phone -d <serial> snapshot      # an input needs a fresh read first
 evidence.py run "$RUN" home --input -- agent-phone -d <serial> press home
 evidence.py run "$RUN" server-stop -- agent-phone -d <serial> server stop
 uv run python -I .claude/skills/verify-agent-phone/scripts/doctor.py --serial <serial> | tee "$RUN/doctor-after.txt"

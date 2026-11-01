@@ -94,8 +94,8 @@ def parse_window_displays(text: str) -> WindowFocus:
 
 
 def parse_top_focused(text: str) -> int | None:
-    """The display that gets key input, from the first `mTopFocusedDisplayId=` line. Android 13 prints
-    it in `dumpsys window`, and Android 15 prints it in no window dump."""
+    """The display that gets key input, from the first `mTopFocusedDisplayId=` line. Android 13 and 15
+    print it in `dumpsys window`, not in `dumpsys window displays`, and Android 9 prints it in neither."""
     found = TOP_FOCUSED.search(text)
     return int(found[1]) if found else None
 

@@ -1,6 +1,6 @@
-"""Which display gets key input. Android 13 prints `mTopFocusedDisplayId` in `dumpsys window`. Android 15
-prints it in neither `dumpsys window` nor `dumpsys window displays`, so facts.py reads the dump that has
-it, and without one line it infers display 0 only on a phone with one display."""
+"""Which display gets key input. Android 13 and 15 print `mTopFocusedDisplayId` in `dumpsys window`, not in
+`dumpsys window displays`, and Android 9 prints it in neither. facts.py reads the dump that has it, and
+without one line it infers display 0 only on a phone with one display."""
 
 import json
 from dataclasses import asdict

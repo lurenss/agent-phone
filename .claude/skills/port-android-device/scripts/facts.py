@@ -6,10 +6,10 @@ run folder from the verify skill (`evidence.py new <feature>`):
 
 It reads `getprop`, `dumpsys display`, `dumpsys window displays`, `dumpsys power` and two
 `settings get` keys, each through `evidence.py`, and sends nothing. When `dumpsys window displays` has
-no `mTopFocusedDisplayId` line it reads `dumpsys window` too. Android 15 prints the line in neither,
-and then a phone with one display gets display 0, marked `top_focused_display_inferred`. It prints a
-short summary and the hints: sentences that a table keyed by manufacturer, and a few facts, produce
-for the person who brings the phone up.
+no `mTopFocusedDisplayId` line it reads `dumpsys window` too, where Android 13 and 15 print it. Android 9
+prints it in neither, and then a phone with one display gets display 0, marked
+`top_focused_display_inferred`. It prints a short summary and the hints: sentences that a table keyed
+by manufacturer, and a few facts, produce for the person who brings the phone up.
 """
 
 from __future__ import annotations
