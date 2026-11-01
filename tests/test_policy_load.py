@@ -4,14 +4,16 @@ the languages the engine claims to read. Each case loads real files through the 
 the CLI uses, and the CLI cases check what reached the backend."""
 
 import shutil
+import tomllib
 
 import pytest
-from fakes import J7_SERIAL, FakeHub, invoke
+from fakes import J7_SERIAL, FakeHub, info_for, invoke
 from support import ROOT, fixture_screen, node, screen_of
 
 from agent_phone.cli.policy import load_policy, load_profile, load_profiles, profile_for
 from agent_phone.core.device import Connected
 from agent_phone.core.outcome import ErrorCode, Refusal
+from agent_phone.core.policy.rules import merge, parse_policy
 
 J7 = Connected(J7_SERIAL, "SM_J730F", ready=True)
 INSTAGRAM = "com.instagram.android"
@@ -29,6 +31,11 @@ GO_LIVE = screen_of(
         bounds="[0,0][1080,1920]",
     )
 )
+
+
+def layer(path, trusted):
+    doc = tomllib.loads((ROOT / path).read_text(encoding="utf-8"))
+    return parse_policy(doc, path, trusted=trusted)
 
 
 def install_j7(root):
@@ -202,3 +209,66 @@ def test_disabling_a_key_or_a_link_rule_does_not_switch_off_a_profile_denial(tmp
     sent = [permit.action for phone in hub.phones for permit in phone.permits]
     assert sent == [], f"{' '.join(argv)} was sent under p.never-send: {wire.get('data', {}).get('gate')}"
     assert wire["error"]["code"] == "DENIED", wire.get("error")
+
+
+GERMAN = screen_of(
+    node(
+        "android.widget.FrameLayout",
+        node("android.widget.Button", text="Löschen", clickable=True, bounds="[0,500][1080,600]"),
+        package="com.android.settings",
+        bounds="[0,0][1080,1920]",
+    )
+)
+UNCOVERED_LANGUAGE = pytest.mark.xfail(
+    strict=True, reason="a consumer's file adds its languages to the ones the locale guard accepts"
+)
+
+
+def tap_delete_on_a_german_phone(root, *flags):
+    infos = {J7_SERIAL: info_for(J7_SERIAL, locale="de-DE")}
+    code, wire = invoke(["snapshot"], FakeHub([J7], infos=infos, screens=[GERMAN]), root)
+    assert code == 0, wire
+    ref = next(
+        t for line in wire["data"]["tree"] if "Löschen" in line for t in line.split() if t.startswith("@")
+    )
+    hub = FakeHub([J7], infos=infos, screens=[GERMAN])
+    _, wire = invoke(["click", ref, *flags], hub, root)
+    return wire, [permit.action for phone in hub.phones for permit in phone.permits]
+
+
+def test_a_german_screen_is_not_judged_and_so_not_tapped(tmp_path):
+    wire, sent = tap_delete_on_a_german_phone(tmp_path)
+    assert wire["error"]["code"] == "LOCALE_UNSUPPORTED" and sent == []
+
+
+@UNCOVERED_LANGUAGE
+def test_a_caller_file_that_only_declares_a_language_does_not_switch_the_locale_guard_off(tmp_path):
+    declares = caller_file(tmp_path, 'languages = ["de"]\n')
+    wire, sent = tap_delete_on_a_german_phone(tmp_path, "--policy", str(declares))
+    assert sent == [], "the Löschen button was tapped with no grant, on words that no rule reads"
+    assert wire["error"]["code"] == "POLICY_INVALID" and wire["error"]["details"]["field"] == "languages"
+    assert str(declares) in wire["error"]["message"] and "built-in" in wire["error"]["message"]
+
+
+@UNCOVERED_LANGUAGE
+def test_no_layer_may_declare_a_language_the_built_in_policy_does_not_cover(tmp_path):
+    declares = parse_policy({"languages": ["de"]}, "extra.toml", trusted=False)
+    with pytest.raises(Refusal) as refused:
+        merge((layer("src/agent_phone/policy/default.toml", True), declares))
+    assert refused.value.code is ErrorCode.POLICY_INVALID and "extra.toml" in refused.value.message
+
+
+def test_a_file_may_name_a_covered_language_and_scope_a_rule_to_any_language(tmp_path):
+    scoped = {
+        "languages": ["en"],
+        "commit": [
+            {"id": "c.loeschen", "effect": "delete", "words": ["löschen"], "languages": ["de"], "reason": "r"}
+        ],
+    }
+    merged = merge(
+        (
+            layer("src/agent_phone/policy/default.toml", True),
+            parse_policy(scoped, "extra.toml", trusted=False),
+        )
+    )
+    assert merged.languages == {"en", "it"} and "c.loeschen" in {rule.origin.rule for rule in merged.rules}
