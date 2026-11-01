@@ -95,6 +95,9 @@ def test_settle_waits_out_a_dump_with_no_window_to_describe(tmp_path):
     assert wire["data"]["settled"] == "settled" and hub.phones[0].reads == 4
 
 
+IN_BUG_2 = pytest.mark.xfail(strict=True, reason="a bar one pixel inside the display is not a strip")
+
+
 def second_display(label="", bounds="[0,0][540,1920]", display=4):
     child = node("android.widget.TextView", text=label, package="test.second_screen", bounds=bounds)
     return node(
@@ -124,3 +127,39 @@ def test_a_window_that_names_display_0_is_kept_like_one_that_names_none():
     screen = screen_of(second_display("Here", display=0), app())
     assert [w.package for w in screen.windows] == ["test.second_screen", "test.app"]
     assert actives(screen) == [("test.second_screen", "application")]
+
+
+def system_window(bounds):
+    return node("android.widget.FrameLayout", package="com.android.systemui", bounds=bounds)
+
+
+@pytest.mark.parametrize(
+    "bounds",
+    [
+        pytest.param(bounds, id=bounds)
+        for bounds in (
+            "[1,0][1080,63]",
+            "[0,0][1079,63]",
+            "[2,0][1078,63]",
+            "[0,2][1080,65]",
+            "[0,1795][1080,1918]",
+        )
+    ],
+)
+@IN_BUG_2
+def test_a_bar_up_to_two_pixels_inside_the_display_edge_is_still_a_strip(bounds):
+    assert actives(screen_of(system_window(bounds), app())) == [("test.app", "application")]
+
+
+@pytest.mark.parametrize(
+    "bounds", ["[3,0][1080,63]", "[0,0][1077,63]", "[0,3][1080,66]", "[0,1792][1080,1917]"]
+)
+def test_a_system_window_three_pixels_short_of_a_side_or_off_an_edge_is_not_a_strip(bounds):
+    assert actives(screen_of(system_window(bounds), app())) == [("com.android.systemui", "system")]
+
+
+@pytest.mark.parametrize("bounds", ["[1801,1][1920,1079]", "[1800,0][1919,1080]"])
+@IN_BUG_2
+def test_a_navigation_bar_down_a_side_that_is_a_pixel_inside_the_display_is_a_strip(bounds):
+    screen = screen_of(system_window(bounds), app(bounds="[0,0][1800,1080]"), rotation=1)
+    assert actives(screen) == [("test.app", "application")]

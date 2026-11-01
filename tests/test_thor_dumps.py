@@ -4,16 +4,19 @@ in every dump, and the root bounds can sit a pixel inside the display. A fixture
 placeholders, so these tests name a node by its bounds."""
 
 import pytest
+from fakes import J7_SERIAL, FakeHub, invoke
 from support import fixture_xml
 
 from agent_phone.adapters.uiautomator2.parse import parse_hierarchy
 from agent_phone.core.act.hit import plan_point
+from agent_phone.core.device import Connected
 from agent_phone.core.geometry import Rect, Size
 from agent_phone.core.screen import Flag, Screen
 from agent_phone.core.snapshot.surface import select_surface
 
 THOR_NATURAL = Size(1080, 1920)
 BOTTOM_SCREEN_WINDOW = "com.odin.dualscreen.assistant"
+PHONE = Connected(J7_SERIAL, "SM_J730F", ready=True)
 THOR_DUMPS = ("thor-launcher", "thor-chess", "thor-netflix", "thor-youtube")
 
 
@@ -43,3 +46,26 @@ RIGHT_ICON = (1261, 524, 1562, 751)
 def test_a_launcher_icon_is_planned_to_its_center_on_either_side_of_the_bottom_screen_window(icon):
     screen = thor("thor-launcher")
     assert plan_point(screen, clickable_at(screen, icon)) == Rect(*icon).center()
+
+
+IN_BUG_2 = pytest.mark.xfail(strict=True, reason="a status bar one pixel inside the display is not a strip")
+
+
+@pytest.mark.parametrize(
+    ("name", "app"),
+    [
+        ("thor-launcher", "com.android.launcher3"),
+        ("thor-youtube", "com.google.android.youtube"),
+        pytest.param("thor-chess", "com.chess", marks=IN_BUG_2),
+        pytest.param("thor-netflix", "com.netflix.mediaclient", marks=IN_BUG_2),
+    ],
+)
+def test_the_active_window_is_the_app_whichever_way_the_status_bar_is_inset(name, app):
+    assert select_surface(thor(name)).window.package == app
+
+
+@IN_BUG_2
+def test_wait_for_an_app_holds_with_that_app_on_the_thor_screen(tmp_path):
+    hub = FakeHub([PHONE], screens=[thor("thor-netflix")])
+    code, wire = invoke(["wait", "--app", "com.netflix.mediaclient", "--timeout-ms", "200"], hub, tmp_path)
+    assert code == 0 and wire["data"]["app"] == "com.netflix.mediaclient"
