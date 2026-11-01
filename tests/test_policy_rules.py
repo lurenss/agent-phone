@@ -64,9 +64,14 @@ def test_shipped_layers_merge_in_order_and_the_profile_deny_is_marked():
     sources = [r.origin.source for r in merged.rules]
     assert list(dict.fromkeys(sources)) == [DEFAULT, PROFILE, INSTAGRAM, BUSINESS_SUITE]
     assert sources == sorted(sources, key=[DEFAULT, PROFILE, INSTAGRAM, BUSINESS_SUITE].index)
-    assert len(ids) == len(set(ids)) == 18
+    assert len(ids) == len(set(ids)) == 20
     deny = {r.origin.rule: r.from_profile for r in merged.of_kind(DenyRule)}
-    assert deny == {"j7.vpn-lockdown": True, "ig.no-live": False}
+    assert deny == {
+        "j7.vpn-lockdown": True,
+        "j7.sockstun": True,
+        "j7.sockstun-screens": True,
+        "ig.no-live": False,
+    }
     assert merged.languages == {"en", "it"}
 
 

@@ -209,7 +209,6 @@ def test_disabling_the_default_commit_rules_does_not_unprotect_a_package():
         assert isinstance(verdict, Denied) and verdict.rule == "profile.protect.hev.sockstun.app-info"
 
 
-@pytest.mark.xfail(strict=True, reason="the J7 profile names no Wi-Fi words and no SocksTun screens")
 def test_on_the_j7_wi_fi_and_any_screen_that_shows_sockstun_are_denied():
     policy = merge((DEFAULT, PROFILE))
     wifi = screen_of(node("android.widget.Switch", content_desc="Wi-Fi", checkable=True, clickable=True))

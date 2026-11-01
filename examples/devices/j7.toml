@@ -12,5 +12,17 @@ reason = "Always-on lockdown VPN: a dead tunnel takes the phone offline."
 
 [[deny]]
 id = "j7.vpn-lockdown"
-words = ["airplane mode", "mobile data", "vpn"]
-reason = "Always-on lockdown VPN: turning off the network or the VPN takes the phone offline."
+words = ["airplane mode", "mobile data", "vpn", "wi-fi", "wifi"]
+reason = "Always-on lockdown VPN: turning off the network or the VPN takes the phone offline. When mobile data is off, Wi-Fi is the only network."
+
+# A label splits at a case hump, so "SocksTun" reads as two words and "sockstun" as one.
+# The rules below name both spellings.
+[[deny]]
+id = "j7.sockstun"
+words = ["SocksTun", "sockstun"]
+reason = "SocksTun is the tunnel. An element that names it can open its settings or stop it."
+
+[[deny]]
+id = "j7.sockstun-screens"
+context_words = ["SocksTun", "sockstun"]
+reason = "A screen that shows SocksTun, such as its VPN dialog or its App info, can stop the tunnel, so nothing on it is tapped."
