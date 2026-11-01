@@ -13,8 +13,8 @@ type, layer or focus attribute. What this module infers, and from what:
 - kind: INPUT_METHOD for the device's default IME package (`shell.py` reads it), SYSTEM for
   the platform's own UI packages in PLATFORM_UI, APPLICATION otherwise. A backend that reads
   AccessibilityWindowInfo replaces all of this with facts.
-- layer: None. The engine therefore treats every non-active window over a point as covering
-  it, except a full-screen application window (`core/act/hit.py`).
+- layer: None. The hit plan therefore treats every other window over a point as covering it
+  (`core/act/hit.py`).
 """
 
 from __future__ import annotations

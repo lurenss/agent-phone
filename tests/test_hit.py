@@ -122,7 +122,6 @@ def test_the_context_of_a_button_is_the_rest_of_its_window():
     assert "Delete this post?" in said and "OK" not in said
 
 
-@pytest.mark.xfail(strict=True, reason="a full-screen window without focus is assumed to lie below")
 def test_a_full_screen_window_without_focus_still_covers_the_target():
     screen = screen_of(app(button("Here", "[0,500][1080,600]")), app(node("android.widget.FrameLayout")))
     assert refused(lambda: plan_point(screen, labelled(screen, "Here"))).code is ErrorCode.OCCLUDED

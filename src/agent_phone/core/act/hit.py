@@ -6,9 +6,8 @@ point, not the node the caller meant. This module makes those the same node, or 
 
 1. The target's window must be the active one, and no other window may cover the point. The
    keyboard, a status bar strip, an overlay and any window whose stacking is unknown all
-   block. A non-active application window that covers the whole display counts as below,
-   because a full-screen window above the active one would have the focus. A dialog over an
-   app needs no rule of its own: the dump of a dialog leaves the app beneath it out (A2-7).
+   block. A dialog over an app needs no rule of its own: the dump of a dialog leaves the app
+   beneath it out (A2-7).
 2. Inside the window, dispatch follows Android's: children containing the point in reverse
    drawing order, deepest node that takes a touch first (`role.takes_touch`). Equal or missing
    drawing order between two branches that both hold one is ambiguous, and an ambiguous point
@@ -27,7 +26,7 @@ from agent_phone.core.labels import Label, own_labels
 from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.phone import Swipe
 from agent_phone.core.role import COLLECTIONS, Role, consumes_touch, role_of, simple_name, takes_touch
-from agent_phone.core.screen import Flag, Node, NodeId, Screen, Window, WindowKind
+from agent_phone.core.screen import Flag, Node, NodeId, Screen, Window
 
 SWIPE_SPAN = 0.6
 SWIPE_MS = 275
@@ -43,17 +42,15 @@ Receiver = NodeId | Ambiguous | None
 
 
 def covering_window(screen: Screen, target: Window, point: Point) -> Window | None:
-    display = Rect(0, 0, screen.display.width, screen.display.height)
+    """Any other window at the point covers it, unless the backend knows both layers and the
+    other one is lower. A window without focus can still lie above and take the touch, such as a
+    full-screen overlay that does not take focus."""
     for window in screen.windows_at(point):
         if window.id == target.id:
             continue
-        if target.layer is not None and window.layer is not None:
-            if window.layer > target.layer:
-                return window
+        if target.layer is not None and window.layer is not None and window.layer < target.layer:
             continue
-        below = window.kind is WindowKind.APPLICATION and not window.active and window.bounds.covers(display)
-        if not below:
-            return window
+        return window
     return None
 
 
