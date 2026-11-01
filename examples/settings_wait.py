@@ -6,7 +6,8 @@ should cause holds. The next step starts the moment it does. A fixed sleep picks
 every phone, so it is too long when the phone is fast and too short when it is slow. It also gives
 the next input no observation, and `wait` records one.
 
-Run it from the repo root with the phone on its home screen:
+Run it from the repo root with the phone on its home screen, whose app it takes from the first
+snapshot and waits for again at the end:
 
     uv run python examples/settings_wait.py [SERIAL]
 
@@ -66,7 +67,7 @@ def read_brightness(phone: Driver, page: Snapshot) -> str:
 
 
 def read_display_page(phone: Driver, steps: Steps) -> str:
-    timed(steps, "look first", phone.snapshot)
+    home = timed(steps, "look first", phone.snapshot).package
 
     timed(steps, "launch settings", lambda: phone.launch(SETTINGS))
     timed(steps, "wait: settings in the foreground", lambda: phone.wait(Foreground(SETTINGS)))
@@ -80,6 +81,7 @@ def read_display_page(phone: Driver, steps: Steps) -> str:
     timed(steps, "wait: display page gone", lambda: phone.wait(Gone(BRIGHTNESS)))
 
     timed(steps, "press home", lambda: phone.press(KeyName.HOME))
+    timed(steps, "wait: home screen back", lambda: phone.wait(Foreground(home)))
     return brightness
 
 

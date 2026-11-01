@@ -52,7 +52,7 @@ PHASES = [
     [LAUNCHER, SETTINGS_HOME],
     [SETTINGS_HOME, DISPLAY_PAGE],
     [DISPLAY_PAGE, SETTINGS_HOME],
-    [LAUNCHER],
+    [SETTINGS_HOME, LAUNCHER],
 ]
 
 
@@ -108,8 +108,9 @@ def test_it_opens_the_page_and_reads_the_row_by_waiting_for_each_screen(example,
         "press back",
         "wait: display page gone",
         "press home",
+        "wait: home screen back",
     ]
-    assert clock.pauses == [POLL_GAP_S] * 3, "each wait read the stale screen once, then the new one"
+    assert clock.pauses == [POLL_GAP_S] * 4, "each wait read the stale screen once, then the new one"
 
 
 def test_it_sends_the_four_inputs_it_names_and_nothing_else(example, tmp_path):
@@ -129,7 +130,7 @@ def test_it_prints_the_value_and_one_line_per_step(example, tmp_path, capsys, mo
     assert example.main([]) == 0
     printed = capsys.readouterr().out.splitlines()
     assert printed[0] == "brightness slider value: 1764.0"
-    assert len(printed) == 1 + 9 + 1 and printed[-1].startswith("total")
+    assert len(printed) == 1 + 10 + 1 and printed[-1].startswith("total")
 
 
 def test_a_page_that_never_opens_stops_the_script_with_what_the_screen_showed(
