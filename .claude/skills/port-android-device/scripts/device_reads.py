@@ -93,6 +93,13 @@ def parse_window_displays(text: str) -> WindowFocus:
     return WindowFocus(top, owners)
 
 
+def parse_top_focused(text: str) -> int | None:
+    """The display that gets key input, from the first `mTopFocusedDisplayId=` line. Android 13 prints
+    it in `dumpsys window`, and Android 15 prints it in no window dump."""
+    found = TOP_FOCUSED.search(text)
+    return int(found[1]) if found else None
+
+
 def parse_awake(text: str) -> bool | None:
     """`mWakefulness=Awake` on API 28 and later. Older dumps only have the display's power state."""
     if wake := WAKEFULNESS.search(text):

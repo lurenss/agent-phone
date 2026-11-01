@@ -68,7 +68,7 @@ def test_the_j7_reads_give_every_fact_and_no_hint():
     assert (got.locale, got.language, got.language_covered) == ("en-US", "en", True)
     assert got.policy_languages == LANGUAGES and got.emulator is False
     assert got.displays == (reads.Display(0, 1080, 1920, "ON"),)
-    assert got.top_focused_display is None, "API 28 prints no mTopFocusedDisplayId"
+    assert (got.top_focused_display, got.top_focused_display_inferred) == (0, True), "API 28 names no display"
     assert (got.awake, got.bluetooth_on, got.ime) == (True, False, "com.sec.android.inputmethod")
     assert got.hints == ()
 
@@ -252,7 +252,7 @@ def test_the_script_reads_through_evidence_and_writes_the_facts(tmp_path, capsys
     assert list(document) == [
         "serial", "manufacturer", "brand", "model", "device", "release", "api", "abi", "locale",
         "language", "policy_languages", "language_covered", "emulator", "displays",
-        "top_focused_display", "awake", "bluetooth_on", "ime", "hints",
+        "top_focused_display", "top_focused_display_inferred", "awake", "bluetooth_on", "ime", "hints",
     ]  # fmt: skip
     assert document["displays"][1] == {"id": 4, "width": 1080, "height": 1240, "state": "OFF"}
     assert document["policy_languages"] == ["en", "it"] and document["language_covered"] is True

@@ -67,6 +67,11 @@ def table(head: tuple[str, ...], rows: list[tuple[object, ...]]) -> list[str]:
     return lines + ["| " + " | ".join(cell(c) for c in row) + " |" for row in rows] + [""]
 
 
+def keys_cell(facts: dict) -> object:
+    shown = facts["top_focused_display"]
+    return f"{shown} (inferred)" if shown is not None and facts.get("top_focused_display_inferred") else shown
+
+
 def facts_section(facts: dict) -> list[str]:
     displays = "; ".join(
         f"{d['id']}: {d['width']}x{d['height']} {d.get('state') or '?'}" for d in facts["displays"]
@@ -82,7 +87,7 @@ def facts_section(facts: dict) -> list[str]:
         ("Policy languages", ", ".join(facts["policy_languages"])),
         ("Emulator", facts["emulator"]),
         ("Displays", displays or None),
-        ("Keys go to display", facts["top_focused_display"]),
+        ("Keys go to display", keys_cell(facts)),
         ("Screen awake", facts["awake"]),
         ("Bluetooth on", facts["bluetooth_on"]),
         ("Keyboard", facts["ime"]),

@@ -5,9 +5,11 @@ run folder from the verify skill (`evidence.py new <feature>`):
     uv run python -I .claude/skills/port-android-device/scripts/facts.py <run> <serial>
 
 It reads `getprop`, `dumpsys display`, `dumpsys window displays`, `dumpsys power` and two
-`settings get` keys, each through `evidence.py`, and sends nothing. It prints a short summary and the
-hints: sentences that a table keyed by manufacturer, and a few facts, produce for the person who
-brings the phone up.
+`settings get` keys, each through `evidence.py`, and sends nothing. When `dumpsys window displays` has
+no `mTopFocusedDisplayId` line it reads `dumpsys window` too. Android 15 prints the line in neither,
+and then a phone with one display gets display 0, marked `top_focused_display_inferred`. It prints a
+short summary and the hints: sentences that a table keyed by manufacturer, and a few facts, produce
+for the person who brings the phone up.
 """
 
 from __future__ import annotations
@@ -30,7 +32,7 @@ from device_reads import (  # noqa: E402
     parse_flag,
     parse_properties,
     parse_setting,
-    parse_window_displays,
+    parse_top_focused,
 )
 
 from agent_phone.cli.policy import DEFAULT_POLICY  # noqa: E402
@@ -49,6 +51,7 @@ MANUFACTURER_HINTS = {
     "vivo": VIVO,
 }
 MORE_DISPLAYS = "Only display 0 is read and tapped (A6-1)."
+UNKNOWN_DISPLAY = "Unknown which display gets key input."
 EMULATOR = "Emulator: no live accounts. Safe for a full survey."
 
 
@@ -71,6 +74,7 @@ class Facts:
     emulator: bool
     displays: tuple[Display, ...]
     top_focused_display: int | None
+    top_focused_display_inferred: bool
     awake: bool | None
     bluetooth_on: bool | None
     ime: str | None
@@ -94,13 +98,20 @@ def facts_from(
     bluetooth: str,
     ime: str,
     languages: tuple[str, ...],
+    all_windows: str = "",
 ) -> Facts:
-    """Pure: the text of each read in, the facts and their hints out."""
+    """Pure: the text of each read in, the facts and their hints out. `all_windows` is `dumpsys window`,
+    which names the focused display on a phone whose `dumpsys window displays` does not."""
     props = parse_properties(getprop)
     raw_locale = props.get("persist.sys.locale") or props.get("ro.product.locale")
     locale = raw_locale.replace("_", "-") if raw_locale else None
     language = language_of(locale) if locale else None
     keyboard = parse_setting(ime)
+    displays = tuple(parse_displays(display))
+    named = parse_top_focused(window)
+    if named is None:
+        named = parse_top_focused(all_windows)
+    inferred = named is None and len(displays) == 1
     facts = Facts(
         serial=serial,
         manufacturer=props.get("ro.product.manufacturer") or None,
@@ -116,8 +127,9 @@ def facts_from(
         language_covered=None if language is None else language in languages,
         emulator=serial.startswith("emulator-")
         or "1" in (props.get("ro.kernel.qemu"), props.get("ro.boot.qemu")),
-        displays=tuple(parse_displays(display)),
-        top_focused_display=parse_window_displays(window).top_focused_display,
+        displays=displays,
+        top_focused_display=0 if inferred else named,
+        top_focused_display_inferred=inferred,
         awake=parse_awake(power),
         bluetooth_on=parse_flag(parse_setting(bluetooth) or ""),
         ime=keyboard.partition("/")[0] if keyboard else None,
@@ -135,6 +147,8 @@ def hints_for(facts: Facts) -> tuple[str, ...]:
             f"Keys go to display {facts.top_focused_display}, not display 0 (A6-1). "
             "press back and press home may miss the screen that agent-phone reads."
         )
+    if facts.top_focused_display is None and len(facts.displays) > 1:
+        hints.append(UNKNOWN_DISPLAY)
     if facts.language_covered is False:
         hints.append(
             f"The policy has no rules for {facts.language}. "
@@ -143,6 +157,13 @@ def hints_for(facts: Facts) -> tuple[str, ...]:
     if facts.emulator:
         hints.append(EMULATOR)
     return tuple(hints)
+
+
+def keys_line(facts: Facts) -> str:
+    if facts.top_focused_display is None:
+        return "keys go to an unknown display"
+    inferred = " (inferred)" if facts.top_focused_display_inferred else ""
+    return f"keys go to display {facts.top_focused_display}{inferred}"
 
 
 def summary(facts: Facts) -> list[str]:
@@ -155,7 +176,7 @@ def summary(facts: Facts) -> list[str]:
         f"{facts.manufacturer} {facts.model} ({facts.device}), {facts.abi}",
         f"Android {facts.release} (API {facts.api})",
         f"locale {facts.locale}, language {facts.language} {covered} ({', '.join(facts.policy_languages)})",
-        f"displays {shown or 'none read'}; keys go to display {facts.top_focused_display}",
+        f"displays {shown or 'none read'}; {keys_line(facts)}",
         f"{wake}, bluetooth {bluetooth}, keyboard {facts.ime}",
     ]
     return lines + [f"hint: {hint}" for hint in facts.hints]
@@ -166,8 +187,8 @@ def read_facts(recorder: Recorder) -> Facts | None:
     getprop = recorder.adb("facts-getprop", "shell", "getprop")
     if getprop.record["exit"] != 0 or not parse_properties(getprop.text):
         return None
-    texts = [
-        recorder.adb(f"facts-{label}", "shell", *command.split()).text
+    texts = {
+        label: recorder.adb(f"facts-{label}", "shell", *command.split()).text
         for label, command in (
             ("display", "dumpsys display"),
             ("window", "dumpsys window displays"),
@@ -175,8 +196,20 @@ def read_facts(recorder: Recorder) -> Facts | None:
             ("bluetooth", "settings get global bluetooth_on"),
             ("ime", "settings get secure default_input_method"),
         )
-    ]
-    return facts_from(recorder.serial, getprop.text, *texts, policy_languages())
+    }
+    named = parse_top_focused(texts["window"]) is not None
+    all_windows = "" if named else recorder.adb("facts-window-all", "shell", "dumpsys", "window").text
+    return facts_from(
+        recorder.serial,
+        getprop.text,
+        texts["display"],
+        texts["window"],
+        texts["power"],
+        texts["bluetooth"],
+        texts["ime"],
+        policy_languages(),
+        all_windows,
+    )
 
 
 def main(argv: list[str], runner: Runner = subprocess.run) -> int:

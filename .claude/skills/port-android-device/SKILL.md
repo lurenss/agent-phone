@@ -58,7 +58,7 @@ uv run python -I $S/facts.py "$RUN" <serial>
 
 Read `$RUN/facts.json` and every hint in it:
 - The language: is it covered?
-- The displays: more than one, and which one has focus?
+- The displays: more than one, and which one has focus? Android 15 names no focused display in any dump. On a phone with one display, `top_focused_display` is then 0 with `top_focused_display_inferred` true. With several displays it is null, and a hint says it is unknown.
 - The brand: does it need a developer switch?
 - Is it an emulator?
 - Is Bluetooth on? That decides the dialog the survey uses.
