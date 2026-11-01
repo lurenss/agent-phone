@@ -7,7 +7,8 @@ A profile file has a `[device]` table (`serial`, `name`, optional `policy_files`
 `[[protected]]` tables (`package`, `labels`, `reason`), and policy tables of its own. Its
 protections compile into deny rules (`rules.protect_rules`), and its own deny rules are marked as
 the profile's, so no later policy file can disable them. `policy_files` are read relative to the
-profile file. `examples/devices/j7.toml` is one.
+profile file and are the profile's own layers: their deny rules are marked too, and a later file,
+a caller's or another of the profile's, cannot disable them. `examples/devices/j7.toml` is one.
 
 A profile that does not parse fails every command that loads it, with POLICY_INVALID. A broken
 profile must never leave its phone unprotected.
@@ -128,6 +129,8 @@ def load_policy(extra: Sequence[Path], profile: LoadedProfile | None = None) -> 
     layers = [parse_policy(read_toml(DEFAULT_POLICY), str(DEFAULT_POLICY))]
     if profile is not None:
         layers.append(profile.layer)
-        layers.extend(parse_policy(read_toml(path), str(path)) for path in profile.policy_files())
+        layers.extend(
+            parse_policy(read_toml(path), str(path), from_profile=True) for path in profile.policy_files()
+        )
     layers.extend(parse_policy(read_toml(path), str(path)) for path in extra)
     return merge(tuple(layers))

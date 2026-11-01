@@ -9,7 +9,8 @@ Sources, merged in this order into one `Policy`:
    `examples/business_suite/policy.toml`.
 
 Later sources add rules and may `disable` an earlier rule by id. Nothing may disable a deny
-rule that came from a device profile, because a consumer's file must not unprotect a phone.
+rule that came from a device profile or from a file the profile names, because a consumer's file
+must not unprotect a phone.
 
 Five rule kinds, one table each in TOML:
 

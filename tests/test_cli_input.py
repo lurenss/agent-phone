@@ -158,7 +158,7 @@ def test_the_j7_profile_and_the_policy_file_it_names_load_from_the_state_root(tm
         "j7.vpn-lockdown": True,
         "j7.sockstun": True,
         "j7.sockstun-screens": True,
-        "ig.no-live": False,
+        "ig.no-live": True,
     }
 
 

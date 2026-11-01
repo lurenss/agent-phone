@@ -31,12 +31,6 @@ GO_LIVE = screen_of(
 )
 
 
-PROFILE_FILES_ARE_PLAIN = pytest.mark.xfail(
-    strict=True,
-    reason="a profile's policy files load as a consumer's: a later file may disable their denials",
-)
-
-
 def install_j7(root):
     (root / "profiles").mkdir()
     (root / "instagram").mkdir()
@@ -69,7 +63,6 @@ def test_the_j7_profile_denies_go_live_with_or_without_a_grant(tmp_path):
         assert sent == []
 
 
-@PROFILE_FILES_ARE_PLAIN
 def test_a_caller_file_cannot_disable_a_deny_rule_that_the_profile_loads(tmp_path):
     install_j7(tmp_path)
     weaken = caller_file(tmp_path, 'disable = ["ig.no-live"]\n')
@@ -78,7 +71,6 @@ def test_a_caller_file_cannot_disable_a_deny_rule_that_the_profile_loads(tmp_pat
     assert wire["error"]["code"] == "POLICY_INVALID" and wire["error"]["details"]["rule"] == "ig.no-live"
 
 
-@PROFILE_FILES_ARE_PLAIN
 def test_a_second_file_of_the_profile_cannot_disable_the_first_ones_deny_rule(tmp_path):
     (tmp_path / "deny.toml").write_text('[[deny]]\nid = "p.deny"\nwords = ["x"]\nreason = "A denial."\n')
     (tmp_path / "weaken.toml").write_text('disable = ["p.deny"]\n')
