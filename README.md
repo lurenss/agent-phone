@@ -22,9 +22,16 @@ agent-phone get @k3x9q:e4 --property bounds   # one property of a ref, read live
 agent-phone is @k3x9q:e4 --property enabled   # one boolean of a ref, read live
 agent-phone server stop                  # free the phone for another tool, such as an old uiautomator dump
 agent-phone skills get phone             # the usage guide for agents, as Markdown in data.content
+agent-phone click @k3x9q:e4 --wait-for 'name*=Brightness'   # tap a ref and verify the tap by its effect
+agent-phone set-text @k3x9q:e2 display   # write a field, then read it back
+agent-phone scroll down @k3x9q:e3        # swipe a list along the way it runs
+agent-phone press back                   # back, home, recents or enter
+agent-phone launch com.android.settings  # also stop, open-url, rotate, clipboard get|set, screenshot
+agent-phone wait --for name=Brightness   # read until a condition holds, with no sleep
+agent-phone click @k3x9q:e9 --commit send   # a commit action is sent only with the effect granted
 ```
 
-Each command prints one JSON object, described in `docs/json-output.md`. `-d <serial>` picks a device when several are ready, and a ref names its own device. The server on the phone starts when a command needs it and stops after 15 idle minutes. Input commands are not built yet. `AGENT_PHONE_HOME`, `AGENT_PHONE_IDLE_S`, `AGENT_PHONE_LOCK_WAIT_S` and `ADB` configure the state folder, the idle limit, how long a command waits for another process to let go of the device, and the adb binary.
+Each command prints one JSON object, described in `docs/json-output.md`. `-d <serial>` picks a device when several are ready, and a ref names its own device. The server on the phone starts when a command needs it and stops after 15 idle minutes. Every input goes through one pipeline. The ref must come from a snapshot taken after the last input, its element is found again on a fresh read, and the policy engine judges what the touch lands on. An input that would post, send, delete, pay or change the system is refused unless the caller grants that effect with `--commit`, and a deny rule or a package the device profile protects refuses it whatever the grant. Each result says whether the input was delivered, and a retry is safe only after `not_delivered`. `AGENT_PHONE_HOME`, `AGENT_PHONE_IDLE_S`, `AGENT_PHONE_LOCK_WAIT_S` and `ADB` configure the state folder, the idle limit, how long a command waits for another process to let go of the device, and the adb binary.
 
 Right after something changes the screen, such as `adb shell am start`, take the next snapshot with `--settle`. A plain snapshot reads once and can show the middle of a transition (`A2-5`).
 

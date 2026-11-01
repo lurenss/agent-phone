@@ -53,6 +53,7 @@ Steps:
 - The keyboard needs typing and the shade needs a swipe, which most tasks do not allow. Report `snap-keyboard-shade` as skipped. `tests/test_surfaces.py` covers them on fixtures only.
 - Never tap `Allow` in the Bluetooth dialog. BACK declines it.
 - The Settings home of a Samsung phone names its tiles `Connections`, `Sounds and vibration` and so on. Another vendor's Settings has other titles, so read the titles before you assert them.
+- Settings remembers how far its list was scrolled. When the first tile is cut off at the top, its title row is off screen and the tile prints only its summary, such as `button "Wi-Fi, Bluetooth, Data usage, Airplane mode"`. Before a step that asserts `Connections`, scroll the list up until the next snapshot shows the title.
 - `--root` with a ref of a list from another screen fails with `STALE_REF`. Drill with a ref from the screen that shows now.
 - `stdout_bytes` counts the whole envelope. The 8 KB budget is for the whole line, so a pass needs it under 8192.
 - The status bar is not always in the dump. On the J7, Settings home listed it in one run and not in the run before, so read `others` of the record at hand before you name a window id.
