@@ -83,6 +83,12 @@ The development phone, Lorenzo's Samsung J7, adds these:
 - SocksTun (`hev.sockstun`) is protected. Never stop it or change VPN settings. With always-on lockdown VPN, a dead tunnel takes the phone offline.
 - It runs live Instagram and Business Suite accounts. Write every app a run opened on it, and every input it sent, to `decisions.tsv`.
 
+The second device, Lorenzo's AYN Thor (`examples/devices/thor.toml`), adds these:
+
+- It has two screens. agent-phone reads and taps only the top one, display 0 (`A6-1`).
+- Both Eden emulators are protected. Never stop one, because a game may be running in it.
+- It is signed in to Lorenzo's Discord, Grok, YouTube, Netflix and Chess accounts. Write every app a run opened on it, and every input it sent, to `decisions.tsv`.
+
 ## Commits
 
 - Use Conventional Commits: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `perf:`, `chore:`. Write `type: imperative summary` in lowercase, and say why in the body.
