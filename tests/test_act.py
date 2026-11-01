@@ -253,6 +253,17 @@ def test_a_query_target_must_match_exactly_one_element_of_a_current_observation(
     )
 
 
+def test_a_query_after_an_input_needs_a_new_observation_and_sends_nothing(tmp_path):
+    ctx, phone = context(tmp_path, SETTINGS)
+    look(ctx)
+    assert isinstance(act(ctx, Request(Key(KeyName.BACK))), Acted)
+    again = refused(act(ctx, Request(Click(QueryTarget(Q("Display"))))), ErrorCode.OBSERVE_FIRST)
+    assert len(phone.permits) == 1 and again.details == {}
+    look(ctx)
+    assert isinstance(act(ctx, Request(Click(QueryTarget(Q("Display"))))), Acted)
+    assert len(phone.permits) == 2
+
+
 def test_a_scroll_swipes_inside_the_list_against_the_direction(tmp_path):
     ctx, phone = context(tmp_path, SETTINGS)
     taken = look(ctx)
