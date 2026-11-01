@@ -125,8 +125,11 @@ Rule = CommitRule | ExemptRule | IgnoreRule | InheritRule | DenyRule
 class Policy:
     """One layer, as `parse_policy` reads it, or the merge of every layer.
 
-    `languages` is the union the commit rules cover. A device whose locale language is not in
-    it gets LOCALE_UNSUPPORTED for every labeled input: the engine cannot read that screen.
+    `languages` is what the built-in policy covers, because its base vocabulary (delete, send, buy
+    and the rest) must exist in a language before any screen in it can be judged. A device whose
+    locale language is not in it gets LOCALE_UNSUPPORTED for every labeled input: the engine cannot
+    read that screen. `merge` refuses a later layer that declares another language, so a file
+    cannot widen it.
 
     `trusted` marks a layer that belongs to the device: the built-in policy, a device profile, or
     a file the profile names. A later layer may weaken what these layers commit, and may not
@@ -136,12 +139,15 @@ class Policy:
     commit rule and every inherit rule loaded, withdrawn or not, and the exempt and ignore rules of
     trusted layers only. A trusted layer's own `disable` removes a rule from it, a consumer's does
     not. Without it, a consumer's file could switch off a profile's protection by disabling
-    `default.delete` or exempting "OK", because a denial that names effects would find none."""
+    `default.delete` or exempting "OK", because a denial that names effects would find none.
+
+    `source` is the file a layer came from, for the errors that name it."""
 
     languages: frozenset[str]
     rules: tuple[Rule, ...]
     strict: tuple[Rule, ...] = ()
     trusted: bool = False
+    source: str = ""
 
     def of_kind[R: Rule](self, kind: type[R]) -> tuple[R, ...]:
         return tuple(rule for rule in self.rules if isinstance(rule, kind))

@@ -79,7 +79,7 @@ def parse_policy(
             rules.append(rule)
     languages = frozenset(top.texts("languages"))
     disabled = frozenset(RuleId(rule) for rule in top.texts("disable"))
-    return Policy(languages, tuple(rules), trusted=trusted), disabled
+    return Policy(languages, tuple(rules), trusted=trusted, source=source), disabled
 
 
 def parse_rule(table: Table) -> Rule:
@@ -195,8 +195,9 @@ class Table:
 
 
 def merge(layers: tuple[tuple[Policy, frozenset[RuleId]], ...]) -> Policy:
-    """Apply layers in order. Disabling a deny rule of a trusted layer raises
-    `Refusal(POLICY_INVALID)`.
+    """Apply layers in order. The first is the built-in policy, and its languages are the ones the
+    result covers. Disabling a deny rule of a trusted layer, or declaring a language the built-in
+    policy does not cover, raises `Refusal(POLICY_INVALID)`.
 
     A layer may disable only rules an earlier layer defined, and may not reuse an id that is
     still in force: a disable that matches nothing is a mistake in that file. `strict` keeps what a
@@ -206,8 +207,17 @@ def merge(layers: tuple[tuple[Policy, frozenset[RuleId]], ...]) -> Policy:
     rules: list[Rule] = []
     strict: list[Rule] = []
     protected: set[RuleId] = set()
-    languages: set[str] = set()
+    languages = layers[0][0].languages if layers else frozenset()
     for policy, disabled in layers:
+        if policy.languages - languages:
+            raise Refusal(
+                ErrorCode.POLICY_INVALID,
+                f"{policy.source or 'A policy file'}: top level: languages names "
+                f"{', '.join(sorted(policy.languages - languages))}, which the built-in policy does not "
+                "cover. The built-in vocabulary (delete, send, buy and the rest) must cover a language "
+                "before any screen in it can be judged.",
+                {"source": policy.source, "table": "document", "field": "languages"},
+            )
         defined = {rule.origin.rule: rule for rule in rules}
         for rule_id in sorted(disabled):
             target = defined.get(rule_id)
@@ -242,8 +252,7 @@ def merge(layers: tuple[tuple[Policy, frozenset[RuleId]], ...]) -> Policy:
         )
         if policy.trusted:
             protected |= {rule.origin.rule for rule in policy.rules if isinstance(rule, DenyRule)}
-        languages |= policy.languages
-    return Policy(frozenset(languages), tuple(rules), tuple(strict))
+    return Policy(languages, tuple(rules), tuple(strict))
 
 
 def protect_rules(profile: DeviceProfile, source: str) -> tuple[DenyRule, ...]:

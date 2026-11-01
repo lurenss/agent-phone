@@ -219,9 +219,6 @@ GERMAN = screen_of(
         bounds="[0,0][1080,1920]",
     )
 )
-UNCOVERED_LANGUAGE = pytest.mark.xfail(
-    strict=True, reason="a consumer's file adds its languages to the ones the locale guard accepts"
-)
 
 
 def tap_delete_on_a_german_phone(root, *flags):
@@ -241,7 +238,6 @@ def test_a_german_screen_is_not_judged_and_so_not_tapped(tmp_path):
     assert wire["error"]["code"] == "LOCALE_UNSUPPORTED" and sent == []
 
 
-@UNCOVERED_LANGUAGE
 def test_a_caller_file_that_only_declares_a_language_does_not_switch_the_locale_guard_off(tmp_path):
     declares = caller_file(tmp_path, 'languages = ["de"]\n')
     wire, sent = tap_delete_on_a_german_phone(tmp_path, "--policy", str(declares))
@@ -250,7 +246,6 @@ def test_a_caller_file_that_only_declares_a_language_does_not_switch_the_locale_
     assert str(declares) in wire["error"]["message"] and "built-in" in wire["error"]["message"]
 
 
-@UNCOVERED_LANGUAGE
 def test_no_layer_may_declare_a_language_the_built_in_policy_does_not_cover(tmp_path):
     declares = parse_policy({"languages": ["de"]}, "extra.toml", trusted=False)
     with pytest.raises(Refusal) as refused:

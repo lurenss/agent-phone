@@ -134,7 +134,7 @@ agent-phone click @m9q4t:e21 --commit schedule  # sent, because the user asked t
 - `press enter` commits `send`. Android hands Enter to the view that has focus, so it also commits what a tap on that view would: Enter on a focused "Delete" button needs `--commit delete` too. `open-url` with a `tel:` or `sms:` link commits `send` as well.
 - `DENIED` comes from a rule of the device's profile or a policy file. No flag opens it. A device profile can protect a package, and then `stop` of that package is `DENIED`. A rule can also name a screen, and then a tap, `set-text`, `scroll` and `press enter` on that screen are `DENIED`. `set-text` and `scroll` commit nothing, so only a deny rule can refuse them. `press back`, `press home` and `press recents` are never refused by a rule, so you can always leave a screen.
 - `--policy FILE` adds a policy file of your own, such as one that exempts a label you know only navigates. Your file can weaken a commit and never a denial: it cannot disable a deny rule of the device's profile, and it cannot hide the words that a denial reads.
-- `LOCALE_UNSUPPORTED` means the phone's language has no rules, so agent-phone does not judge what it cannot read.
+- `LOCALE_UNSUPPORTED` means the phone's language has no rules, so agent-phone does not judge what it cannot read. A `--policy` file cannot add a language: the built-in vocabulary must cover one before any screen in it can be judged, and a file that declares another is `POLICY_INVALID`.
 
 ## Drive the device
 

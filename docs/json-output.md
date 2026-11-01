@@ -51,7 +51,7 @@ The exit code is 0 when `ok` is true, 1 for an error envelope, and 2 when the ar
 | Code | Meaning |
 | --- | --- |
 | `INVALID_ARGS` | The arguments do not parse. A ref without its snapshot id, such as `e12`, is one case. |
-| `POLICY_INVALID` | A policy file, or the order its layers merge in, is invalid. `details` names the `source`, the `table` and the `field`, or the `rule`. A file that disables a deny rule of the device profile, or of a file the profile names, is one case. |
+| `POLICY_INVALID` | A policy file, or the order its layers merge in, is invalid. `details` names the `source`, the `table` and the `field`, or the `rule`. A file that disables a deny rule of the device profile, or of a file the profile names, is one case, and a file whose top-level `languages` names a language the built-in policy does not cover is another. |
 | `NO_DEVICE` | No device is connected and ready, or the requested one is not. |
 | `DEVICE_AMBIGUOUS` | Several devices are ready and neither `-d` nor a ref names one. |
 | `WRONG_DEVICE` | The ref belongs to another device, or `-d` contradicts the device the ref names. |
@@ -69,7 +69,7 @@ The exit code is 0 when `ok` is true, 1 for an error envelope, and 2 when the ar
 | `OCCLUDED` | No point of the element would reach it: another window covers it, another element takes the touch there, two elements overlap in an unknown order, or its window has no input focus. |
 | `COMMIT_REFUSED` | The input would commit an effect that `--commit` did not grant. `details` lists the `effects`, the `granted` effects and the `evidence`. |
 | `DENIED` | A deny rule forbids the input whatever the caller grants. `details` names the `rule`, its `source` and the `evidence`. A device profile's protected package is denied this way. A deny rule reads a tap, a set-text, a scroll and Enter, and never back, home or recents. |
-| `LOCALE_UNSUPPORTED` | The device language has no policy rules, so labeled input cannot be judged. |
+| `LOCALE_UNSUPPORTED` | The device language has no policy rules, so input that commit rules read, a tap or Enter, cannot be judged. |
 | `TIMEOUT` | A wait reached its deadline. |
 | `TRANSPORT` | adb or the server failed, or the device returned output that does not parse. |
 | `ACTION_FAILED` | The input went out, and reading the screen back contradicts what was asked, such as a field that does not hold the text `set-text` sent. |
