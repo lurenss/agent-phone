@@ -100,6 +100,10 @@ Whether the screen had stopped changing when it was read (`SettleState`). `settl
 
 A handle on one element, valid for one snapshot (`RefToken`), written `@k3x9q:e12`. The number counts actionable elements in tree order over the whole window, so an element keeps its number in compact, skeleton and drill-down views of the same screen. A ref without its snapshot id is `INVALID_ARGS`.
 
+### Target
+
+What an input acts on (`Target`, `core/refs/resolve.py`): a ref, or a query that is found again on the live screen. On the command line, a TARGET of `click`, `set-text` and `scroll` that starts with `@` is a ref, and anything else is a query in the syntax `--wait-for` takes, parsed by the same function (`query_text`). A query must match one element: two are `AMBIGUOUS_TARGET` with nothing sent, and none is waited for until the timeout and then `NOT_FOUND`. Like a ref it needs an observation taken since the last input, or it is `OBSERVE_FIRST`. A ref names the element the agent saw, so it is the safer target right after a look. A query is for a step that cannot have looked yet.
+
 ### Device identity
 
 The adb serial plus the boot id (`DeviceIdentity`, `core/device.py`). A ref used on another device is `WRONG_DEVICE`. A ref used on the same phone after a reboot is `STALE_REF` with reason `rebooted`.
@@ -167,6 +171,16 @@ One thing a wait checks on a read (`Predicate`, `core/wait/predicate.py`): `Pres
 ### Wait
 
 The read-only command that reads the screen until every condition holds on one read (`wait`, `core/commands/wait.py`). It returns the snapshot of that read, recorded at the current epoch, so it is also the observation that the next input needs. A timeout is `TIMEOUT` with the last read's snapshot in `details.after`. It sends nothing, so it spends no permit and its retry is safe. `--wait-for` on an input runs the same loop (`observe`, `core/wait/observe.py`) after the input and turns what it saw into the input's `delivery`. *Avoid:* "auto-wait", which is what an input does before it is sent.
+
+## Batches
+
+### Batch
+
+Several steps run in one process (`batch`, `cli/batch.py`). A step is the CLI's own argv array, parsed by `parse_args`, so it means what the same words mean on a command line. The batch opens the device once, holds its lock across the steps, runs them in order and stops at the first step that is not ok. Its envelope holds each step's own envelope, the index it stopped at and the trace's path. `error` and `delivery` are the failed step's, and `retry` is `unsafe` when an earlier step sent input, so `retry` is the one value that is not derived from `delivery` alone. A batch fits when each later step finds its target by query or after a `wait`, because every input spends the refs taken before it. It is not part of the Python API, since a `Driver` already runs steps one after another. *Avoid:* "script" or "macro", which a batch is not: it has no variables, branches or retries.
+
+### Trace
+
+The record of one batch (`Trace`, `cli/trace.py`): a JSONL file under `traces/<serial>/` in the state root, mode 0600 in a folder of mode 0700, with a line appended as each step ends and a last line for the end. A step's line is read from its envelope: whether it was ok, its delivery and retry, its error code, and for an input its kind, its target and its gate verdict. It holds no snapshot, and the text of `set-text` and `clipboard set` shows as `<N chars>`. *Avoid:* "log" for `decisions.tsv`, which records decisions and not steps.
 
 ## Devices and the server
 

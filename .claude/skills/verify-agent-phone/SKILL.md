@@ -1,6 +1,6 @@
 ---
 name: verify-agent-phone
-description: Prove a change to agent-phone on a real Android phone over adb, the way an agent uses the CLI, and keep the evidence outside git. Use after a change to devices, snapshots, refs, find, get, is, wait, taps, text, keys, device operations, the commit gate, the on-device server or the lock, before you call the change done, or when asked to verify, smoke-test or reproduce agent-phone behavior on the Samsung J7 or another connected phone.
+description: Prove a change to agent-phone on a real Android phone over adb, the way an agent uses the CLI, and keep the evidence outside git. Use after a change to devices, snapshots, refs, find, get, is, wait, taps, text, keys, batch, device operations, the commit gate, the on-device server or the lock, before you call the change done, or when asked to verify, smoke-test or reproduce agent-phone behavior on the Samsung J7 or another connected phone.
 ---
 
 # Verify agent-phone on a real phone

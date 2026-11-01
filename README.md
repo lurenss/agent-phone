@@ -29,6 +29,8 @@ agent-phone press back                   # back, home, recents or enter
 agent-phone launch com.android.settings  # also stop, open-url, rotate, clipboard get|set, screenshot
 agent-phone wait --for name=Brightness   # read until a condition holds, with no sleep
 agent-phone click @k3x9q:e9 --commit send   # a commit action is sent only with the effect granted
+agent-phone click name=Display           # a target is a ref or a query that must match one element
+agent-phone batch steps.json             # several steps in one call, with one trace of what each did
 ```
 
 Each command prints one JSON object, described in `docs/json-output.md`. `-d <serial>` picks a device when several are ready, and a ref names its own device. The server on the phone starts when a command needs it and stops after 15 idle minutes. Every input goes through one pipeline. The ref must come from a snapshot taken after the last input, its element is found again on a fresh read, and the policy engine judges what the touch lands on. An input that would post, send, delete, pay or change the system is refused unless the caller grants that effect with `--commit`, and a deny rule or a package the device profile protects refuses it whatever the grant. Each result says whether the input was delivered, and a retry is safe only after `not_delivered`. `AGENT_PHONE_HOME`, `AGENT_PHONE_IDLE_S`, `AGENT_PHONE_LOCK_WAIT_S` and `ADB` configure the state folder, the idle limit, how long a command waits for another process to let go of the device, and the adb binary.

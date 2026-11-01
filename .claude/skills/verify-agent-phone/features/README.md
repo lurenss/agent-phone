@@ -49,4 +49,5 @@ Keep implementation details out of the map. Name only entry points, commands, th
 - [Taps, text, scrolls and keys](./ref-actions.md) covers `click`, `set-text`, `scroll`, `press`, spent refs and `OBSERVE_FIRST`.
 - [Device operations](./device-operations.md) covers `launch`, `stop`, `open-url`, `rotate`, `clipboard` and `screenshot`.
 - [Waiting for a screen condition](./wait.md) covers `wait`, its four conditions, `TIMEOUT` with the last read, and the observation it gives the next input.
+- [Several steps in one call](./batch.md) covers `batch`, query targets, the stopped batch and its retry rule, and the trace.
 - [The commit gate and device protections](./policy-gate.md) covers `COMMIT_REFUSED`, `DENIED`, grants and protected packages.
