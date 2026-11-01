@@ -110,37 +110,46 @@ package = "com.example.tunnel"
 labels = ["SafeTunnel"]
 reason = "Always-on lockdown VPN."
 """
-UNINSTALL = screen_of(
-    node(
-        "android.widget.FrameLayout",
-        node("android.widget.TextView", text="SafeTunnel", bounds="[60,1400][1020,1480]", package=INSTALLER),
+
+
+def uninstall_dialog(positive="OK"):
+    """The package installer's question about SafeTunnel, with `positive` on its positive button."""
+    return screen_of(
         node(
-            "android.widget.TextView",
-            text="Do you want to uninstall this app?",
-            resource_id="android:id/message",
-            bounds="[60,1500][1020,1600]",
+            "android.widget.FrameLayout",
+            node(
+                "android.widget.TextView", text="SafeTunnel", bounds="[60,1400][1020,1480]", package=INSTALLER
+            ),
+            node(
+                "android.widget.TextView",
+                text="Do you want to uninstall this app?",
+                resource_id="android:id/message",
+                bounds="[60,1500][1020,1600]",
+                package=INSTALLER,
+            ),
+            node(
+                "android.widget.Button",
+                text="Cancel",
+                resource_id="android:id/button2",
+                clickable=True,
+                bounds="[540,1700][780,1800]",
+                package=INSTALLER,
+            ),
+            node(
+                "android.widget.Button",
+                text=positive,
+                resource_id="android:id/button1",
+                clickable=True,
+                bounds="[780,1700][1020,1800]",
+                package=INSTALLER,
+            ),
             package=INSTALLER,
-        ),
-        node(
-            "android.widget.Button",
-            text="Cancel",
-            resource_id="android:id/button2",
-            clickable=True,
-            bounds="[540,1700][780,1800]",
-            package=INSTALLER,
-        ),
-        node(
-            "android.widget.Button",
-            text="OK",
-            resource_id="android:id/button1",
-            clickable=True,
-            bounds="[780,1700][1020,1800]",
-            package=INSTALLER,
-        ),
-        package=INSTALLER,
-        bounds="[0,1350][1080,1900]",
+            bounds="[0,1350][1080,1900]",
+        )
     )
-)
+
+
+UNINSTALL = uninstall_dialog()
 WEAKENINGS = {
     "disable-default-delete": 'disable = ["default.delete"]\n',
     "disable-default-affirmative": 'disable = ["default.affirmative"]\n',
@@ -151,17 +160,26 @@ WEAKENINGS = {
 }
 
 
-def tap_ok_of_the_uninstall_dialog(root, *flags):
+def tap_positive_of_the_uninstall_dialog(root, positive, *flags):
+    screen = uninstall_dialog(positive)
     (root / "profiles").mkdir(exist_ok=True)
     (root / "profiles" / "phone.toml").write_text(PROTECTS_A_TUNNEL)
-    code, wire = invoke(["snapshot"], FakeHub([J7], screens=[UNINSTALL]), root)
+    code, wire = invoke(["snapshot"], FakeHub([J7], screens=[screen]), root)
     assert code == 0, wire
     ref = next(
-        t for line in wire["data"]["tree"] if '"OK"' in line for t in line.split() if t.startswith("@")
+        t
+        for line in wire["data"]["tree"]
+        if f'"{positive}"' in line
+        for t in line.split()
+        if t.startswith("@")
     )
-    hub = FakeHub([J7], screens=[UNINSTALL])
+    hub = FakeHub([J7], screens=[screen])
     _, wire = invoke(["click", ref, *flags], hub, root)
     return wire, [permit.action for phone in hub.phones for permit in phone.permits]
+
+
+def tap_ok_of_the_uninstall_dialog(root, *flags):
+    return tap_positive_of_the_uninstall_dialog(root, "OK", *flags)
 
 
 def test_the_profile_alone_denies_the_ok_of_the_uninstall_dialog_of_a_protected_app(tmp_path):
@@ -178,6 +196,91 @@ def test_no_consumer_file_turns_the_denial_of_that_ok_into_anything_else(tmp_pat
     )
     assert sent == [], f"the OK of 'uninstall SafeTunnel?' was tapped: {wire.get('data', {}).get('gate')}"
     assert wire["error"]["code"] == "DENIED", wire["error"]
+
+
+def a_commit(effect, word):
+    return f'[[commit]]\nid = "c.mask"\neffect = "{effect}"\nwords = ["{word}"]\nreason = "A test commit."\n'
+
+
+COMMITS_ON_THE_BUTTON = {
+    "ok-confirms": ("confirm", a_commit("confirm", "ok")),
+    "the-class-word": ("confirm", a_commit("confirm", "button")),
+    "the-positive-button-id": ("confirm", a_commit("confirm", "button1")),
+    "the-positive-button-id-is-social": ("social", a_commit("social", "button1")),
+}
+"""A consumer's commit rule that matches the OK button's own words, its class name or its
+resource-id. Each gives the button an effect of its own, and the effect that the rule gives is the
+grant that the refusal would ask for."""
+
+
+@pytest.mark.xfail(
+    strict=True, reason="R2-1: the button's own effect stops the dialog's from reaching a denial"
+)
+@pytest.mark.parametrize("case", sorted(COMMITS_ON_THE_BUTTON))
+def test_a_consumer_commit_rule_on_the_ok_button_does_not_lift_the_denial_of_its_dialog(tmp_path, case):
+    effect, text = COMMITS_ON_THE_BUTTON[case]
+    consumer = caller_file(tmp_path, text)
+    for flags in ([], ["--commit", effect]):
+        wire, sent = tap_ok_of_the_uninstall_dialog(tmp_path, "--policy", str(consumer), *flags)
+        assert sent == [], f"the OK of 'uninstall SafeTunnel?' was tapped under {flags}: {wire}"
+        assert wire["error"]["code"] == "DENIED", (
+            f"no consumer rule on the button's own words removes its question's effects; got {wire['error']}"
+        )
+        assert wire["error"]["details"]["rule"] == "profile.protect.com.example.tunnel.app-info"
+
+
+NEVER_DELETES = f"""
+[device]
+serial = "{J7_SERIAL}"
+name = "test-phone"
+
+[[deny]]
+id = "p.never-delete"
+effects = ["delete"]
+reason = "Nothing is ever deleted on this phone, with or without --commit."
+"""
+
+
+@pytest.mark.xfail(
+    strict=True, reason="R2-1: the button's own effect stops the dialog's from reaching a denial"
+)
+def test_a_consumer_commit_rule_on_ok_does_not_open_a_denial_that_names_an_effect(tmp_path):
+    delete_post = screen_of(
+        node(
+            "android.widget.FrameLayout",
+            node("android.widget.TextView", text="Delete this post?", bounds="[60,1400][1020,1480]"),
+            node("android.widget.Button", text="Cancel", clickable=True, bounds="[540,1700][780,1800]"),
+            node("android.widget.Button", text="OK", clickable=True, bounds="[780,1700][1020,1800]"),
+            bounds="[0,1350][1080,1900]",
+        )
+    )
+    (tmp_path / "profiles").mkdir()
+    (tmp_path / "profiles" / "phone.toml").write_text(NEVER_DELETES)
+    consumer = caller_file(tmp_path, a_commit("confirm", "ok"))
+    code, wire = invoke(["snapshot"], FakeHub([J7], screens=[delete_post]), tmp_path)
+    assert code == 0, wire
+    ref = next(
+        t for line in wire["data"]["tree"] if '"OK"' in line for t in line.split() if t.startswith("@")
+    )
+    for flags in ([], ["--commit", "confirm"]):
+        hub = FakeHub([J7], screens=[delete_post])
+        _, wire = invoke(["click", ref, "--policy", str(consumer), *flags], hub, tmp_path)
+        sent = [permit.action for phone in hub.phones for permit in phone.permits]
+        assert sent == [], f"the OK of 'Delete this post?' was tapped under {flags}"
+        assert wire["error"]["details"]["rule"] == "p.never-delete", wire["error"]
+
+
+@pytest.mark.xfail(
+    strict=True, reason="R2-1: a built-in confirm word on the button stops its dialog's words being read"
+)
+@pytest.mark.parametrize("positive", ["Confirm", "Submit"])
+def test_a_built_in_confirm_button_under_a_denied_question_is_denied_with_no_consumer_file(
+    tmp_path, positive
+):
+    for flags in ([], ["--commit", "confirm"]):
+        wire, sent = tap_positive_of_the_uninstall_dialog(tmp_path, positive, *flags)
+        assert sent == [], f"the {positive} of 'uninstall SafeTunnel?' was tapped under {flags}"
+        assert wire["error"]["code"] == "DENIED", wire["error"]
 
 
 NEVER_SENDS = f"""

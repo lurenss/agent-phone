@@ -108,6 +108,43 @@ def test_a_neutral_affirmative_does_what_its_dialog_says():
     assert tap_on(harmless, button(harmless, "Allow")) == Clear(ClearReason.NO_COMMIT_WORDS)
 
 
+OK_CONFIRMS = {"commit": [{"id": "c.ok", "effect": "confirm", "words": ["ok"], "reason": "A test commit."}]}
+
+
+@pytest.mark.xfail(
+    strict=True, reason="R2-1: a button's own confirm words stop its dialog's effects being read"
+)
+@pytest.mark.parametrize(
+    ("title", "label", "consumer", "effects"),
+    [
+        ("Delete this post?", "OK", OK_CONFIRMS, {Effect.CONFIRM, Effect.DELETE}),
+        ("Delete this post?", "Confirm", {}, {Effect.CONFIRM, Effect.DELETE}),
+        ("Delete this post?", "Submit", {}, {Effect.CONFIRM, Effect.DELETE}),
+    ],
+    ids=["ok-under-a-consumer-confirm", "confirm", "submit"],
+)
+def test_a_button_keeps_its_own_effects_and_takes_those_of_its_dialog(title, label, consumer, effects):
+    screen = dialog(title, "Cancel", label)
+    policy = merge((DEFAULT, parse_policy(consumer, "consumer.toml")))
+    verdict = tap_on(screen, button(screen, label), policy)
+    assert isinstance(verdict, Commits) and verdict.effects == effects, (
+        f"a button that does what its question says carries its effects too: {verdict}"
+    )
+    assert {e.source for e in verdict.evidence} == {Source.RECEIVER, Source.CONTEXT}
+
+
+@pytest.mark.parametrize(
+    ("label", "effects"),
+    [("Send", {Effect.SEND}), ("Confirm and send", {Effect.CONFIRM, Effect.SEND})],
+)
+def test_a_button_whose_own_words_say_more_than_confirm_does_not_take_its_dialogs_effects(label, effects):
+    screen = dialog("Delete this post?", "Cancel", label)
+    verdict = tap_on(screen, button(screen, label))
+    assert isinstance(verdict, Commits) and verdict.effects == effects, (
+        f"{label!r} says what it does, so the question under it adds nothing: {verdict}"
+    )
+
+
 @pytest.mark.parametrize("description", ["OK, Button", "Allow,Button"])
 def test_an_affirmative_described_with_a_role_suffix_does_what_its_dialog_says(description):
     screen = screen_of(
@@ -308,6 +345,36 @@ def test_a_consumer_layer_may_weaken_a_commit_and_never_a_denial(case):
 def test_a_layer_of_the_device_may_weaken_what_its_own_denials_read(case):
     verdict = weakened_tap(case, by_the_device=True)
     assert not isinstance(verdict, Denied), "the device's own layer chose this, and the denial ignored it"
+
+
+CONSUMER_OK_CONFIRMS = parse_policy(OK_CONFIRMS, "consumer.toml")
+CONSUMER_OK_CONFIRMS_AND_NO_DELETE = parse_policy(
+    {**OK_CONFIRMS, "disable": ["default.delete"]}, "consumer.toml"
+)
+
+
+@pytest.mark.xfail(
+    strict=True, reason="R2-1: a button's own confirm words stop its dialog's effects being read"
+)
+@pytest.mark.parametrize(
+    ("label", "consumer"),
+    [
+        ("Confirm", None),
+        ("Submit", None),
+        ("OK", CONSUMER_OK_CONFIRMS),
+        ("OK", CONSUMER_OK_CONFIRMS_AND_NO_DELETE),
+    ],
+    ids=["confirm", "submit", "ok-under-a-consumer-confirm", "ok-with-the-delete-words-disabled"],
+)
+def test_a_button_with_commit_words_of_its_own_is_denied_under_a_question_that_a_denial_names(
+    label, consumer
+):
+    screen = dialog("Uninstall SafeTunnel?", "Cancel", label)
+    layers = (DEFAULT, PROTECTS_TUNNEL, *(() if consumer is None else (consumer,)))
+    verdict = tap_on(screen, button(screen, label), merge(layers))
+    assert isinstance(verdict, Denied) and verdict.rule == "profile.protect.com.example.tunnel.app-info", (
+        f"the button does what its question says, and the protection reads the question: got {verdict}"
+    )
 
 
 def test_on_the_j7_wi_fi_and_any_screen_that_shows_sockstun_are_denied():
