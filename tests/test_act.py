@@ -5,6 +5,7 @@ received, so "sends no input" is an observation and not a claim."""
 
 import tomllib
 
+import pytest
 from fakes import EMULATOR_SERIAL, J7_SERIAL, FakePhone, info_for
 from support import ROOT, FakeClock, checkbox_row, consumer_of, fixture_screen, labelled, node, screen_of
 
@@ -394,6 +395,94 @@ def test_a_sideways_scroll_of_a_pager_or_of_rows_side_by_side_is_sent(tmp_path):
     ctx, phone = context(tmp_path, carousel)
     done = act(ctx, Request(Scroll(RefTarget(look(ctx, SettleState.SETTLED).ref(1)), Direction.RIGHT)))
     assert isinstance(done, Acted) and isinstance(phone.permits[0].action, Swipe)
+
+
+def cards(*lefts, scroller="androidx.recyclerview.widget.RecyclerView"):
+    """Cards side by side in one row, 880 wide, in a collection that scrolls: the recents screen."""
+    return window(
+        node(
+            scroller,
+            *(
+                node(
+                    "android.widget.FrameLayout",
+                    node(
+                        "android.widget.TextView", text=f"App {n}", bounds=f"[{left},200][{left + 880},260]"
+                    ),
+                    clickable=True,
+                    bounds=f"[{left},200][{left + 880},1700]",
+                )
+                for n, left in enumerate(lefts, 1)
+            ),
+            scrollable=True,
+            bounds="[0,200][1080,1700]",
+        )
+    )
+
+
+VERTICAL_ON_A_ROW = pytest.mark.xfail(
+    strict=True,
+    reason="a vertical swipe on a collection that runs across is planned, and it dismisses a card",
+)
+
+
+@VERTICAL_ON_A_ROW
+@pytest.mark.parametrize("direction", [Direction.UP, Direction.DOWN])
+def test_a_vertical_scroll_of_a_collection_that_runs_across_is_refused(tmp_path, direction):
+    ctx, phone = context(tmp_path, cards(100, 1020))
+    taken = look(ctx, SettleState.SETTLED)
+    outcome = refused(act(ctx, Request(Scroll(RefTarget(taken.ref(1)), direction))), ErrorCode.NOT_ACTIONABLE)
+    assert outcome.details == {"reason": "wrong_axis"}, (
+        "the cards run across, so up and down would dismiss one"
+    )
+    assert "left or right" in outcome.message, "the message says which way to scroll"
+    assert phone.permits == []
+
+
+@VERTICAL_ON_A_ROW
+@pytest.mark.parametrize(
+    "scroller", ["android.widget.HorizontalScrollView", "androidx.viewpager.widget.ViewPager"]
+)
+def test_a_vertical_scroll_of_a_horizontal_scroll_view_or_a_pager_is_refused(tmp_path, scroller):
+    ctx, phone = context(tmp_path, cards(0, scroller=scroller))
+    taken = look(ctx, SettleState.SETTLED)
+    refused(act(ctx, Request(Scroll(RefTarget(taken.ref(1)), Direction.DOWN))), ErrorCode.NOT_ACTIONABLE)
+    assert phone.permits == []
+
+
+def test_a_collection_that_runs_across_still_scrolls_sideways(tmp_path):
+    ctx, phone = context(tmp_path, cards(100, 1020))
+    taken = look(ctx, SettleState.SETTLED)
+    for direction in (Direction.LEFT, Direction.RIGHT):
+        assert isinstance(act(ctx, Request(Scroll(RefTarget(taken.ref(1)), direction))), Acted)
+        taken = look(ctx, SettleState.SETTLED)
+    assert [type(permit.action) for permit in phone.permits] == [Swipe, Swipe]
+
+
+def test_a_grid_that_runs_down_scrolls_up_and_down(tmp_path):
+    """Three columns and two rows: its cards sit side by side, and it still runs down."""
+    grid = window(
+        node(
+            "androidx.recyclerview.widget.RecyclerView",
+            *(
+                node(
+                    "android.widget.Button",
+                    text=f"Photo {3 * row + column}",
+                    clickable=True,
+                    bounds=f"[{360 * column},{300 + 400 * row}][{360 * column + 360},{700 + 400 * row}]",
+                )
+                for row in range(2)
+                for column in range(3)
+            ),
+            scrollable=True,
+            bounds="[0,300][1080,1100]",
+        )
+    )
+    ctx, phone = context(tmp_path, grid)
+    taken = look(ctx, SettleState.SETTLED)
+    for direction in (Direction.DOWN, Direction.UP):
+        assert isinstance(act(ctx, Request(Scroll(RefTarget(taken.ref(1)), direction))), Acted)
+        taken = look(ctx, SettleState.SETTLED)
+    assert [type(permit.action) for permit in phone.permits] == [Swipe, Swipe]
 
 
 def test_a_blank_frame_between_two_screens_proves_nothing_gone(tmp_path):
