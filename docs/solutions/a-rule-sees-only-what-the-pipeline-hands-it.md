@@ -18,7 +18,7 @@ The J7's profile says that a screen showing SocksTun is a screen where "nothing 
 
 ## Why the checks missed it
 
-Every earlier check planted its evidence on one path. The commit table planted each commit phrase in six places, all on a tap. The fix for withdrawn commit rules (`f526ec0`) closed the receiver's words and tested the receiver's words. Each fix was right for its path, and its test could not see a sibling path, because the test was built from the path it fixed.
+Every earlier check planted its evidence on one path. The commit table planted each commit phrase in six places, all on a tap. The fix for withdrawn commit rules (`4c5208e`) closed the receiver's words and tested the receiver's words. Each fix was right for its path, and its test could not see a sibling path, because the test was built from the path it fixed.
 
 ## Rules
 
