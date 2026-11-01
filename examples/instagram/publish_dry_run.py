@@ -26,7 +26,6 @@ from pathlib import Path
 
 from agent_phone import (
     Driver,
-    Effect,
     Gone,
     KeyName,
     Match,
@@ -97,16 +96,12 @@ def switch_to(phone: Driver, account: str) -> bool:
         return False
     current = next(name for name in ACCOUNTS if name != account)
     phone.click(Q(current), wait_for=Present(Q(f"{account},", match=Match.PREFIX)), timeout_ms=SCREEN_MS)
-    # The row's label sums up the account's unread notifications ("1 comment and 25 more"), and
-    # "comment" is a send word of the default policy, so the gate reads the switch as a send. It
-    # sends nothing. The policy cannot yet exempt a phrase inside a label, so this one tap, on a
-    # row named by its handle, carries the grant.
-    phone.click(
-        Q(f"{account},", match=Match.PREFIX),
-        commit=Effect.SEND,
-        wait_for=Present(Q(account)),
-        timeout_ms=SCREEN_MS,
-    )
+    # The row's label sums up the account's unread notifications ("account-2, 41 comments and 136
+    # more"). With exactly one comment it reads "1 comment and ...", and the default policy reads
+    # "comment" as a send, so the gate refuses the switch with COMMIT_REFUSED. It sends nothing, but
+    # granting send here is the user's call, not this script's (FINDINGS A7-4), so the refusal
+    # stops the run and says so.
+    phone.click(Q(f"{account},", match=Match.PREFIX), wait_for=Present(Q(account)), timeout_ms=SCREEN_MS)
     return True
 
 
