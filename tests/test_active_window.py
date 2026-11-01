@@ -2,11 +2,14 @@
 window first when the server knows one (A2-7). A server that started after the screen last changed
 knows none, and then it lists the windows by layer, so the status bar comes first (A2-8)."""
 
+import pytest
 from fakes import J7_SERIAL, FakeHub, invoke
 from support import fixture_screen, node, screen_of
 
 from agent_phone.core.device import Connected
+from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.screen import WindowKind
+from agent_phone.core.snapshot.surface import select_surface
 
 BAR = "[0,0][1080,63]"
 
@@ -90,3 +93,40 @@ def test_settle_waits_out_a_dump_with_no_window_to_describe(tmp_path):
     code, wire = invoke(["snapshot", "--settle"], hub, tmp_path)
     assert code == 0 and wire["data"]["app"] == "com.android.settings"
     assert wire["data"]["settled"] == "settled" and hub.phones[0].reads == 4
+
+
+IN_BUG_1 = pytest.mark.xfail(strict=True, reason="the parser keeps the windows of other displays")
+
+
+def second_display(label="", bounds="[0,0][540,1920]", display=4):
+    child = node("android.widget.TextView", text=label, package="test.second_screen", bounds=bounds)
+    return node(
+        "android.widget.FrameLayout", child, package="test.second_screen", bounds=bounds, display_id=display
+    )
+
+
+@IN_BUG_1
+def test_a_window_of_another_display_is_never_active_even_when_it_comes_first():
+    screen = screen_of(status_bar(), second_display(), app())
+    assert actives(screen) == [("test.app", "application")]
+
+
+@IN_BUG_1
+def test_a_window_of_another_display_is_not_in_the_screen_at_all():
+    screen = screen_of(app(), second_display("Elsewhere"))
+    assert [w.package for w in screen.windows] == ["test.app"]
+    assert [n.attrs.text for n in screen.nodes if n.attrs.text] == []
+    assert select_surface(screen).others == ()
+
+
+@IN_BUG_1
+def test_a_dump_of_windows_on_other_displays_only_is_no_surface():
+    with pytest.raises(Refusal) as refused:
+        screen_of(second_display(), second_display(display=2))
+    assert refused.value.code is ErrorCode.NO_SURFACE
+
+
+def test_a_window_that_names_display_0_is_kept_like_one_that_names_none():
+    screen = screen_of(second_display("Here", display=0), app())
+    assert [w.package for w in screen.windows] == ["test.second_screen", "test.app"]
+    assert actives(screen) == [("test.second_screen", "application")]
