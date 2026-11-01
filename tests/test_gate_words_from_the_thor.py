@@ -1,8 +1,9 @@
-"""Labels from Lorenzo's AYN Thor that the gate must read as commits (A6-9).
+"""Labels the gate must read as commits, from what unit 7 saw on Lorenzo's AYN Thor (A6-9).
 
-YouTube's subscribe button, a call button of a messaging app and the join of a server or a call
-passed the default policy as clear, and Chess's start of a rated game against a stranger is a
-commit only that app's rules can name. Each label is tapped the way `act()` judges a tap: the
+YouTube's Iscriviti and Chess's Inizia partita and Sfida un amico are the Thor's own labels.
+The call and join labels are written for this test: no call or join button was on any screen
+read, and the default had no word for either. Chess's start of a rated game against a stranger is
+a commit only that app's rules can name. Each label is tapped the way `act()` judges a tap: the
 button's own words and the rest of its window."""
 
 import pytest

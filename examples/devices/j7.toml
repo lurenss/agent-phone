@@ -1,4 +1,6 @@
-# Lorenzo's Samsung J7 profile. Copied to ~/.agent-phone/profiles/ on that Mac.
+# Lorenzo's Samsung J7 profile. Copied to ~/.agent-phone/profiles/ on that Mac, with
+# examples/instagram/policy.toml copied to ~/.agent-phone/instagram/policy.toml: a policy file
+# resolves from the profile's folder, and one that cannot be read fails every command on the device.
 
 [device]
 serial = "0a1b2c3d4e5f6a7b"

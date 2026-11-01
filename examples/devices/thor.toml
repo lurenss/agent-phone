@@ -1,4 +1,6 @@
-# Lorenzo's AYN Thor profile. Copied to ~/.agent-phone/profiles/ on that Mac.
+# Lorenzo's AYN Thor profile. Copied to ~/.agent-phone/profiles/ on that Mac, with
+# examples/chess/policy.toml copied to ~/.agent-phone/chess/policy.toml: a policy file resolves
+# from the profile's folder, and one that cannot be read fails every command on the device.
 # Two screens: display 0 (the top screen, where launch and every input go) and display 4 (the
 # bottom screen). Android 13, Italian UI.
 
