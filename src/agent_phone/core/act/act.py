@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from agent_phone.core.act.hit import plan_point, require_active, runs_across, swipe_across
+from agent_phone.core.act.hit import plan_point, require_active, runs_across, runs_down, swipe_across
 from agent_phone.core.act.intent import ActionReport, Click, Direction, Fill, Request, Scroll, TargetReport
 from agent_phone.core.act.site import element_site, focus_site
 from agent_phone.core.context import Context
@@ -228,6 +228,15 @@ def ready(intent: Click | Fill | Scroll, node: Node, screen: Screen) -> None:
             raise Refusal(
                 ErrorCode.NOT_ACTIONABLE,
                 "The list runs down, so a sideways swipe would land on one row. Scroll up or down.",
+                {"reason": "wrong_axis"},
+            )
+        case Scroll(direction=Direction.UP | Direction.DOWN) if runs_across(screen, node) and not runs_down(
+            screen, node
+        ):
+            raise Refusal(
+                ErrorCode.NOT_ACTIONABLE,
+                "The items run side by side, so an up or down swipe would land on one card, and a card "
+                "can dismiss on a swipe. Scroll left or right.",
                 {"reason": "wrong_axis"},
             )
 

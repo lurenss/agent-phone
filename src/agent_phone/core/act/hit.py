@@ -183,12 +183,21 @@ def outside_labels(screen: Screen, window: Window, own: set[NodeId]) -> tuple[La
 def runs_across(screen: Screen, node: Node) -> bool:
     """A pager, a horizontal scroll view, or a collection with two rows side by side. A sideways
     swipe on a list that runs down lands on one row, and a row can act on a swipe: Samsung's
-    Phone and Contacts call on one, and a notification is dismissed by one."""
+    Phone and Contacts call on one, and a notification is dismissed by one. The mirror holds too:
+    an up or down swipe on a collection that runs across lands on one card, and on the recents
+    screen it dismisses the app (`runs_down` tells such a collection from a grid)."""
     if role_of(node.attrs) is Role.PAGER or simple_name(node.attrs.class_name) == "HorizontalScrollView":
         return True
     rows = [b for child in node.children if not (b := screen.node(child).attrs.bounds).empty]
     pairs = zip(rows, rows[1:], strict=False)
     return any(a.left != b.left and a.top < b.bottom and b.top < a.bottom for a, b in pairs)
+
+
+def runs_down(screen: Screen, node: Node) -> bool:
+    """A collection with an item entirely below another, such as a grid of photos: its items may sit
+    side by side, and it still scrolls up and down."""
+    rows = [b for child in node.children if not (b := screen.node(child).attrs.bounds).empty]
+    return bool(rows) and max(b.top for b in rows) >= min(b.bottom for b in rows)
 
 
 def swipe_across(screen: Screen, node: Node, direction: Direction) -> Swipe:

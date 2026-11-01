@@ -419,13 +419,6 @@ def cards(*lefts, scroller="androidx.recyclerview.widget.RecyclerView"):
     )
 
 
-VERTICAL_ON_A_ROW = pytest.mark.xfail(
-    strict=True,
-    reason="a vertical swipe on a collection that runs across is planned, and it dismisses a card",
-)
-
-
-@VERTICAL_ON_A_ROW
 @pytest.mark.parametrize("direction", [Direction.UP, Direction.DOWN])
 def test_a_vertical_scroll_of_a_collection_that_runs_across_is_refused(tmp_path, direction):
     ctx, phone = context(tmp_path, cards(100, 1020))
@@ -438,7 +431,6 @@ def test_a_vertical_scroll_of_a_collection_that_runs_across_is_refused(tmp_path,
     assert phone.permits == []
 
 
-@VERTICAL_ON_A_ROW
 @pytest.mark.parametrize(
     "scroller", ["android.widget.HorizontalScrollView", "androidx.viewpager.widget.ViewPager"]
 )
