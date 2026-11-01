@@ -124,7 +124,7 @@ Snapshots on disk, one immutable JSON file each, under `devices/<serial>/snapsho
 
 ### Policy
 
-The rules that decide what an input commits (`Policy`, `core/policy/rules.py`). Rules are data in TOML files: the package's `default.toml`, a device profile, and the files a caller passes. There are five rule kinds: `commit`, `exempt`, `ignore`, `inherit` and `deny`. `parse_policy` validates a file and `merge` applies the layers in order.
+The rules that decide what an input commits (`Policy`, `core/policy/model.py`; `rules.py` reads and layers it). Rules are data in TOML files: the package's `default.toml`, a device profile, and the files a caller passes. There are five rule kinds: `commit`, `exempt`, `ignore`, `inherit` and `deny`. `parse_policy` validates a file and `merge` applies the layers in order.
 
 ### Effect
 
