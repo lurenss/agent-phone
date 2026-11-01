@@ -251,8 +251,11 @@ def judge_receiver(
     """The effects of a tap on `receiver`, and the exempt rules that removed a label from it.
 
     A receiver with no naming label and no resource-id left after the ignore rules is
-    unlabeled: nothing says what it does. A neutral affirmative ("OK") takes the effects of the
-    words around it."""
+    unlabeled: nothing says what it does. A receiver whose own words do not say what it does
+    takes the effects of the words around it as well as its own: a neutral affirmative ("OK"),
+    and a button whose every effect is `confirm`, which the rules define as a label that does not
+    name its effect. Its own effects never replace its dialog's, because a rule that gives the
+    button's own words an effect would otherwise hide the dialog from every denial."""
     ignored = {node_id for rule in ignores for node_id in rule.node_ids}
     own = [label for label in receiver if label.node_resource_id not in ignored]
     around = [label for label in context if label.node_resource_id not in ignored]
@@ -271,8 +274,8 @@ def judge_receiver(
     found = phrases_in(commits, own_kept, Source.RECEIVER)
     if not any(label.naming or label.field is LabelField.RESOURCE_ID for label in own):
         found.append((Effect.UNLABELED, Evidence(None, Source.UNLABELED, None, None)))
-    if not found and is_affirmative(inherits, own_kept):
-        found = phrases_in(commits, kept(around), Source.CONTEXT)
+    if is_affirmative(inherits, own_kept) or (found and all(e is Effect.CONFIRM for e, _ in found)):
+        found = [*found, *phrases_in(commits, kept(around), Source.CONTEXT)]
     return found, exempted
 
 

@@ -213,9 +213,6 @@ resource-id. Each gives the button an effect of its own, and the effect that the
 grant that the refusal would ask for."""
 
 
-@pytest.mark.xfail(
-    strict=True, reason="R2-1: the button's own effect stops the dialog's from reaching a denial"
-)
 @pytest.mark.parametrize("case", sorted(COMMITS_ON_THE_BUTTON))
 def test_a_consumer_commit_rule_on_the_ok_button_does_not_lift_the_denial_of_its_dialog(tmp_path, case):
     effect, text = COMMITS_ON_THE_BUTTON[case]
@@ -241,9 +238,6 @@ reason = "Nothing is ever deleted on this phone, with or without --commit."
 """
 
 
-@pytest.mark.xfail(
-    strict=True, reason="R2-1: the button's own effect stops the dialog's from reaching a denial"
-)
 def test_a_consumer_commit_rule_on_ok_does_not_open_a_denial_that_names_an_effect(tmp_path):
     delete_post = screen_of(
         node(
@@ -270,9 +264,6 @@ def test_a_consumer_commit_rule_on_ok_does_not_open_a_denial_that_names_an_effec
         assert wire["error"]["details"]["rule"] == "p.never-delete", wire["error"]
 
 
-@pytest.mark.xfail(
-    strict=True, reason="R2-1: a built-in confirm word on the button stops its dialog's words being read"
-)
 @pytest.mark.parametrize("positive", ["Confirm", "Submit"])
 def test_a_built_in_confirm_button_under_a_denied_question_is_denied_with_no_consumer_file(
     tmp_path, positive

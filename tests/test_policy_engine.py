@@ -111,9 +111,6 @@ def test_a_neutral_affirmative_does_what_its_dialog_says():
 OK_CONFIRMS = {"commit": [{"id": "c.ok", "effect": "confirm", "words": ["ok"], "reason": "A test commit."}]}
 
 
-@pytest.mark.xfail(
-    strict=True, reason="R2-1: a button's own confirm words stop its dialog's effects being read"
-)
 @pytest.mark.parametrize(
     ("title", "label", "consumer", "effects"),
     [
@@ -353,9 +350,6 @@ CONSUMER_OK_CONFIRMS_AND_NO_DELETE = parse_policy(
 )
 
 
-@pytest.mark.xfail(
-    strict=True, reason="R2-1: a button's own confirm words stop its dialog's effects being read"
-)
 @pytest.mark.parametrize(
     ("label", "consumer"),
     [

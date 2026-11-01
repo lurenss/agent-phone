@@ -28,3 +28,10 @@ Every earlier check planted its evidence on one path. The commit table planted e
 - Consumer layers may weaken a commit and never a denial. A denial reads `Policy.strict`, which keeps every commit and inherit rule that any layer loaded, and the exempt and ignore rules of trusted layers only. The same function, `effects_of`, runs on the rules in force and on `strict`, so no path gets a reading of its own.
 - Test every path into the engine. `tests/test_input_sites.py` plants a deny rule's words on the element and on the screen around it, then sends a tap, a set-text, a scroll and Enter down each. A new kind of input joins that table in the same change.
 - When a review finds a bypass, search for its siblings before you fix the instance. List the inputs, the rule kinds and the layers, and plant the words on each pair.
+
+## Round 2: the same fault on the paths that round 1 left
+
+Round 1 closed a consumer's `disable`, `exempt` and `ignore` on the affirmative path. Two more reviewers found that the path still had ways in, and that the fix had left a reader of its own.
+
+- **An added commit rule is a fourth way in.** Round 1 asked what a consumer can remove. It did not ask what a consumer can add. `judge_receiver` read the dialog around a button only when the button's own words found no effect, so a consumer rule that gave "OK", its class word or its resource-id an effect of its own made the engine stop at the button, on the rules in force and on `strict` alike. The built-in `default.confirm` did the same to "Confirm" and "Submit" with no consumer file. The dialog's "uninstall" never reached the profile's denial, and the refusal asked for a grant that opens the tap. The rule is that a denial may lose no word of the evidence to anything else on the path. A button now keeps its own effects and takes its dialog's when it is an affirmative or when all its own effects are `confirm`, and the verdict is the union.
+- **List what a layer can add as well as what it can remove.** Test each of the five rule kinds, in each of the three roles a layer can play (remove, add, shadow), against each path into the engine. Round 1 tested the removals only.

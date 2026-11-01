@@ -240,7 +240,7 @@ A refused commit lists what the input would do, what was granted, and the labels
 | Reason | Meaning |
 | --- | --- |
 | `no_receiver` | Nothing that takes a touch is at the point, or, for Enter, no view has focus. |
-| `no_commit_words` | No commit rule matched the words of the element or, for a neutral affirmative such as OK, its dialog. |
+| `no_commit_words` | No commit rule matched the words of the element or, for a button that does not say what it does, such as OK or Confirm, its dialog. |
 | `exempt` | An exempt rule removed the only words that matched. |
 | `not_labeled_input` | Commit rules do not read this input: a set-text, a scroll, back, home, recents, or an input that lands on no element, and no rule for keys or links matched it. |
 
