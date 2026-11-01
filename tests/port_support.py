@@ -132,7 +132,7 @@ class FakePhone:
     def adb(self, words: list[str]) -> str:
         assert words[0] in ("shell", "logcat"), words
         script = " ".join(words[1:])
-        if script == "dumpsys window displays":
+        if script == "dumpsys window displays" and script not in self.shell:
             return self.window_dump()
         return self.shell.get(script, "")
 
