@@ -307,7 +307,6 @@ def settings_row(title: str, switch_clickable: bool) -> str:
     )
 
 
-@pytest.mark.xfail(strict=True, reason="a checkable view that is not clickable is taken for the receiver")
 def test_a_switch_that_takes_no_touch_is_never_tapped_for_its_row(tmp_path):
     ctx, phone = context(tmp_path, window(settings_row("Airplane mode", switch_clickable=False)))
     refused(act(ctx, click(look(ctx, SettleState.SETTLED), 2)), ErrorCode.NOT_ACTIONABLE)

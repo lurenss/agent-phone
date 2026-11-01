@@ -10,8 +10,9 @@ point, not the node the caller meant. This module makes those the same node, or 
    because a full-screen window above the active one would have the focus. A dialog over an
    app needs no rule of its own: the dump of a dialog leaves the app beneath it out (A2-7).
 2. Inside the window, dispatch follows Android's: children containing the point in reverse
-   drawing order, deepest consumer first. Equal or missing drawing order between two
-   branches that both hold a consumer is ambiguous, and an ambiguous point is never used.
+   drawing order, deepest node that takes a touch first (`role.takes_touch`). Equal or missing
+   drawing order between two branches that both hold one is ambiguous, and an ambiguous point
+   is never used.
 3. `plan_point` tries the visible center, then the four quadrant centers, and returns the
    first point whose receiver is exactly the target.
 """
@@ -25,7 +26,7 @@ from agent_phone.core.geometry import Point, Rect
 from agent_phone.core.labels import Label, own_labels
 from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.phone import Swipe
-from agent_phone.core.role import consumes_touch
+from agent_phone.core.role import consumes_touch, takes_touch
 from agent_phone.core.screen import Flag, Node, NodeId, Screen, Window, WindowKind
 
 SWIPE_SPAN = 0.6
@@ -75,7 +76,7 @@ def receiver_in(screen: Screen, node: Node, point: Point) -> Receiver:
         if None in orders or len(set(orders)) < len(orders):
             return Ambiguous(tuple(child.id for child, _ in taking))
         return max(taking, key=lambda pair: pair[0].attrs.drawing_order or 0)[1]
-    return node.id if consumes_touch(node.attrs) else None
+    return node.id if takes_touch(node.attrs) else None
 
 
 def visible_area(screen: Screen, node: Node) -> Rect:

@@ -29,7 +29,7 @@ from agent_phone.core.phone import (
 from agent_phone.core.policy.engine import Site, Verdict, classify, require
 from agent_phone.core.refs.fingerprint import path_of
 from agent_phone.core.refs.resolve import QueryTarget, RefTarget, Resolved, Target, locate, observed_snapshot
-from agent_phone.core.role import Role, consumes_touch, role_of
+from agent_phone.core.role import Role, role_of, takes_touch
 from agent_phone.core.screen import Flag, Node, Screen
 from agent_phone.core.snapshot.capture import capture
 from agent_phone.core.snapshot.snapshot import SettleState, Snapshot
@@ -200,7 +200,7 @@ def ready(intent: Click | Fill | Scroll, node: Node) -> None:
     if not node.has(Flag.ENABLED):
         raise NotYet(ErrorCode.NOT_ACTIONABLE, "The element is disabled.", {"reason": "disabled"})
     match intent:
-        case Click() if not consumes_touch(node.attrs):
+        case Click() if not takes_touch(node.attrs):
             raise Refusal(ErrorCode.NOT_ACTIONABLE, "The element takes no tap.", {"reason": "no_tap"})
         case Fill() if role_of(node.attrs) is not Role.TEXT_FIELD:
             raise Refusal(

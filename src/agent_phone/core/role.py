@@ -89,6 +89,14 @@ def consumes_touch(attrs: Attrs) -> bool:
     return bool(attrs.flags & {Flag.CLICKABLE, Flag.LONG_CLICKABLE, Flag.CHECKABLE})
 
 
+def takes_touch(attrs: Attrs) -> bool:
+    """True when Android hands a touch to this node: `View.onTouchEvent` keeps a touch only for a
+    clickable or long-clickable view. A checkable view that is not clickable, such as the switch
+    of a preference row, passes the touch to its row. The hit plan uses this, not
+    `consumes_touch`, which also decides whose words a label belongs to."""
+    return bool(attrs.flags & {Flag.CLICKABLE, Flag.LONG_CLICKABLE})
+
+
 def is_actionable(attrs: Attrs, role: Role) -> bool:
     """Gets a ref in a snapshot. Disabled nodes still get one, so `wait` and `is` can name them."""
     return Flag.VISIBLE in attrs.flags and (
