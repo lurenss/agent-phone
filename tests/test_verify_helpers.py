@@ -140,3 +140,28 @@ def test_list_skips_a_batch_steps_file_kept_in_the_run_folder(tmp_path, capsys):
     assert evidence.listing(str(tmp_path)) == 0
     out = capsys.readouterr().out
     assert "1 records, 1 inputs" in out and "input: agent-phone batch" in out
+
+
+DOCTOR = ROOT / ".claude" / "skills" / "verify-agent-phone" / "scripts" / "doctor.py"
+doctor_spec = importlib.util.spec_from_file_location("doctor", DOCTOR)
+doctor = importlib.util.module_from_spec(doctor_spec)
+doctor_spec.loader.exec_module(doctor)
+
+TWO_SCREENS = """WINDOW MANAGER DISPLAY CONTENTS (dumpsys window displays)
+  Display: mDisplayId=4 (organized)
+    init=1080x1240 369dpi
+  mCurrentFocus=Window{310cce3 u0 primaryScreenTopLayout}
+  mFocusedApp=ActivityRecord{31a00e4 u0 com.android.launcher3/.SecondaryDisplayLauncher} t147}
+  Display: mDisplayId=0 (organized)
+    init=1080x1920 369dpi
+  mCurrentFocus=Window{4e4f68d u0 com.android.launcher3/com.android.launcher3.uioverrides.QuickstepLauncher}
+"""
+
+
+def test_the_doctor_names_the_focus_of_display_0_when_another_screen_is_listed_first():
+    focus = doctor.display_focus(TWO_SCREENS)
+    assert focus is not None and focus.endswith("uioverrides.QuickstepLauncher}")
+
+
+def test_the_doctor_says_so_when_display_0_has_no_focus_line():
+    assert doctor.display_focus(TWO_SCREENS.split("  Display: mDisplayId=0")[0]) is None

@@ -76,8 +76,22 @@ def screen(serial: str) -> None:
     power = shell(serial, "dumpsys power")
     awake = "mWakefulness=Awake" in power
     say("ok" if awake else "stop", "screen", "awake" if awake else "not awake; waking the phone is an input")
-    focus = [line.strip() for line in shell(serial, "dumpsys window").splitlines() if "mCurrentFocus" in line]
-    say("ok", "focus", focus[0] if focus else "no window has focus")
+    focus = display_focus(shell(serial, "dumpsys window displays"))
+    say("ok", "focus", focus or "no window on display 0 has focus")
+
+
+def display_focus(dumpsys: str, display: str = "0") -> str | None:
+    """`mCurrentFocus` of one display. agent-phone reads and taps display 0. A phone with a second
+    screen, such as the AYN Thor, lists one focus line per display, and the other screen's can
+    come first."""
+    current = None
+    for line in dumpsys.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("Display: mDisplayId="):
+            current = stripped.removeprefix("Display: mDisplayId=").split()[0]
+        elif stripped.startswith("mCurrentFocus=") and current == display:
+            return stripped
+    return None
 
 
 def server(serial: str) -> None:
