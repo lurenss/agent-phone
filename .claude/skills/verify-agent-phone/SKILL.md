@@ -1,6 +1,6 @@
 ---
 name: verify-agent-phone
-description: Prove a change to agent-phone on a real Android phone over adb, the way an agent uses the CLI, and keep the evidence outside git. Use after a change to devices, snapshots, refs, find, get, is, taps, text, keys, device operations, the commit gate, the on-device server or the lock, before you call the change done, or when asked to verify, smoke-test or reproduce agent-phone behavior on the Samsung J7 or another connected phone.
+description: Prove a change to agent-phone on a real Android phone over adb, the way an agent uses the CLI, and keep the evidence outside git. Use after a change to devices, snapshots, refs, find, get, is, wait, taps, text, keys, device operations, the commit gate, the on-device server or the lock, before you call the change done, or when asked to verify, smoke-test or reproduce agent-phone behavior on the Samsung J7 or another connected phone.
 ---
 
 # Verify agent-phone on a real phone
@@ -17,7 +17,7 @@ evidence.py() { uv run python -I .claude/skills/verify-agent-phone/scripts/evide
 
 The phone runs live accounts. A wrong input can post, send or delete, and that cannot be undone.
 
-- Send only the inputs your task names. Reading is always allowed. That covers agent-phone's read commands (`devices`, `snapshot`, `find`, `get`, `is`, `server`, `skills`, `clipboard get` and `screenshot`) and the adb reads that `evidence.py` knows, such as `dumpsys`, `getprop` and `screencap`. A tap, text, a key, `am start`, opening an app and every other agent-phone command are inputs.
+- Send only the inputs your task names. Reading is always allowed. That covers agent-phone's read commands (`devices`, `snapshot`, `find`, `get`, `is`, `wait`, `server`, `skills`, `clipboard get` and `screenshot`) and the adb reads that `evidence.py` knows, such as `dumpsys`, `getprop` and `screencap`. A tap, text, a key, `am start`, opening an app and every other agent-phone command are inputs.
 - Send every input through `evidence.py run --input`, so the record lists it. AGENTS.md requires every app a run opened and every input it sent in `decisions.tsv`. Put the input list from `evidence.py list` there, or in your report when another agent owns that file.
 - Never stop, start or change a package that its device profile in `examples/devices/` protects. On the J7 that is SocksTun (`hev.sockstun`). With always-on lockdown VPN, a dead tunnel takes the phone offline. `evidence.py` refuses an input that names a protected package.
 - Leave the phone on the screen your task names. On the J7 that is the home screen.
@@ -50,7 +50,7 @@ Doctor is read-only. Each line is `ok`, `note` or `stop`, then the check. Drive 
 - Run every command as `evidence.py run "$RUN" <label> -- <command>`. It drops every `AGENT_PHONE_*` variable, so the CLI runs its defaults the way an agent's plain shell does (`docs/solutions/a-probe-that-sets-every-variable-never-runs-the-default.md`). Add `--env NAME=VALUE` only for a journey that sets a variable on purpose.
 - Assert on `ok`, `error.code`, `delivery`, `retry` and `data`. Never assert on `message`, whose wording can change.
 - Take each ref from an envelope of this run.
-- After an input that changes the screen, read with `agent-phone snapshot --settle`. A plain snapshot can show the screen before the change (`A2-10`).
+- After an input that changes the screen, read with `agent-phone snapshot --settle`, or with `agent-phone wait` for the condition the input should cause. A plain snapshot can show the screen before the change (`A2-10`).
 - For a change to reading, drive the journey once with the server cold (stopped first) and once warm. A cold server lists the status bar first (`docs/solutions/two-equal-reads-do-not-prove-the-right-window.md`).
 - Check what agent-phone says against a read it did not make, such as `adb shell dumpsys window` for the focused window.
 - Drive one phone from one run at a time. Each command takes the device lock, but two runs still change the screen under each other.

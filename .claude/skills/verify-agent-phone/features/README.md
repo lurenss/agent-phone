@@ -18,7 +18,7 @@ This folder is the maintained source for verifying what agent-phone does for an 
 - Treat every command as literal. Keep the flags and the quoted words unchanged.
 - Take refs from an envelope of this run, as printed, such as `@k3x9q:e4`.
 - Read with `agent-phone snapshot --settle` after any input that changes the screen.
-- Wait for a phone condition with a bounded loop that polls a read. Never wait with a fixed sleep and then assume.
+- Wait for a screen condition with `agent-phone wait`. Wait for a condition that is not on the screen with a bounded loop that polls a read. Never wait with a fixed sleep and then assume.
 
 ## Proof and skip reporting
 
@@ -48,4 +48,5 @@ Keep implementation details out of the map. Name only entry points, commands, th
 - [Server lifetime and the device lock](./server-lifetime.md) covers start, status, stop, the idle stop, freeing the phone, and the lock.
 - [Taps, text, scrolls and keys](./ref-actions.md) covers `click`, `set-text`, `scroll`, `press`, spent refs and `OBSERVE_FIRST`.
 - [Device operations](./device-operations.md) covers `launch`, `stop`, `open-url`, `rotate`, `clipboard` and `screenshot`.
+- [Waiting for a screen condition](./wait.md) covers `wait`, its four conditions, `TIMEOUT` with the last read, and the observation it gives the next input.
 - [The commit gate and device protections](./policy-gate.md) covers `COMMIT_REFUSED`, `DENIED`, grants and protected packages.

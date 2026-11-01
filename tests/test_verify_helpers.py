@@ -25,6 +25,7 @@ READS = [
     ["adb", "devices", "-l"],
     ["agent-phone", "screenshot"],
     ["agent-phone", "clipboard", "get"],
+    ["agent-phone", "wait", "--for", "name=Brightness", "--timeout-ms", "1500"],
 ]
 CHANGES = [
     ["agent-phone", "click", "@k3x9q:e1"],
