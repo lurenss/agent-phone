@@ -37,6 +37,7 @@ SHELL_READS = set(
     "cat date dumpsys echo getprop grep head id ls pgrep pidof ps screencap stat tail wc".split()
 )
 SHELL_READ_PAIRS = {("settings", "get"), ("uiautomator", "dump")}
+RECORD_KEYS = {"label", "argv", "input", "started_utc", "ms", "exit"}
 SEPARATORS = re.compile(r"&&|\|\||[;\n|]|(?<![>&\d])&(?!>)")
 
 
@@ -171,7 +172,8 @@ def record(args: argparse.Namespace) -> int:
 def listing(run: str) -> int:
     if not Path(run).is_dir():
         sys.exit(f"evidence: {run} is not a run folder")
-    entries = [json.loads(path.read_text(encoding="utf-8")) for path in Path(run).glob("*.json")]
+    found = (json.loads(path.read_text(encoding="utf-8")) for path in Path(run).glob("*.json"))
+    entries = [entry for entry in found if isinstance(entry, dict) and RECORD_KEYS <= entry.keys()]
     entries.sort(key=lambda entry: entry["started_utc"])
     for entry in entries:
         kind = "input" if entry["input"] else "read"

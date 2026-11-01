@@ -126,7 +126,6 @@ def test_a_batch_that_names_a_protected_package_in_its_steps_is_refused_before_i
     assert list(run.iterdir()) == []
 
 
-@pytest.mark.xfail(strict=True, reason="list reads every .json file of the run folder as a record")
 def test_list_skips_a_batch_steps_file_kept_in_the_run_folder(tmp_path, capsys):
     (tmp_path / "three-steps.json").write_text('[["press", "back"]]')
     record = {
