@@ -43,9 +43,6 @@ def effects_of_a_tap(label: str, package: str, policy) -> set[str]:
     return {effect.value for effect in verdict.effects} if isinstance(verdict, Commits) else set()
 
 
-@pytest.mark.xfail(
-    strict=True, reason="A6-9: the default policy has no word for a subscribe in Italian, a call or a join"
-)
 @pytest.mark.parametrize(
     ("label", "effects"),
     [
@@ -63,7 +60,6 @@ def test_the_default_reads_a_subscribe_a_call_and_a_join_as_commits(label, effec
     assert effects_of_a_tap(label, "test.app", load_policy([])) == effects
 
 
-@pytest.mark.xfail(strict=True, reason="A6-9: no policy names the start of a game in Chess")
 @pytest.mark.parametrize("label", ["Inizia partita", "Sfida un amico"])
 def test_the_thor_profile_reads_the_start_of_a_chess_game_as_social(label):
     assert effects_of_a_tap(label, "com.chess", load_policy([], THOR)) == {"social"}

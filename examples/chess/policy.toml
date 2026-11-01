@@ -1,0 +1,10 @@
+# Chess.com knowledge as data, loaded by the Thor's profile (examples/devices/thor.toml).
+# The default policy cannot know that a chess app's start button pairs the account with a
+# stranger, so the rule names the app.
+
+[[commit]]
+id = "chess.start-game"
+effect = "social"
+packages = ["com.chess"]
+words = ["inizia partita", "sfida", "start game", "challenge"]
+reason = "Starts a rated game against a stranger, or sends a friend a challenge. The opponent sees it, and leaving the game loses rating."

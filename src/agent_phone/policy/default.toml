@@ -21,8 +21,9 @@ reason = "Queues a post or message for later."
 [[commit]]
 id = "default.send"
 effect = "send"
-words = ["send", "reply", "comment", "invia", "rispondi", "commenta"]
-reason = "Delivers a message to someone."
+words = ["send", "reply", "comment", "call", "invia", "rispondi", "commenta", "chiama", "chiamata",
+         "videochiamata"]
+reason = "Delivers a message or a call to someone."
 
 [[commit]]
 id = "default.delete"
@@ -41,8 +42,9 @@ reason = "Spends money."
 [[commit]]
 id = "default.social"
 effect = "social"
-words = ["follow", "unfollow", "block", "report", "segui", "blocca", "segnala"]
-reason = "Changes who the account is connected to, visibly."
+words = ["follow", "unfollow", "block", "report", "join", "segui", "blocca", "segnala", "iscriviti",
+         "partecipa", "unisciti"]
+reason = "Changes who the account is connected to, or what it joins, visibly."
 
 [[commit]]
 id = "default.system"

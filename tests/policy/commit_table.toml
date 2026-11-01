@@ -82,6 +82,22 @@ label = "Invia"
 effects = ["send"]
 
 [[case]]
+label = "Call"
+effects = ["send"]
+
+[[case]]
+label = "Chiama"
+effects = ["send"]
+
+[[case]]
+label = "Chiamata"
+effects = ["send"]
+
+[[case]]
+label = "Videochiamata"
+effects = ["send"]
+
+[[case]]
 label = "Rispondi"
 effects = ["send"]
 
@@ -207,6 +223,22 @@ effects = ["social"]
 
 [[case]]
 label = "Segui"
+effects = ["social"]
+
+[[case]]
+label = "Join"
+effects = ["social"]
+
+[[case]]
+label = "Iscriviti"
+effects = ["social"]
+
+[[case]]
+label = "Partecipa"
+effects = ["social"]
+
+[[case]]
+label = "Unisciti"
 effects = ["social"]
 
 [[case]]
