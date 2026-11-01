@@ -45,3 +45,6 @@ InputCommand = (
     | ScreenshotCommand
 )
 DriverCommand = SnapshotCommand | FindCommand | GetCommand | IsCommand | WaitCommand | InputCommand
+READS = (SnapshotCommand, FindCommand, GetCommand, IsCommand, WaitCommand)
+"""The commands that read the screen before anything else. The phone opens for them with the
+first read overlapped with its facts."""

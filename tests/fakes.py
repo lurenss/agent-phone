@@ -13,6 +13,7 @@ from support import FakeClock
 
 from agent_phone.cli.process import run
 from agent_phone.cli.settings import Settings
+from agent_phone.core.act import ledger
 from agent_phone.core.device import BootId, Capability, Connected, DeviceIdentity, DeviceInfo, Package, Serial
 from agent_phone.core.geometry import Size
 from agent_phone.core.outcome import ErrorCode, Refusal
@@ -183,10 +184,12 @@ class FakeHub:
 
 
 def invoke(argv, hub, root=None, lock_wait_s=0.0, clock: Clock | None = None, stdin: TextIO | None = None):
-    """Run one command line against `hub` and return its exit code and its one envelope."""
+    """Run one command line against `hub` and return its exit code and its one envelope. Each call
+    is a new process, so it starts with no permit that an earlier call left unrefunded."""
+    ledger.UNREFUNDED.clear()
     out = io.StringIO()
     settings = Settings(state_root=root or Path("/nonexistent-agent-phone-root"), lock_wait_s=lock_wait_s)
-    code = run(argv, hub, settings, out, clock or FakeClock(), **({} if stdin is None else {"stdin": stdin}))
+    code = run(argv, hub, settings, out, clock or FakeClock(), stdin)
     lines = out.getvalue().splitlines()
     assert len(lines) == 1, "one command prints one envelope"
     return code, json.loads(lines[0])

@@ -89,7 +89,14 @@ class Ledger:
             os.close(directory)
 
 
-def unrefunded() -> bool:
-    """True when this process spent a permit it did not refund. The CLI's last-resort error
-    handler reports `delivery_uncertain` then, because it cannot know how far input got."""
-    return bool(UNREFUNDED)
+def spends() -> int:
+    """The permits this process holds unrefunded now. A caller that runs several commands in one
+    process takes the count before each, and asks `unrefunded(since)` about that command alone."""
+    return len(UNREFUNDED)
+
+
+def unrefunded(since: int = 0) -> bool:
+    """True when this process spent a permit it did not refund, after the first `since`. The CLI's
+    last-resort error handler reports `delivery_uncertain` then, because it cannot know how far
+    input got."""
+    return len(UNREFUNDED) > since

@@ -14,6 +14,9 @@ from typing import TextIO
 from agent_phone.adapters.uiautomator2.adb import SubprocessAdb
 from agent_phone.adapters.uiautomator2.phone import U2Hub
 from agent_phone.cli.args import Command, Invocation, parse_args
+from agent_phone.cli.batch import BatchResult, read_steps, run_batch
+from agent_phone.cli.batch_args import BatchCommand
+from agent_phone.cli.commands import READS
 from agent_phone.cli.driver import PhoneError, device_lock, open_phone
 from agent_phone.cli.policy import load_profiles
 from agent_phone.cli.settings import Settings
@@ -29,7 +32,6 @@ from agent_phone.core.commands.server import ServerCommand
 from agent_phone.core.commands.set_text import SetTextCommand
 from agent_phone.core.commands.skills import SkillsGetCommand, SkillsListCommand
 from agent_phone.core.commands.snapshot import SnapshotCommand
-from agent_phone.core.commands.wait import WaitCommand
 from agent_phone.core.device import Serial, select_device
 from agent_phone.core.envelope import encode, exit_code, floor_envelope, to_wire
 from agent_phone.core.outcome import Outcome, Refusal, Refused
@@ -42,15 +44,21 @@ SKILLS_ROOT = Path(__file__).resolve().parents[1] / "skills"
 
 
 def run(
-    argv: Sequence[str], hub: PhoneHub, settings: Settings, out: TextIO, clock: Clock | None = None
+    argv: Sequence[str],
+    hub: PhoneHub,
+    settings: Settings,
+    out: TextIO,
+    clock: Clock | None = None,
+    stdin: TextIO | None = None,
 ) -> int:
-    """Run one command line against `hub` and print its envelope to `out`."""
+    """Run one command line against `hub` and print its envelope to `out`. `stdin` is where a
+    batch reads its steps when it is given no file."""
     name, device = "", None
-    outcome: Outcome
+    outcome: Outcome | BatchResult
     try:
         invocation = parse_args(argv)
         name = invocation.name
-        outcome, device = execute(invocation, hub, settings, clock or SystemClock())
+        outcome, device = execute(invocation, hub, settings, clock or SystemClock(), stdin or sys.stdin)
     except Refusal as refusal:
         if unrefunded():
             out.write(encode(floor_envelope(name, device, refusal, unrefunded=True)) + "\n")
@@ -61,13 +69,16 @@ def run(
     except Exception as error:
         out.write(encode(floor_envelope(name, device, error, unrefunded=unrefunded())) + "\n")
         return 1
+    if isinstance(outcome, BatchResult):
+        out.write(encode(outcome.wire()) + "\n")
+        return outcome.exit_code
     out.write(encode(to_wire(name, device, outcome)) + "\n")
     return exit_code(outcome)
 
 
 def execute(
-    invocation: Invocation, hub: PhoneHub, settings: Settings, clock: Clock
-) -> tuple[Outcome, Serial | None]:
+    invocation: Invocation, hub: PhoneHub, settings: Settings, clock: Clock, stdin: TextIO
+) -> tuple[Outcome | BatchResult, Serial | None]:
     """The outcome and the serial the command ran against, None when it chose no device."""
     match invocation.command:
         case DevicesCommand():
@@ -78,7 +89,7 @@ def execute(
             return devices.run(hub, profiles), None
         case SkillsListCommand() | SkillsGetCommand() as command:
             return skills.run(SKILLS_ROOT, command), None
-        case SnapshotCommand() | FindCommand() | GetCommand() | IsCommand() | WaitCommand() as command:
+        case command if isinstance(command, READS):
             with open_phone(
                 invocation.serial,
                 hub=hub,
@@ -89,6 +100,11 @@ def execute(
                 first_read=True,
             ) as driver:
                 return driver.run(command), driver.serial
+        case BatchCommand() as command:
+            steps = read_steps(command, stdin)
+            ref = next((found for step in steps if (found := ref_of(step.command)) is not None), None)
+            result = run_batch(steps, invocation.serial, ref, hub, settings, clock)
+            return result, result.device
         case ServerCommand() as command:
             serial = select_device(hub.connected(), invocation.serial, None)
             try:

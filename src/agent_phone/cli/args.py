@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import NoReturn
 
+from agent_phone.cli.batch_args import BatchCommand, add_batch, batch_command
 from agent_phone.cli.commands import InputCommand
 from agent_phone.cli.input_args import INPUTS, add_inputs, input_command
 from agent_phone.cli.wait_args import add_wait, wait_command
@@ -38,6 +39,7 @@ Command = (
     | GetCommand
     | IsCommand
     | WaitCommand
+    | BatchCommand
     | SkillsListCommand
     | SkillsGetCommand
     | InputCommand
@@ -96,6 +98,7 @@ def build() -> Parser:
     actions.add_parser("status", parents=[after], help="say whether the server runs and how long it is idle")
     add_wait(commands, after)
     add_inputs(commands, after)
+    add_batch(commands, after)
     add_skills(commands)
     return parser
 
@@ -258,6 +261,8 @@ def parse_args(argv: Sequence[str]) -> Invocation:
             command = IsCommand(parsed.ref, IsProperty(parsed.property))
         case "wait":
             command = wait_command(parsed)
+        case "batch":
+            command = batch_command(parsed)
         case "server":
             command = ServerCommand(ServerAction(parsed.action))
         case "skills" if parsed.action == "list":

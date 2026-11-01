@@ -6,7 +6,7 @@ description: >
   snapshot the active window as compact lines with refs, outline a long screen and drill into one
   list, find elements, read one property of an element, wait for a screen condition, tap, type into
   a field, scroll, press back or home, launch or stop an app, open a link or a Settings page, rotate
-  the screen, read or set the clipboard, or save a screenshot. Every input passes a commit gate, so a tap that would post, send,
+  the screen, read or set the clipboard, save a screenshot, or run several steps in one batch. Every input passes a commit gate, so a tap that would post, send,
   delete or pay needs the user's grant. Triggers on "android", "phone screen", "adb", "accessibility
   tree", "snapshot the phone", "tap on the phone", "agent-phone".
 ---
@@ -126,17 +126,20 @@ agent-phone is @p4n8c:e4 --property enabled       # one boolean of the element, 
 - The refs in `matches` belong to the snapshot that `find` records, whose id is `data.id`.
 - `get` reads `text`, `value`, `bounds` or `states`. `is` checks `visible`, `enabled`, `checked`, `focused` or `selected`. Neither records a snapshot.
 
-## Act on a ref
+## Act on a ref or a query
 
 ```bash
 agent-phone snapshot --settle                                  # look first, and take the ref
 agent-phone click @q7m2k:e7 --wait-for 'name=Brightness'      # tap, then wait for the effect
+agent-phone click 'name=Display' --wait-for 'name*=Brightness'  # the same tap, found by a query
 agent-phone set-text @r2c8w:e3 'display'                       # replace a field's text
 agent-phone scroll down @r2c8w:e5                              # swipe the list; down shows what is below
 agent-phone press back                                         # also home, recents and enter
 ```
 
-- An input needs a ref from the newest snapshot of its device. `press` and every other input without a ref need that snapshot too. An input with no current observation fails with `OBSERVE_FIRST`. A `snapshot`, a `find` that lists matches, or a `wait` taken after the last input is that observation.
+- `click`, `set-text` and `scroll` take a TARGET. One that starts with `@` is a ref. Anything else is a query, written as `--wait-for` takes it: `name=Display`, `name*=Bright`, `role=button name=OK`, `id=dashboard_container`. A bare word such as `Display` is neither, and it is `INVALID_ARGS`.
+- A query is found again on the live screen, and it must match exactly one element. Two matches are `AMBIGUOUS_TARGET`, `details.matches` counts them, and nothing is sent. No match is waited for up to `--timeout-ms`, then `NOT_FOUND`. A ref is the safer target when you have just looked, because it names the element you saw. Use a query when you cannot have looked yet, as in a batch.
+- An input needs the newest snapshot of its device, whether it names a ref or a query. `press` and every other input without a target need that snapshot too. An input with no current observation fails with `OBSERVE_FIRST`. A `snapshot`, a `find` that lists matches, or a `wait` taken after the last input is that observation, and so is the `after` of an input that had a `--wait-for`.
 - Before it sends anything, agent-phone finds the ref's element again, checks that it is visible, enabled and at the same place on two reads, and plans a point where the touch reaches exactly that element. A disabled or moving element is waited for up to `--timeout-ms` (5000 by default).
 - `NOT_ACTIONABLE` means the element cannot take this input, such as a tap on a plain text, text into a button, or a tap on a switch that its row handles. Tap the row instead. `scroll left` and `scroll right` work only on a collection that runs across, such as a pager, a horizontal scroll view, items that sit side by side, or one card of a row with its neighbor cut off at the edge, because a sideways swipe on a row can call or dismiss. The mirror holds: `scroll up` and `scroll down` on a collection that runs across, such as the recents screen, are `NOT_ACTIONABLE` with `details.reason` `wrong_axis`, because an up or down swipe on a card can dismiss the app. Scroll left or right there. A grid, which has at least two rows of at least two items, scrolls up and down, and a lone item below side-by-side items, such as a footer, does not make a grid. A sideways swipe on a pager whose page is a list keeps to a height between the rows of that list. When the rows cover the whole height, it is refused with the same reason, because it would start on a row: tap the tab or button that switches the page instead. A collection that shows one child that fills it, and nothing else that says it runs across, reads as a list that runs down, so a sideways scroll of it is refused. `UNSTABLE` means it kept moving. `OCCLUDED` means another window, such as the keyboard, or another element covers it. A list that scrolls and is drawn over the element counts, even when the screen shows it as invisible, such as a sheet that is fading in, because a scrolling view keeps the tap at any alpha.
 - `click --long` holds the touch. `set-text` replaces the whole text through the accessibility action, with no keyboard and no tap, and reads the field back.
@@ -175,6 +178,31 @@ agent-phone screenshot              # data.value is the path of the image under 
 - `open-url` opens a link with the VIEW action. An intent is written as `intent:#Intent;action=<action>;end`, with `package=<package>;` before `end` when one app must open it. Nothing else an intent can carry is accepted. A link that holds a line break or any other control character, written out or percent-encoded (`%0A`), is `INVALID_ARGS`, and nothing is sent.
 - `clipboard get` and `screenshot` only read. A screenshot is evidence for a person and takes about a second, so leave it out of the loop.
 
+## Send several steps in one call
+
+```bash
+agent-phone batch steps.json          # the steps in a file; with no file, or -, it reads stdin
+cat steps.json | agent-phone batch
+```
+
+```json
+[
+  ["launch", "com.android.settings", "--wait-for", "name=Display"],
+  ["click", "name=Display", "--wait-for", "name*=Brightness"],
+  ["press", "back", "--wait-for", "name=Display"]
+]
+```
+
+- Each step is the arguments of one command, as you would type them on the command line, without the program name. The same parser reads them, so a step means what the same words mean on a command line. A step that does not parse is `INVALID_ARGS`, and no step runs.
+- A batch fits when you know the steps, and each later step finds its target by a query or after a `wait`. Every input spends the refs taken before it, so two steps with refs from one snapshot fail: the second is `STALE_REF`. Give each input a `--wait-for`, or follow it with a `wait` step, so the next step has an observation. Otherwise run one command at a time and look between them.
+- Give `-d` once, on the batch. A step that names its own device is `INVALID_ARGS`. A step is a command that reads or drives the phone. It may not be `batch`, `server`, `devices` or `skills`.
+- Give `--commit` and `--policy` inside the step they serve. A grant or a file in one step does not reach the next. `--commit` on the batch itself is `INVALID_ARGS`.
+- The steps run in order, in one process, under one device lock. The batch stops at the first step that is not ok, and later steps do not run.
+- The result is one envelope with `command` `batch`. `data.steps` holds each step's own envelope, as that command alone would print it. `data.stopped_at` is the index of the failed step, or null. `data.trace` is the path of a trace file.
+- When a step fails, the batch's `error` and `delivery` are that step's. Its `retry` is `unsafe` when any earlier step sent input, because running the batch again would send that input again. Read the screen, then plan the rest as new steps.
+- The trace is a JSONL file, readable only by you, with one line for each step that ran and a last line for the end. A step line has its index, its arguments, `started_utc`, `ms`, `ok`, `delivery`, `retry`, the error code, and for an input its kind, its target and its gate verdict. The text of `set-text` and `clipboard set` shows as `<N chars>`. It holds no snapshot.
+- A Python caller does not need `batch`: a `Driver` from `open_phone()` already runs one step after another in one process.
+
 ## Retry only what did not reach the phone
 
 Every error carries `delivery` and `retry`.
@@ -183,6 +211,7 @@ Every error carries `delivery` and `retry`.
 - Any other `delivery` means input may have reached the phone. Read the screen before you do anything else.
 - Every input spends every ref taken before it. Running the same input again fails with `STALE_REF` and `details.reason` `spent` until you take a new snapshot, so a blind retry cannot repeat a tap. `not_delivered` is the one case after which the same command can work again.
 - `delivery_uncertain` means the request went out and no answer came back. The tap may have landed.
+- A batch that stops after an input went out has `retry` `unsafe`, even when its failed step sent nothing. Look at the screen before you run any step of it again.
 - `DEVICE_BUSY` means another process drives the phone. Nothing was sent. Run the command again when that process is done.
 - `SERVER_UNAVAILABLE` means the server on the phone did not answer, often because another tool holds the phone's one accessibility connection. Run `agent-phone server stop`, then the command again.
 
@@ -227,3 +256,4 @@ agent-phone skills get phone      # this guide, in data.content
 7. **Two state folders for one phone.** Each has its own lock, so two processes can drive the phone at once.
 8. **A `--commit` your user did not ask for.** The gate exists because a wrong commit cannot be undone. Grant the one effect the user asked for, for the one input that does it.
 9. **Retrying an input whose `delivery` is not `not_delivered`.** Take a snapshot and look first.
+10. **A batch whose later steps use refs.** Each input spends the refs before it. Name later targets by query, and give each input a `--wait-for` or a `wait` step after it.

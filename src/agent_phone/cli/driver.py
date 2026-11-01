@@ -28,7 +28,7 @@ from pathlib import Path
 from agent_phone.adapters.uiautomator2.adb import SubprocessAdb
 from agent_phone.adapters.uiautomator2.phone import U2Hub
 from agent_phone.cli.commands import INPUT_TIMEOUT_MS, DriverCommand, ScreenshotCommand
-from agent_phone.cli.policy import load_policy, load_profiles, profile_for
+from agent_phone.cli.policy import LoadedProfile, load_policy, load_profiles, profile_for
 from agent_phone.cli.request import TargetLike, effects, predicates, target_of
 from agent_phone.cli.settings import Settings
 from agent_phone.core.act.intent import Direction
@@ -108,13 +108,22 @@ class Driver:
     """The public API. Each method runs the same `core/commands/<name>.py` function the CLI
     runs, so a consumer cannot reach the device by a path the CLI does not have."""
 
-    def __init__(self, ctx: Context, state_root: Path) -> None:
+    def __init__(self, ctx: Context, state_root: Path, profile: LoadedProfile | None = None) -> None:
         self._ctx = ctx
         self._state_root = state_root
+        self._profile = profile
 
     @property
     def serial(self) -> Serial:
         return self._ctx.info.identity.serial
+
+    def with_policies(self, policies: Sequence[Path]) -> Driver:
+        """The same device, lock and ledger, judging under these caller policy files as well. They
+        load now, so a bad file refuses before any command runs."""
+        if not policies:
+            return self
+        policy = load_policy(policies, self._profile)
+        return Driver(replace(self._ctx, policy=policy), self._state_root, self._profile)
 
     def run(self, command: DriverCommand) -> Outcome:
         """The one dispatch over command dataclasses, for `main()` and for the typed methods."""
@@ -379,4 +388,4 @@ def open_phone(
             )
         except Refusal as refusal:
             raise PhoneError(Refused.of(refusal), chosen) from refusal
-        yield Driver(ctx, settings.state_root)
+        yield Driver(ctx, settings.state_root, profile)

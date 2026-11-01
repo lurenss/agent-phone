@@ -17,8 +17,6 @@ from support import fixture_screen, node, screen_of
 from agent_phone.core.device import Connected
 from agent_phone.core.phone import Key, Launch, Tap
 
-pytestmark = pytest.mark.xfail(strict=True, reason="the batch command is not in the parser yet")
-
 J7 = Connected(J7_SERIAL, "SM_J730F", ready=True)
 EMULATOR = Connected(EMULATOR_SERIAL, "emu", ready=True)
 HOME = screen_of(
