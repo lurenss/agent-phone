@@ -245,6 +245,16 @@ def test_an_intent_with_anything_but_an_action_and_a_package_is_refused_before_i
     assert code == 2 and wire["error"]["code"] == "INVALID_ARGS" and sent(hub) == []
 
 
+@pytest.mark.xfail(strict=True, reason="a link whose text breaks a line is sent, and am start echoes it")
+@pytest.mark.parametrize("uri", ["myapp:open%0AError:%20see%20docs", "myapp:open\nError: see docs"])
+def test_a_link_with_a_line_break_is_refused_before_it_is_judged(tmp_path, uri):
+    snapshot(tmp_path)
+    hub = FakeHub([J7], screens=[SETTINGS])
+    code, wire = invoke(["open-url", uri], hub, tmp_path)
+    assert code == 2 and wire["error"]["code"] == "INVALID_ARGS" and wire["delivery"] == "not_delivered"
+    assert sent(hub) == []
+
+
 def test_a_failure_after_an_input_went_out_is_never_reported_as_not_delivered(tmp_path):
     class ClosesBadly(FakePhone):
         def close(self):

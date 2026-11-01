@@ -2,10 +2,12 @@
 records every request, so "sent once" and "sent nothing" are observations."""
 
 import base64
+import shlex
+from urllib.parse import quote, unquote
 
 import pytest
 from fakes import EMULATOR_SERIAL, J7_SERIAL, info_for
-from support import FakeClock
+from support import FakeClock, fixture_xml
 from test_u2_phone import Forward, Rpc, Server, Shell, answered, phone_with
 
 from agent_phone.adapters.uiautomator2.adb import AdbResult
@@ -15,9 +17,15 @@ from agent_phone.adapters.uiautomator2.phone import U2Phone
 from agent_phone.adapters.uiautomator2.rpc import Phase, RpcResult
 from agent_phone.adapters.uiautomator2.shell import Shell as AdbShell
 from agent_phone.adapters.uiautomator2.shell import commands_for
+from agent_phone.cli.policy import load_policy
+from agent_phone.core.act.ledger import Ledger
+from agent_phone.core.commands.open_url import OpenUrlCommand
+from agent_phone.core.commands.open_url import run as open_url
+from agent_phone.core.context import Context
 from agent_phone.core.device import Package
+from agent_phone.core.envelope import to_wire
 from agent_phone.core.geometry import Point, Rect
-from agent_phone.core.outcome import ErrorCode, Refusal
+from agent_phone.core.outcome import Acted, ErrorCode, Refusal, Refused
 from agent_phone.core.phone import (
     Ack,
     Activate,
@@ -37,8 +45,11 @@ from agent_phone.core.phone import (
     Stop,
     Swipe,
     Tap,
+    intent_of,
 )
 from agent_phone.core.policy.engine import Clear, ClearReason, Grant
+from agent_phone.core.refs.store import SnapshotStore
+from agent_phone.core.snapshot.capture import capture
 
 FIELD = NodeAddress(
     Package("com.android.settings"),
@@ -229,3 +240,97 @@ def test_the_clipboard_and_a_screenshot_are_reads_of_the_server():
 def test_the_phone_reports_what_this_backend_can_do():
     phone = U2Phone(INFO, Rpc(), Forward(), Server(), 900, FakeClock(), Shell())
     assert {c.value for c in phone.info().capabilities} == {"clipboard", "screenshot"}
+
+
+class AmStartAdb:
+    """`adb shell am start -a VIEW -d <uri>`: starts the activity, exits 0, and prints the intent
+    the way `Intent.toString()` does for a custom scheme, with the decoded link in it. It is a model
+    of AOSP's ActivityManagerShellCommand, not a phone."""
+
+    def __init__(self):
+        self.scripts = []
+
+    def run(self, args, timeout_s=15.0):
+        self.scripts.append(args[3])
+        argv = shlex.split(args[3])
+        scheme, _, rest = argv[argv.index("-d") + 1].partition(":")
+        return AdbResult(
+            0, f"Starting: Intent {{ act={argv[argv.index('-a') + 1]} dat={scheme}:{unquote(rest)} }}\n", ""
+        )
+
+
+LINKS_WITH_A_BREAK = ["myapp:open%0AError:%20see%20docs", "myapp:open\nError: see docs", "myapp:a%E2%80%A8b"]
+LINK_REFUSED_BEFORE_SENDING = pytest.mark.xfail(
+    strict=True, reason="a link whose decoded text breaks a line reads as 'nothing started' when am echoes it"
+)
+
+
+def open_url_on(tmp_path, adb):
+    phone = phone_with(Rpc(answered(fixture_xml("settings-home"))), shell=AdbShell(J7_SERIAL, adb))
+    info = phone.info()
+    ctx = Context(
+        phone,
+        info,
+        None,
+        load_policy(()),
+        SnapshotStore(tmp_path),
+        Ledger(tmp_path, info.identity),
+        FakeClock(),
+    )
+    return ctx, capture(ctx, phone.read())
+
+
+@LINK_REFUSED_BEFORE_SENDING
+@pytest.mark.parametrize("uri", LINKS_WITH_A_BREAK)
+def test_a_link_with_a_line_break_is_refused_before_anything_is_sent(tmp_path, uri):
+    adb = AmStartAdb()
+    ctx, before = open_url_on(tmp_path, adb)
+    outcome = open_url(ctx, OpenUrlCommand(uri))
+    assert adb.scripts == [], "am start ran, and its echo of the link can read as 'nothing started'"
+    assert isinstance(outcome, Refused) and outcome.code is ErrorCode.INVALID_ARGS
+    wire = to_wire("open-url", J7_SERIAL, outcome)
+    assert (wire["delivery"], wire["retry"]) == ("not_delivered", "safe")
+    assert ctx.ledger.epoch() == before.epoch, "a refused link spends nothing"
+
+
+def test_a_link_that_opens_is_reported_as_sent_and_spends_the_refs(tmp_path):
+    adb = AmStartAdb()
+    ctx, before = open_url_on(tmp_path, adb)
+    outcome = open_url(ctx, OpenUrlCommand("myapp:open%20the%20docs"))
+    assert len(adb.scripts) == 1 and isinstance(outcome, Acted)
+    assert ctx.ledger.epoch() == before.epoch + 1
+
+
+@LINK_REFUSED_BEFORE_SENDING
+def test_every_character_that_splits_a_line_or_is_a_control_character_refuses_a_link():
+    splitting = [chr(i) for i in range(0x10000) if len(f"a{chr(i)}b".splitlines()) > 1]
+    assert {"\n", "\r", "\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x85", " ", " "} <= set(splitting)
+    for char in (*splitting, *(chr(i) for i in range(0x20))):
+        for uri in (f"myapp:a{char}b", f"myapp:a{quote(char)}b"):
+            with pytest.raises(Refusal) as refused:
+                intent_of(OpenUri(uri, None))
+            assert refused.value.code is ErrorCode.INVALID_ARGS, repr(uri)
+
+
+def test_a_link_with_encoded_text_that_is_no_control_character_is_still_opened():
+    for uri in ("https://example.com/a%20b?q=%2F&r=%E2%9C%93", "myapp:open/path%3Fx", "tel:+39%20055%201234"):
+        assert intent_of(OpenUri(uri, None)) is None
+
+
+@LINK_REFUSED_BEFORE_SENDING
+@pytest.mark.parametrize("action", [Launch(Package("a.b\nError: x")), Stop(Package("a.b\nError: x"))])
+def test_no_shell_input_carries_a_line_break_to_adb(action):
+    class Never:
+        def run(self, args, timeout_s=15.0):
+            raise AssertionError(f"adb ran {args}")
+
+    delivery = AdbShell(J7_SERIAL, Never()).run(action)
+    assert isinstance(delivery, NotSent) and delivery.code is ErrorCode.INVALID_ARGS
+
+
+def test_the_clipboard_is_a_call_to_the_server_so_its_text_is_never_read_as_a_shell_error():
+    rpc = Rpc(answered(True))
+    text = "Error: nothing started\nNo activities found to run"
+    delivery = phone_with(rpc).inject(permit(SetClipboard(text)))
+    assert rpc.calls == [("setClipboard", [None, text])]
+    assert isinstance(delivery, Sent) and delivery.ack is Ack.ACKNOWLEDGED
