@@ -5,3 +5,4 @@ __pycache__/
 probes/android/raw/
 traces/
 *.raw.xml
+.claude/worktrees/
