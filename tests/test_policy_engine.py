@@ -407,6 +407,73 @@ def test_a_consumer_file_cannot_stop_a_denial_reading_the_question_of_a_neutral_
     assert isinstance(verdict, Denied), f"a consumer's file made the denied tap {verdict}"
 
 
+VERBS = [
+    ("Turn off mobile data?", "Turn off"),
+    ("Turn off Wi-Fi?", "Turn off"),
+    ("Turn off Wi-Fi?", "Disable"),
+    ("Disconnect the VPN?", "Disconnect"),
+    ("Disattivare il Wi-Fi?", "Disattiva"),
+    ("Interrompere la VPN?", "Interrompi"),
+    ("Disconnettere la VPN?", "Disconnetti"),
+]
+
+
+@pytest.mark.xfail(
+    strict=True, reason="R2-4: a verb that takes its object from the question is no affirmative"
+)
+@pytest.mark.parametrize(("title", "label"), VERBS)
+def test_a_verb_that_takes_its_object_from_its_question_is_denied_when_the_question_names_the_network(
+    title, label
+):
+    screen = dialog(title, "Cancel", label)
+    verdict = tap_on(screen, button(screen, label), J7_DENIES)
+    assert isinstance(verdict, Denied) and verdict.rule == "j7.vpn-lockdown", (
+        f"{label!r} does to the object of {title!r} what it says, and the profile denies the network: "
+        f"got {verdict}"
+    )
+
+
+def positive_button(title, label, **attrs):
+    """A dialog with Cancel on the negative id and `label` on the positive one, which has `attrs`."""
+    return screen_of(
+        node(
+            "android.widget.FrameLayout",
+            node("android.widget.TextView", text=title, bounds="[0,1500][1080,1600]"),
+            node(
+                "android.widget.Button",
+                text="Cancel",
+                resource_id="android:id/button2",
+                clickable=True,
+                bounds="[0,1700][540,1800]",
+            ),
+            node(
+                "android.widget.Button", text=label, clickable=True, bounds="[540,1700][1080,1800]", **attrs
+            ),
+            bounds="[0,1400][1080,1900]",
+        )
+    )
+
+
+@pytest.mark.xfail(strict=True, reason="R2-4: the platform's positive button is not named an affirmative")
+def test_the_positive_button_of_a_platform_dialog_does_what_its_question_says_whatever_it_is_called():
+    asked = "Delete this post?"
+    named = positive_button(asked, "Proceed", resource_id="android:id/button1")
+    verdict = tap_on(named, button(named, "Proceed"))
+    assert isinstance(verdict, Commits) and verdict.effects == {Effect.DELETE}, (
+        f"android:id/button1 is the button that confirms the dialog's question: {verdict}"
+    )
+    network = positive_button("Turn off mobile data?", "Proceed", resource_id="android:id/button1")
+    denied = tap_on(network, button(network, "Proceed"), J7_DENIES)
+    assert isinstance(denied, Denied) and denied.rule == "j7.vpn-lockdown", f"got {denied}"
+
+
+def test_a_button_with_no_such_id_is_not_taken_for_the_platforms_positive_button():
+    asked = "Delete this post?"
+    for attrs in ({}, {"resource_id": "test.app:id/button1"}, {"resource_id": "android:id/button2"}):
+        screen = positive_button(asked, "Proceed", **attrs)
+        assert tap_on(screen, button(screen, "Proceed")) == Clear(ClearReason.NO_COMMIT_WORDS), attrs
+
+
 def test_on_the_j7_wi_fi_and_any_screen_that_shows_sockstun_are_denied():
     policy = merge((DEFAULT, PROFILE))
     wifi = screen_of(node("android.widget.Switch", content_desc="Wi-Fi", checkable=True, clickable=True))

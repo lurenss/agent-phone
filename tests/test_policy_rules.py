@@ -130,6 +130,8 @@ COMMIT = {"id": "t.send", "effect": "send", "words": ["send"], "reason": "Sends.
         ({"commit": [COMMIT, {**COMMIT, "words": ["reply"]}]}, "commit", "id"),
         ({"exempt": [{"id": "t.e", "reason": "r"}]}, "exempt", "labels"),
         ({"ignore": [{"id": "t.i", "reason": "r", "node_ids": []}]}, "ignore", "node_ids"),
+        ({"inherit": [{"id": "t.a", "reason": "r"}]}, "inherit", "words"),
+        ({"inherit": [{"id": "t.a", "reason": "r", "words": ["ok"], "node_ids": []}]}, "inherit", "node_ids"),
         ({"deny": [{"id": "t.d", "reason": "r"}]}, "deny", "words"),
         ({"deny": [{"id": "t.d", "reason": "r", "effects": ["everything"]}]}, "deny", "effects"),
         ({"languages": "en"}, "document", "languages"),
@@ -151,3 +153,13 @@ def test_a_scope_applies_where_every_set_it_names_holds():
     assert not one_app.applies(Package("other.app"), WindowKind.APPLICATION, "en")
     assert not one_app.applies(Package("test.app"), WindowKind.SYSTEM, "en")
     assert not one_app.applies(Package("test.app"), WindowKind.APPLICATION, "it")
+
+
+@pytest.mark.xfail(strict=True, reason="R2-4: an inherit rule cannot name a resource-id")
+def test_an_inherit_rule_names_words_or_resource_ids_and_may_name_both():
+    by_id = {"id": "t.id", "reason": "r", "node_ids": ["android:id/button1"]}
+    by_both = {"id": "t.both", "reason": "r", "words": ["ok"], "node_ids": ["android:id/button1"]}
+    policy, _ = parse_policy({"inherit": [by_id, by_both]}, "consumer.toml")
+    only_id, both = policy.rules
+    assert only_id.words == () and only_id.node_ids == {"android:id/button1"}
+    assert both.words == (Phrase(("ok",), anchored=False),) and both.node_ids == {"android:id/button1"}

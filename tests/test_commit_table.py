@@ -21,21 +21,23 @@ from agent_phone.core.labels import LabelField, surface_of, words
 from agent_phone.core.outcome import Acted, ErrorCode, Refused
 from agent_phone.core.phone import NodeAddress, Tap
 from agent_phone.core.policy.engine import Clear, Commits, Site, classify
-from agent_phone.core.policy.rules import CommitRule, Effect, merge, parse_policy
+from agent_phone.core.policy.rules import CommitRule, Effect, InheritRule, merge, parse_policy
 from agent_phone.core.refs.resolve import RefTarget
 from agent_phone.core.refs.store import SnapshotStore
 from agent_phone.core.screen import Screen
 from agent_phone.core.snapshot.capture import capture
 from agent_phone.core.snapshot.snapshot import SettleState
 
-TABLE = tomllib.loads((ROOT / "tests" / "policy" / "commit_table.toml").read_text(encoding="utf-8"))["case"]
+TABLE_DOC = tomllib.loads((ROOT / "tests" / "policy" / "commit_table.toml").read_text(encoding="utf-8"))
+TABLE = TABLE_DOC["case"]
 POLICY = merge((parse_policy(tomllib.loads(DEFAULT_POLICY.read_text(encoding="utf-8")), "default.toml"),))
 PLACEMENTS = ("text", "content_desc", "hint", "resource_id", "class_name", "child_text")
 
 
-def tapped(label: str, placement: str) -> Screen:
-    """A full-screen app with one button. A neutral child text names the button in every
-    placement, so a class name alone never leaves it unlabeled."""
+def tapped(label: str, placement: str, question: str | None = None) -> Screen:
+    """A full-screen app with one button, and the `question` above it when there is one. A
+    neutral child text names the button in every placement, so a class name alone never leaves it
+    unlabeled."""
     tokens = words(label, LabelField.TEXT)
     attrs: dict[str, object] = {"clickable": True, "bounds": "[0,0][400,100]"}
     cls = "android.widget.Button"
@@ -49,8 +51,9 @@ def tapped(label: str, placement: str) -> Screen:
             children.append(node("android.widget.TextView", text=label, bounds="[200,0][400,100]"))
         case _:
             attrs[placement] = label
+    asked = [node("android.widget.TextView", text=question, bounds="[0,200][1080,300]")] if question else []
     return screen_of(
-        node("android.widget.FrameLayout", node(cls, *children, **attrs), bounds="[0,0][1080,1920]")
+        node("android.widget.FrameLayout", node(cls, *children, **attrs), *asked, bounds="[0,0][1080,1920]")
     )
 
 
@@ -120,3 +123,58 @@ def test_a_click_on_any_placement_of_a_commit_sends_nothing(tmp_path, label, pla
         assert set(outcome.details["effects"]) == effects and phone.permits == []
     else:
         assert isinstance(outcome, Acted) and len(phone.permits) == 1
+
+
+AFFIRMATIVES = TABLE_DOC["affirmative"]
+NAMING_PLACEMENTS = ("text", "content_desc", "hint", "child_text")
+NEW_AFFIRMATIVES = {
+    "Turn off",
+    "Turn on",
+    "Disable",
+    "Enable",
+    "Stop",
+    "Disconnect",
+    "Remove",
+    "Disattiva",
+    "Attiva",
+    "Interrompi",
+    "Disconnetti",
+    "Rimuovi",
+}
+AFFIRMATIVE_CASES = [
+    pytest.param(
+        row["label"],
+        placement,
+        row["question"],
+        set(row["effects"]),
+        id=f"{row['label']}-{placement}",
+        marks=[pytest.mark.xfail(strict=True, reason="R2-4: not yet an affirmative")]
+        if row["label"] in NEW_AFFIRMATIVES
+        else [],
+    )
+    for row in AFFIRMATIVES
+    for placement in NAMING_PLACEMENTS
+]
+
+
+@pytest.mark.parametrize(("label", "placement", "question", "effects"), AFFIRMATIVE_CASES)
+def test_an_affirmative_under_a_question_that_commits_gives_its_own_effects_and_the_questions(
+    label, placement, question, effects
+):
+    assert effects_of(verdict_of(tapped(label, placement, question))) == effects
+
+
+@pytest.mark.parametrize("label", sorted({row["label"] for row in AFFIRMATIVES}))
+def test_the_words_of_a_class_or_an_id_are_no_affirmative(label):
+    """An affirmative is a label the user reads: `ok` in a resource-id says nothing about what the
+    button does, and the question under it is not read for it."""
+    for placement in ("resource_id", "class_name"):
+        own = {e for row in TABLE for e in row["effects"] if row["label"] == label}
+        assert effects_of(verdict_of(tapped(label, placement, "Delete this post?"))) == own
+
+
+def test_the_table_has_a_row_for_every_affirmative_of_the_default_policy():
+    rows = {words(row["label"], LabelField.TEXT) for row in AFFIRMATIVES}
+    for rule in POLICY.of_kind(InheritRule):
+        for phrase in rule.words:
+            assert phrase.words in rows, f"{rule.origin.rule} has no affirmative row for {phrase.words!r}"

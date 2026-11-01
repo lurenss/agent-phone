@@ -2,6 +2,12 @@
 # content-desc, its hint, its resource-id, its class name and a child's text, and every
 # placement must give the effects listed here. Every phrase of the default policy has a row, and
 # the test fails when a phrase is added to the default policy without one.
+#
+# The [[affirmative]] rows follow. Each plants an affirmative label in a button that sits under a
+# question, in the placements a user reads (text, content-desc, hint, a child's text). The effects
+# are the union of the button's own words and the question's: an affirmative does what its dialog
+# says and keeps what it says itself. Every affirmative of the default policy has a row, and the
+# question of a row never commits the effect the label already carries, so the union shows.
 
 [[case]]
 label = "Share"
@@ -318,3 +324,143 @@ effects = []
 [[case]]
 label = "Search"
 effects = []
+
+[[affirmative]]
+label = "OK"
+question = "Delete this post?"
+effects = ["delete"]
+
+[[affirmative]]
+label = "Okay"
+question = "Delete this post?"
+effects = ["delete"]
+
+[[affirmative]]
+label = "Yes"
+question = "Delete this post?"
+effects = ["delete"]
+
+[[affirmative]]
+label = "Done"
+question = "Delete this post?"
+effects = ["delete"]
+
+[[affirmative]]
+label = "Continue"
+question = "Delete this post?"
+effects = ["delete"]
+
+[[affirmative]]
+label = "Accept"
+question = "Delete this post?"
+effects = ["delete"]
+
+[[affirmative]]
+label = "Agree"
+question = "Delete this post?"
+effects = ["delete"]
+
+[[affirmative]]
+label = "Allow"
+question = "Delete this post?"
+effects = ["delete"]
+
+[[affirmative]]
+label = "Apply"
+question = "Delete this post?"
+effects = ["delete"]
+
+[[affirmative]]
+label = "Got it"
+question = "Delete this post?"
+effects = ["delete"]
+
+[[affirmative]]
+label = "Sì"
+question = "Elimina questo post?"
+effects = ["delete"]
+
+[[affirmative]]
+label = "Fatto"
+question = "Elimina questo post?"
+effects = ["delete"]
+
+[[affirmative]]
+label = "Continua"
+question = "Elimina questo post?"
+effects = ["delete"]
+
+[[affirmative]]
+label = "Accetta"
+question = "Elimina questo post?"
+effects = ["delete"]
+
+[[affirmative]]
+label = "Consenti"
+question = "Elimina questo post?"
+effects = ["delete"]
+
+[[affirmative]]
+label = "Applica"
+question = "Elimina questo post?"
+effects = ["delete"]
+
+[[affirmative]]
+label = "Turn off"
+question = "Delete this post?"
+effects = ["delete"]
+
+[[affirmative]]
+label = "Turn on"
+question = "Delete this post?"
+effects = ["delete"]
+
+[[affirmative]]
+label = "Disable"
+question = "Delete this post?"
+effects = ["delete", "system"]
+
+[[affirmative]]
+label = "Enable"
+question = "Delete this post?"
+effects = ["delete"]
+
+[[affirmative]]
+label = "Stop"
+question = "Delete this post?"
+effects = ["delete"]
+
+[[affirmative]]
+label = "Disconnect"
+question = "Delete this post?"
+effects = ["delete"]
+
+[[affirmative]]
+label = "Remove"
+question = "Send this message?"
+effects = ["delete", "send"]
+
+[[affirmative]]
+label = "Disattiva"
+question = "Elimina questo post?"
+effects = ["delete", "system"]
+
+[[affirmative]]
+label = "Attiva"
+question = "Elimina questo post?"
+effects = ["delete"]
+
+[[affirmative]]
+label = "Interrompi"
+question = "Elimina questo post?"
+effects = ["delete"]
+
+[[affirmative]]
+label = "Disconnetti"
+question = "Elimina questo post?"
+effects = ["delete"]
+
+[[affirmative]]
+label = "Rimuovi"
+question = "Invia questo messaggio?"
+effects = ["delete", "send"]
