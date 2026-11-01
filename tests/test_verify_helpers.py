@@ -93,3 +93,19 @@ def test_flags_before_the_double_dash_are_ours_and_the_rest_is_the_command(tmp_p
         and entry["argv"] == ["python", "-c", "print('hi')"]
     )
     assert entry["exit"] == 0 and entry["stdout"] == "hi\n"
+
+
+@pytest.mark.xfail(
+    strict=True, reason="evidence.py judges only the argv, which a batch keeps its steps out of"
+)
+def test_the_words_judged_for_a_protected_package_include_the_steps_in_a_batch_file(tmp_path):
+    steps = tmp_path / "steps.json"
+    steps.write_text('[["launch", "com.android.settings"], ["stop", "hev.sockstun"]]')
+    for argv in (
+        ["agent-phone", "batch", str(steps)],
+        ["agent-phone", "-d", "0a1b2c3d4e5f6a7b", "batch", str(steps)],
+        ["agent-phone", "batch", "-d", "0a1b2c3d4e5f6a7b", str(steps)],
+    ):
+        assert "hev.sockstun" in evidence.scanned(argv)
+    assert "hev.sockstun" not in evidence.scanned(["agent-phone", "batch", str(tmp_path / "nowhere.json")])
+    assert "hev.sockstun" not in evidence.scanned(["agent-phone", "snapshot"])
