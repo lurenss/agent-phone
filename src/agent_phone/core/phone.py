@@ -17,6 +17,7 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Protocol
+from urllib.parse import unquote
 
 from agent_phone.core.device import Connected, DeviceIdentity, DeviceInfo, DeviceState, Package, Power, Serial
 from agent_phone.core.geometry import Point, Rect
@@ -126,9 +127,23 @@ INTENT_KEYS = frozenset({"action", "package"})
 NAME = re.compile(r"[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z0-9_]+)+")
 
 
+def splits_a_line(text: str) -> bool:
+    """True when `text` holds a character that `str.splitlines` splits on, or any other C0
+    control character. `am start` echoes a link before its result, with the link percent-decoded,
+    and a line of that echo that starts with "Error:" reads as proof that nothing started."""
+    return any(ord(char) < 0x20 or char in "\x85\u2028\u2029" for char in text)
+
+
 def intent_of(open: OpenUri) -> tuple[str, Package | None] | None:
     """The action and package of an intent URI, or None for a link. Raises `Refusal(INVALID_ARGS)`
-    for a URI with no scheme, and for an intent URI with data or any key but action and package."""
+    for a URI that breaks a line or holds a control character, written out or percent-encoded, for
+    a URI with no scheme, and for an intent URI with data or any key but action and package."""
+    if splits_a_line(open.uri) or splits_a_line(unquote(open.uri)):
+        raise Refusal(
+            ErrorCode.INVALID_ARGS,
+            "The link holds a line break or a control character, written out or percent-encoded. "
+            "It is not sent, because the phone echoes a link in its own output.",
+        )
     scheme, colon, _ = open.uri.partition(":")
     if not colon or not scheme or not scheme[0].isalpha():
         raise Refusal(ErrorCode.INVALID_ARGS, f"{open.uri!r} has no scheme, such as https: or intent:.")

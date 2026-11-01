@@ -260,9 +260,6 @@ class AmStartAdb:
 
 
 LINKS_WITH_A_BREAK = ["myapp:open%0AError:%20see%20docs", "myapp:open\nError: see docs", "myapp:a%E2%80%A8b"]
-LINK_REFUSED_BEFORE_SENDING = pytest.mark.xfail(
-    strict=True, reason="a link whose decoded text breaks a line reads as 'nothing started' when am echoes it"
-)
 
 
 def open_url_on(tmp_path, adb):
@@ -280,7 +277,6 @@ def open_url_on(tmp_path, adb):
     return ctx, capture(ctx, phone.read())
 
 
-@LINK_REFUSED_BEFORE_SENDING
 @pytest.mark.parametrize("uri", LINKS_WITH_A_BREAK)
 def test_a_link_with_a_line_break_is_refused_before_anything_is_sent(tmp_path, uri):
     adb = AmStartAdb()
@@ -301,7 +297,6 @@ def test_a_link_that_opens_is_reported_as_sent_and_spends_the_refs(tmp_path):
     assert ctx.ledger.epoch() == before.epoch + 1
 
 
-@LINK_REFUSED_BEFORE_SENDING
 def test_every_character_that_splits_a_line_or_is_a_control_character_refuses_a_link():
     splitting = [chr(i) for i in range(0x10000) if len(f"a{chr(i)}b".splitlines()) > 1]
     assert {"\n", "\r", "\x0b", "\x0c", "\x1c", "\x1d", "\x1e", "\x85", " ", " "} <= set(splitting)
@@ -317,7 +312,6 @@ def test_a_link_with_encoded_text_that_is_no_control_character_is_still_opened()
         assert intent_of(OpenUri(uri, None)) is None
 
 
-@LINK_REFUSED_BEFORE_SENDING
 @pytest.mark.parametrize("action", [Launch(Package("a.b\nError: x")), Stop(Package("a.b\nError: x"))])
 def test_no_shell_input_carries_a_line_break_to_adb(action):
     class Never:

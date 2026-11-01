@@ -11,6 +11,12 @@
 | adb shell exited non-zero, or did not finish                | Sent(UNACKNOWLEDGED)              |
 | adb shell exited 0                                          | Sent(ACKNOWLEDGED)                |
 
+`am start` echoes the intent it starts, with its link in it, before it prints a result. A line of
+that echo that starts with "Error:" would read as proof that nothing started, so no word of an
+adb shell command may break a line (`shell.Shell.run`, `phone.intent_of`), and the echo cannot
+hold a line of the caller's making. The clipboard is a call to the server, not a shell command,
+and `classify` reads only an error message, never the text a call returned or was given.
+
 `UiAutomation not connected` and `DeadObjectException` stay on the unsafe side. The sketch
 guessed that the server fails before it reaches UiAutomation, but a click is a touch down and a
 touch up (A2-11), and nothing shows that a connection lost between the two sent neither. An

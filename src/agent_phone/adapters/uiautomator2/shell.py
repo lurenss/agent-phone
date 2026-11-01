@@ -16,7 +16,17 @@ from agent_phone.adapters.uiautomator2.delivery import classify_shell
 from agent_phone.core.device import BootId, DeviceIdentity, DeviceInfo, DeviceState, Package, Serial
 from agent_phone.core.geometry import Size
 from agent_phone.core.outcome import ErrorCode, Refusal
-from agent_phone.core.phone import Delivery, Launch, OpenUri, Orientation, Rotate, Stop, intent_of
+from agent_phone.core.phone import (
+    Delivery,
+    Launch,
+    NotSent,
+    OpenUri,
+    Orientation,
+    Rotate,
+    Stop,
+    intent_of,
+    splits_a_line,
+)
 
 PROPERTIES = (
     "ro.build.version.sdk",
@@ -111,8 +121,18 @@ class Shell:
 
     def run(self, action: Launch | Stop | OpenUri | Rotate) -> Delivery:
         """One `adb shell` call. Each argument is quoted for the phone's shell, so a package or a
-        link reaches its command as one word and never as shell syntax."""
-        script = " && ".join(shlex.join(argv) for argv in commands_for(action))
+        link reaches its command as one word and never as shell syntax. A word that breaks a line is
+        never sent: the phone's commands echo their words, and an echoed line that starts with "Error:"
+        reads as proof that nothing started (`delivery.classify_shell`)."""
+        try:
+            argvs = commands_for(action)
+        except Refusal as refusal:
+            return NotSent(refusal.code, refusal.message)
+        if any(splits_a_line(word) for argv in argvs for word in argv):
+            return NotSent(
+                ErrorCode.INVALID_ARGS, "A word of the command breaks a line, and the phone echoes words."
+            )
+        script = " && ".join(shlex.join(argv) for argv in argvs)
         try:
             result = shell(self._adb, self._serial, script, ACTION_TIMEOUT_S)
         except Refusal:

@@ -150,7 +150,7 @@ agent-phone screenshot              # data.value is the path of the image under 
 ```
 
 - `launch`, `stop`, `open-url`, `rotate` and `clipboard set` are inputs, so they spend every ref like a tap does.
-- `open-url` opens a link with the VIEW action. An intent is written as `intent:#Intent;action=<action>;end`, with `package=<package>;` before `end` when one app must open it. Nothing else an intent can carry is accepted.
+- `open-url` opens a link with the VIEW action. An intent is written as `intent:#Intent;action=<action>;end`, with `package=<package>;` before `end` when one app must open it. Nothing else an intent can carry is accepted. A link that holds a line break or any other control character, written out or percent-encoded (`%0A`), is `INVALID_ARGS`, and nothing is sent.
 - `clipboard get` and `screenshot` only read. A screenshot is evidence for a person and takes about a second, so leave it out of the loop.
 
 ## Retry only what did not reach the phone
