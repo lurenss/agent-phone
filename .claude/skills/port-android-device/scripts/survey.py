@@ -26,7 +26,6 @@ import subprocess
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
-from enum import Enum
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent))
@@ -42,18 +41,13 @@ from device_calls import (  # noqa: E402
     run_folder,
 )
 from device_reads import parse_window_displays  # noqa: E402
+from surveyed_screens import Screen  # noqa: E402
 
 SETTINGS = "intent:#Intent;action=android.settings.SETTINGS;end"
 ABOUT = "intent:#Intent;action=android.settings.DEVICE_INFO_SETTINGS;end"
 BLUETOOTH = "intent:#Intent;action=android.bluetooth.adapter.action.{}"
 RUNS, SETTLES, BUDGET = 20, 10, 8 * 1024
 REF = re.compile(r"@\w+:e\d+ ")
-
-
-class Screen(Enum):
-    LAUNCHER = "launcher"
-    SETTINGS = "settings"
-    DIALOG = "dialog"
 
 
 @dataclass(frozen=True, slots=True)
