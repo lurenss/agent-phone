@@ -8,7 +8,7 @@ import tomllib
 from fakes import EMULATOR_SERIAL, J7_SERIAL, FakePhone, info_for
 from support import FakeClock, consumer_of, fixture_screen, labelled, node, screen_of
 
-from agent_phone.cli.driver import DEFAULT_POLICY
+from agent_phone.cli.policy import DEFAULT_POLICY
 from agent_phone.core.act.act import act
 from agent_phone.core.act.intent import Click, Direction, Fill, Request, Scroll
 from agent_phone.core.act.ledger import Ledger

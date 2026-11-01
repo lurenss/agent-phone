@@ -6,7 +6,7 @@ import re
 
 import pytest
 from fakes import FakeHub, invoke
-from support import GOLDEN, ROOT, fixture_screen, snapshot_of
+from support import GOLDEN, ROOT, fixture_screen, node, screen_of, snapshot_of
 
 from agent_phone.core.commands.get import GetProperty
 from agent_phone.core.commands.is_ import IsProperty
@@ -24,6 +24,8 @@ from agent_phone.core.envelope import payload_data, to_wire
 from agent_phone.core.geometry import Size
 from agent_phone.core.outcome import Disposition, ErrorCode, Read
 from agent_phone.core.phone import ServerStatus
+from agent_phone.core.policy.engine import ClearReason
+from agent_phone.core.policy.rules import Effect
 from agent_phone.core.role import Role
 from agent_phone.core.screen import WindowKind
 from agent_phone.core.snapshot.snapshot import SettleState, SnapshotId
@@ -59,6 +61,8 @@ def json_blocks():
         ("### Settle states", SettleState),
         ("### Get properties", GetProperty),
         ("### Is properties", IsProperty),
+        ("### Clear reasons", ClearReason),
+        ("### Effects", Effect),
     ],
 )
 def test_each_value_table_lists_exactly_its_enum(heading, enum):
@@ -153,3 +157,30 @@ def test_the_example_get_is_what_the_code_prints_for_its_fixture(tmp_path):
     assert code == 0 and json.loads(printed) == example
     code, checked = invoke(["is", ref], hub, tmp_path)
     assert set(checked["data"]) == set(first_column("## Get and is payload"))
+
+
+def test_the_example_click_is_what_the_code_prints_for_its_fixture(tmp_path):
+    example = next(block for block in json_blocks() if block["command"] == "click" and block["ok"])
+    assert set(example["data"]) == set(first_column("## Input payload"))
+    hub = FakeHub(
+        [Connected(Serial(example["device"]), "SM_J730F", True)], screens=[fixture_screen("settings-home")]
+    )
+    _, taken = invoke(["snapshot"], hub, tmp_path)
+    code, wire = invoke(["click", f"@{taken['data']['id']}:e7"], hub, tmp_path)
+    printed = json.dumps(wire, ensure_ascii=False).replace(taken["data"]["id"], "q7m2k")
+    assert code == 0 and json.loads(printed) == example
+
+
+def test_the_example_refused_commit_is_what_the_code_prints(tmp_path):
+    example = next(block for block in json_blocks() if block.get("error", {}).get("code") == "COMMIT_REFUSED")
+    schedule = screen_of(
+        node(
+            "android.widget.FrameLayout",
+            node("android.widget.Button", text="Schedule reel", clickable=True, bounds="[0,1700][1080,1800]"),
+            bounds="[0,0][1080,1920]",
+        )
+    )
+    hub = FakeHub([Connected(Serial(example["device"]), "SM_J730F", True)], screens=[schedule])
+    _, taken = invoke(["snapshot"], hub, tmp_path)
+    code, wire = invoke(["click", f"@{taken['data']['id']}:e1"], hub, tmp_path)
+    assert code == 1 and wire == example

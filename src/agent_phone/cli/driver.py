@@ -7,10 +7,11 @@ lock throughout (A3-4) and pays process start and device facts once.
 
 Wiring order, each step a Refusal on failure:
 1. pick the device: `device.select_device(hub.connected(), -d, the ref's device)`;
-2. take the device lock `devices/<serial>/lock` (flock; DEVICE_BUSY after the wait budget);
-3. open the backend, read `DeviceInfo`;
-4. merge policies: package default, then caller files (`rules.merge`). Profile files load with
-   the policy engine, in unit 4;
+2. merge policies: package default, the device profile from `<state root>/profiles/` and its
+   policy files, then caller files (`rules.merge`). A profile or a policy file that does not
+   parse is POLICY_INVALID before the device is locked or opened;
+3. take the device lock `devices/<serial>/lock` (flock; DEVICE_BUSY after the wait budget);
+4. open the backend, read `DeviceInfo`;
 5. build `Context`.
 
 Setup failures arrive as `PhoneError`, like every other failure a consumer sees.
@@ -18,29 +19,54 @@ Setup failures arrive as `PhoneError`, like every other failure a consumer sees.
 
 from __future__ import annotations
 
-import tomllib
 from collections.abc import Iterator, Sequence
 from contextlib import ExitStack, contextmanager
-from dataclasses import replace
+from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 from pathlib import Path
 
 from agent_phone.adapters.uiautomator2.adb import SubprocessAdb
 from agent_phone.adapters.uiautomator2.phone import U2Hub
+from agent_phone.cli.policy import load_policy, load_profiles, profile_for
+from agent_phone.cli.request import TargetLike, effects, predicates, target_of
 from agent_phone.cli.settings import Settings
 from agent_phone.core.act.intent import Direction
 from agent_phone.core.act.ledger import Ledger
-from agent_phone.core.commands import find, get, is_, snapshot
+from agent_phone.core.commands import (
+    click,
+    clipboard,
+    find,
+    get,
+    is_,
+    launch,
+    open_url,
+    press,
+    rotate,
+    screenshot,
+    scroll,
+    set_text,
+    snapshot,
+    stop,
+)
+from agent_phone.core.commands.click import ClickCommand
+from agent_phone.core.commands.clipboard import ClipboardGetCommand, ClipboardSetCommand
 from agent_phone.core.commands.find import DEFAULT_LIMIT, FindCommand, Found
 from agent_phone.core.commands.get import GetCommand, GetProperty
 from agent_phone.core.commands.is_ import IsCommand, IsProperty
+from agent_phone.core.commands.launch import LaunchCommand
+from agent_phone.core.commands.open_url import OpenUrlCommand
+from agent_phone.core.commands.press import PressCommand
+from agent_phone.core.commands.rotate import RotateCommand
+from agent_phone.core.commands.scroll import ScrollCommand
+from agent_phone.core.commands.set_text import SetTextCommand
 from agent_phone.core.commands.snapshot import SnapshotCommand
+from agent_phone.core.commands.stop import StopCommand
 from agent_phone.core.context import Context
-from agent_phone.core.device import Serial, select_device
-from agent_phone.core.outcome import Acted, ErrorCode, Outcome, Read, Refusal, Refused, Value
+from agent_phone.core.device import Package, Serial, select_device
+from agent_phone.core.outcome import Acted, Outcome, Read, Refusal, Refused, Value
 from agent_phone.core.phone import KeyName, Orientation, PhoneHub
-from agent_phone.core.policy.rules import Effect, Policy, merge, parse_policy
+from agent_phone.core.policy.rules import Effect
 from agent_phone.core.query import Query
-from agent_phone.core.refs.resolve import Target
 from agent_phone.core.refs.store import DeviceLock, SnapshotStore
 from agent_phone.core.screen import WindowId
 from agent_phone.core.snapshot.scope import SETTLE_TIMEOUT_MS, Scope
@@ -50,9 +76,40 @@ from agent_phone.core.snapshot.view import Mode
 from agent_phone.core.wait.clock import Clock, SystemClock
 from agent_phone.core.wait.predicate import Predicate
 
-DEFAULT_POLICY = Path(__file__).resolve().parents[1] / "policy" / "default.toml"
+INPUT_TIMEOUT_MS = 5000
 
-TargetLike = Target | RefToken | Query | str
+
+@dataclass(frozen=True, slots=True)
+class ScreenshotCommand:
+    """`path` None writes under the state root, in the device's own folder."""
+
+    path: Path | None = None
+
+
+DriverCommand = (
+    SnapshotCommand
+    | FindCommand
+    | GetCommand
+    | IsCommand
+    | ClickCommand
+    | SetTextCommand
+    | ScrollCommand
+    | PressCommand
+    | LaunchCommand
+    | StopCommand
+    | OpenUrlCommand
+    | RotateCommand
+    | ClipboardGetCommand
+    | ClipboardSetCommand
+    | ScreenshotCommand
+)
+
+
+def acted(outcome: Outcome) -> Acted:
+    """The outcome of an input that went out and did what was asked, or PhoneError."""
+    if isinstance(outcome, Acted) and outcome.error is None:
+        return outcome
+    raise PhoneError(outcome)
 
 
 def device_lock(settings: Settings, serial: Serial, clock: Clock, command: str) -> DeviceLock:
@@ -76,24 +133,50 @@ class Driver:
     """The public API. Each method runs the same `core/commands/<name>.py` function the CLI
     runs, so a consumer cannot reach the device by a path the CLI does not have."""
 
-    def __init__(self, ctx: Context) -> None:
+    def __init__(self, ctx: Context, state_root: Path) -> None:
         self._ctx = ctx
+        self._state_root = state_root
 
     @property
     def serial(self) -> Serial:
         return self._ctx.info.identity.serial
 
-    def run(self, command: SnapshotCommand | FindCommand | GetCommand | IsCommand) -> Outcome:
+    def run(self, command: DriverCommand) -> Outcome:
         """The one dispatch over command dataclasses, for `main()` and for the typed methods."""
+        ctx = self._ctx
         match command:
             case SnapshotCommand():
-                return snapshot.run(self._ctx, command)
+                return snapshot.run(ctx, command)
             case FindCommand():
-                return find.run(self._ctx, command)
+                return find.run(ctx, command)
             case GetCommand():
-                return get.run(self._ctx, command)
+                return get.run(ctx, command)
             case IsCommand():
-                return is_.run(self._ctx, command)
+                return is_.run(ctx, command)
+            case ClickCommand():
+                return click.run(ctx, command)
+            case SetTextCommand():
+                return set_text.run(ctx, command)
+            case ScrollCommand():
+                return scroll.run(ctx, command)
+            case PressCommand():
+                return press.run(ctx, command)
+            case LaunchCommand():
+                return launch.run(ctx, command)
+            case StopCommand():
+                return stop.run(ctx, command)
+            case OpenUrlCommand():
+                return open_url.run(ctx, command)
+            case RotateCommand():
+                return rotate.run(ctx, command)
+            case ClipboardGetCommand() | ClipboardSetCommand():
+                return clipboard.run(ctx, command)
+            case ScreenshotCommand():
+                return screenshot.run(ctx, command.path or self.screenshot_path())
+
+    def screenshot_path(self) -> Path:
+        stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S.%fZ")
+        return self._state_root / "devices" / self.serial / "screenshots" / f"{stamp}.jpg"
 
     def snapshot(
         self,
@@ -163,14 +246,21 @@ class Driver:
         long: bool = False,
         commit: Effect | Sequence[Effect] = (),
         wait_for: Predicate | Sequence[Predicate] = (),
-        timeout_ms: int = 5000,
+        timeout_ms: int = INPUT_TIMEOUT_MS,
     ) -> Acted:
-        raise NotImplementedError
+        return acted(
+            self.run(ClickCommand(target_of(target), long, effects(commit), predicates(wait_for), timeout_ms))
+        )
 
     def set_text(
-        self, target: TargetLike, text: str, *, wait_for: Predicate | Sequence[Predicate] = ()
+        self,
+        target: TargetLike,
+        text: str,
+        *,
+        wait_for: Predicate | Sequence[Predicate] = (),
+        timeout_ms: int = INPUT_TIMEOUT_MS,
     ) -> Acted:
-        raise NotImplementedError
+        return acted(self.run(SetTextCommand(target_of(target), text, predicates(wait_for), timeout_ms)))
 
     def scroll(
         self,
@@ -178,8 +268,10 @@ class Driver:
         target: TargetLike | None = None,
         *,
         wait_for: Predicate | Sequence[Predicate] = (),
+        timeout_ms: int = INPUT_TIMEOUT_MS,
     ) -> Acted:
-        raise NotImplementedError
+        aimed = None if target is None else target_of(target)
+        return acted(self.run(ScrollCommand(direction, aimed, predicates(wait_for), timeout_ms)))
 
     def press(
         self,
@@ -187,14 +279,27 @@ class Driver:
         *,
         commit: Effect | Sequence[Effect] = (),
         wait_for: Predicate | Sequence[Predicate] = (),
+        timeout_ms: int = INPUT_TIMEOUT_MS,
     ) -> Acted:
-        raise NotImplementedError
+        return acted(self.run(PressCommand(key, effects(commit), predicates(wait_for), timeout_ms)))
 
-    def launch(self, package: str, *, wait_for: Predicate | Sequence[Predicate] = ()) -> Acted:
-        raise NotImplementedError
+    def launch(
+        self,
+        package: str,
+        *,
+        wait_for: Predicate | Sequence[Predicate] = (),
+        timeout_ms: int = INPUT_TIMEOUT_MS,
+    ) -> Acted:
+        return acted(self.run(LaunchCommand(Package(package), predicates(wait_for), timeout_ms)))
 
-    def stop(self, package: str, *, wait_for: Predicate | Sequence[Predicate] = ()) -> Acted:
-        raise NotImplementedError
+    def stop(
+        self,
+        package: str,
+        *,
+        wait_for: Predicate | Sequence[Predicate] = (),
+        timeout_ms: int = INPUT_TIMEOUT_MS,
+    ) -> Acted:
+        return acted(self.run(StopCommand(Package(package), predicates(wait_for), timeout_ms)))
 
     def open_uri(
         self,
@@ -203,32 +308,36 @@ class Driver:
         *,
         commit: Effect | Sequence[Effect] = (),
         wait_for: Predicate | Sequence[Predicate] = (),
+        timeout_ms: int = INPUT_TIMEOUT_MS,
     ) -> Acted:
-        raise NotImplementedError
+        named = None if package is None else Package(package)
+        return acted(self.run(OpenUrlCommand(uri, named, effects(commit), predicates(wait_for), timeout_ms)))
 
-    def rotate(self, orientation: Orientation, *, wait_for: Predicate | Sequence[Predicate] = ()) -> Acted:
-        raise NotImplementedError
+    def rotate(
+        self,
+        orientation: Orientation,
+        *,
+        wait_for: Predicate | Sequence[Predicate] = (),
+        timeout_ms: int = INPUT_TIMEOUT_MS,
+    ) -> Acted:
+        return acted(self.run(RotateCommand(orientation, predicates(wait_for), timeout_ms)))
 
-    def wait(self, *predicates: Predicate, timeout_ms: int = 10_000) -> Snapshot:
-        raise NotImplementedError
+    def clipboard(self) -> str | None:
+        outcome = self.run(ClipboardGetCommand())
+        if isinstance(outcome, Read) and isinstance(outcome.payload, Value):
+            value = outcome.payload.value
+            if value is None or isinstance(value, str):
+                return value
+        raise PhoneError(outcome)
 
-    def screenshot(self, path: Path) -> Read:
-        raise NotImplementedError
+    def set_clipboard(self, text: str) -> Acted:
+        return acted(self.run(ClipboardSetCommand(text)))
 
-
-def load_policy(extra: Sequence[Path]) -> Policy:
-    layers = []
-    for path in (DEFAULT_POLICY, *extra):
-        try:
-            document = tomllib.loads(path.read_text(encoding="utf-8"))
-        except (OSError, tomllib.TOMLDecodeError) as error:
-            raise Refusal(
-                ErrorCode.POLICY_INVALID,
-                f"The policy file {path} cannot be read as TOML: {error}.",
-                {"source": str(path)},
-            ) from error
-        layers.append(parse_policy(document, str(path)))
-    return merge(tuple(layers))
+    def screenshot(self, path: Path | None = None) -> Path:
+        outcome = self.run(ScreenshotCommand(path))
+        if isinstance(outcome, Read) and isinstance(outcome.payload, Value):
+            return Path(str(outcome.payload.value))
+        raise PhoneError(outcome)
 
 
 @contextmanager
@@ -265,6 +374,8 @@ def open_phone(
         try:
             ref_device = SnapshotStore(settings.state_root).device_of(ref.snapshot) if ref else None
             chosen = select_device(hub.connected(), Serial(serial) if serial else None, ref_device)
+            profile = profile_for(load_profiles(settings.state_root), chosen)
+            policy = load_policy(policies, profile)
             stack.enter_context(device_lock(settings, chosen, clock, command))
             phone = hub.open(chosen, first_read)
             stack.callback(phone.close)
@@ -272,12 +383,12 @@ def open_phone(
             ctx = Context(
                 phone,
                 info,
-                None,
-                load_policy(policies),
+                None if profile is None else profile.profile,
+                policy,
                 SnapshotStore(settings.state_root),
                 Ledger(settings.state_root, info.identity),
                 clock,
             )
         except Refusal as refusal:
             raise PhoneError(Refused.of(refusal), chosen) from refusal
-        yield Driver(ctx)
+        yield Driver(ctx, settings.state_root)

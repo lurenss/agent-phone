@@ -13,21 +13,27 @@ from typing import TextIO
 
 from agent_phone.adapters.uiautomator2.adb import SubprocessAdb
 from agent_phone.adapters.uiautomator2.phone import U2Hub
-from agent_phone.cli.args import Invocation, parse_args
+from agent_phone.cli.args import Command, Invocation, parse_args
 from agent_phone.cli.driver import PhoneError, device_lock, open_phone
+from agent_phone.cli.policy import load_profiles
 from agent_phone.cli.settings import Settings
+from agent_phone.core.act.ledger import unrefunded
 from agent_phone.core.commands import devices, server, skills
+from agent_phone.core.commands.click import ClickCommand
 from agent_phone.core.commands.devices import DevicesCommand
 from agent_phone.core.commands.find import FindCommand
 from agent_phone.core.commands.get import GetCommand
 from agent_phone.core.commands.is_ import IsCommand
+from agent_phone.core.commands.scroll import ScrollCommand
 from agent_phone.core.commands.server import ServerCommand
+from agent_phone.core.commands.set_text import SetTextCommand
 from agent_phone.core.commands.skills import SkillsGetCommand, SkillsListCommand
 from agent_phone.core.commands.snapshot import SnapshotCommand
 from agent_phone.core.device import Serial, select_device
 from agent_phone.core.envelope import encode, exit_code, floor_envelope, to_wire
 from agent_phone.core.outcome import Outcome, Refusal, Refused
 from agent_phone.core.phone import PhoneHub
+from agent_phone.core.refs.resolve import RefTarget
 from agent_phone.core.snapshot.snapshot import RefToken
 from agent_phone.core.wait.clock import Clock, SystemClock
 
@@ -49,7 +55,7 @@ def run(
     except PhoneError as error:
         outcome, device = error.outcome, error.device
     except Exception as error:
-        out.write(encode(floor_envelope(name, device, error, unrefunded=False)) + "\n")
+        out.write(encode(floor_envelope(name, device, error, unrefunded=unrefunded())) + "\n")
         return 1
     out.write(encode(to_wire(name, device, outcome)) + "\n")
     return exit_code(outcome)
@@ -61,7 +67,11 @@ def execute(
     """The outcome and the serial the command ran against, None when it chose no device."""
     match invocation.command:
         case DevicesCommand():
-            return devices.run(hub, profiles=()), None
+            try:
+                profiles = tuple(loaded.profile for loaded in load_profiles(settings.state_root))
+            except Refusal as refusal:
+                return Refused.of(refusal), None
+            return devices.run(hub, profiles), None
         case SkillsListCommand() | SkillsGetCommand() as command:
             return skills.run(SKILLS_ROOT, command), None
         case SnapshotCommand() | FindCommand() | GetCommand() | IsCommand() as command:
@@ -84,15 +94,32 @@ def execute(
                     return server.run(hub.server(serial), command), serial
             except Refusal as refusal:
                 raise PhoneError(Refused.of(refusal), serial) from refusal
+        case command:
+            with open_phone(
+                invocation.serial,
+                invocation.policies,
+                hub=hub,
+                settings=settings,
+                clock=clock,
+                command=invocation.name,
+                ref=ref_of(command),
+            ) as driver:
+                return driver.run(command), driver.serial
 
 
-def ref_of(command: SnapshotCommand | FindCommand | GetCommand | IsCommand) -> RefToken | None:
+def ref_of(command: Command) -> RefToken | None:
     """The ref that names the device when no `-d` does."""
     match command:
         case GetCommand() | IsCommand():
             return command.ref
         case SnapshotCommand() | FindCommand():
             return command.scope.root
+        case ClickCommand(target=RefTarget(token)) | SetTextCommand(target=RefTarget(token)):
+            return token
+        case ScrollCommand(target=RefTarget(token)):
+            return token
+        case _:
+            return None
 
 
 def main() -> int:

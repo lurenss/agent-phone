@@ -62,17 +62,17 @@ The exit code is 0 when `ok` is true, 1 for an error envelope, and 2 when the ar
 | `STALE_REF` | The ref cannot be trusted. `details.reason` is `spent` (input was sent after its snapshot), `rebooted` (the snapshot is from an earlier boot) or `gone` (its element is no longer on screen). |
 | `OBSERVE_FIRST` | Input was sent after the device's latest snapshot, so a query or an input without a target needs a new snapshot first. |
 | `AMBIGUOUS_TARGET` | More than one live element matches. `details.candidates` lists their refs when the target was a query. A ref that now matches several elements lists `details.matches`, their number. |
-| `NOT_FOUND` | No element matches the query, or the snapshot has no ref with that number. |
+| `NOT_FOUND` | No element matches the query, the snapshot has no ref with that number, nothing on screen scrolls, or no app handles the link or intent. |
 | `NO_SURFACE` | The window asked for is not on screen. No window has input focus (the screen is off), or `--surface` finds none, or `--window` is not an id of this read. The message lists the windows that are. |
-| `NOT_ACTIONABLE` | The element cannot take this input, for example because it is disabled. |
+| `NOT_ACTIONABLE` | The element cannot take this input. `details.reason` is `hidden` or `disabled` when it stayed so until the deadline, and `no_tap`, `not_a_field`, `not_scrollable` or `no_area` when it never can. |
 | `UNSTABLE` | The element moved between two reads. |
-| `OCCLUDED` | Another window covers the point the input would land on. |
+| `OCCLUDED` | No point of the element would reach it: another window covers it, another element takes the touch there, two elements overlap in an unknown order, or its window has no input focus. |
 | `COMMIT_REFUSED` | The input would commit an effect that `--commit` did not grant. `details` lists the `effects`, the `granted` effects and the `evidence`. |
-| `DENIED` | A deny rule forbids the input whatever the caller grants. `details` names the `rule` and its `source`. |
+| `DENIED` | A deny rule forbids the input whatever the caller grants. `details` names the `rule`, its `source` and the `evidence`. A device profile's protected package is denied this way. |
 | `LOCALE_UNSUPPORTED` | The device language has no policy rules, so labeled input cannot be judged. |
 | `TIMEOUT` | A wait reached its deadline. |
 | `TRANSPORT` | adb or the server failed, or the device returned output that does not parse. |
-| `ACTION_FAILED` | The input went out, and reading the screen back contradicts what was asked. |
+| `ACTION_FAILED` | The input went out, and reading the screen back contradicts what was asked, such as a field that does not hold the text `set-text` sent. |
 | `INTERNAL` | A defect in agent-phone. |
 
 ## Devices payload
@@ -92,7 +92,7 @@ The exit code is 0 when `ok` is true, 1 for an error envelope, and 2 when the ar
 | `ime` | string or null | with facts | The package of the default keyboard, or null when none is set. |
 | `boot_id` | string | with facts | The kernel's boot id. It changes at every reboot, and a ref from an earlier boot is `STALE_REF`. |
 | `problem` | string | when facts failed | Why a ready device has no facts. |
-| `profile` | string or null | always | The device profile that applies. It is null until profile files load. |
+| `profile` | string or null | always | The `name` of the device profile in `<state root>/profiles/` whose `serial` is this device's, or null when none is. |
 
 ```json
 {"v":1,"ok":true,"command":"devices","device":null,"data":{"devices":[
@@ -188,6 +188,79 @@ The exit code is 0 when `ok` is true, 1 for an error envelope, and 2 when the ar
 | `checked` | `true` when the element is checked. It is `false` for an element that cannot be checked. |
 | `focused` | `true` when the element has input focus. |
 | `selected` | `true` when the element is selected. |
+
+## Input payload
+
+`click`, `set-text`, `scroll`, `press`, `launch`, `stop`, `open-url`, `rotate` and `clipboard set` send input. An input that went out has `delivery` and `retry` from how far it got, and this `data` object. An input refused before it went out is an error envelope with `delivery` `not_delivered`, and has no `data`. An input that went out and then failed, such as a `--wait-for` that timed out, has `data` and `error` both.
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `input` | object | What was sent. `kind` is one of the [input kinds](#input-kinds), with its own keys. Typed text and clipboard text are never echoed. |
+| `target` | object or null | For an input on an element: its `ref` (or null for a query), `role`, `name`, and `at`, the point a tap landed on, or null. Null for an input with no element. |
+| `gate` | object | The policy verdict the input was sent under: `{"verdict": "clear", "reason": …}` with a [clear reason](#clear-reasons), or `{"verdict": "commits", "effects": […]}` with the granted [effects](#effects). |
+| `verified_by` | string or null | What proved the effect, such as `present name="Brightness"`, or why the proof does not count. |
+| `after` | object or null | The snapshot the wait ended on, with fresh refs, as in [Snapshot payload](#snapshot-payload). Null when nothing was waited for. |
+
+```json
+{"v":1,"ok":true,"command":"click","device":"0a1b2c3d4e5f6a7b","delivery":"delivered_unverified","retry":"unsafe",
+ "data":{"input":{"kind":"tap","at":[960,995]},
+  "target":{"ref":"@q7m2k:e7","role":"button","name":"Display","at":[960,995]},
+  "gate":{"verdict":"clear","reason":"no_commit_words"},"verified_by":null,"after":null}}
+```
+
+A refused commit lists what the input would do, what was granted, and the labels that said so:
+
+```json
+{"v":1,"ok":false,"command":"click","device":"0a1b2c3d4e5f6a7b","delivery":"not_delivered","retry":"safe",
+ "error":{"code":"COMMIT_REFUSED",
+  "message":"This input would schedule ('Schedule reel'). It is sent only with --commit schedule. Grant it only when your user asked for this commit.",
+  "hint":"Grant the listed effect with --commit only when your user asked for it.",
+  "details":{"effects":["schedule"],"granted":[],"evidence":[{"rule":"default.schedule","source":"receiver","label":"Schedule reel"}]}}}
+```
+
+### Input kinds
+
+| Kind | Keys | Input |
+| --- | --- | --- |
+| `tap` | `at` | A touch at a point (`click`). |
+| `long_press` | `at`, `ms` | A touch held for `ms` (`click --long`). |
+| `activate` | none | The accessibility click of a backend that has one. The uiautomator2 backend has none (`A2-11`). |
+| `swipe` | `from`, `to` | A swipe across a list (`scroll`). |
+| `set_text` | `secret` | A field's text replaced through the accessibility action (`set-text`). |
+| `key` | `key` | A key: `back`, `home`, `recents` or `enter` (`press`). |
+| `launch` | `package` | An app's launcher screen started. |
+| `stop` | `package` | An app force-stopped. |
+| `open_uri` | `uri`, `package` | A link or an intent opened (`open-url`). |
+| `rotate` | `orientation` | The rotation locked to `portrait` or `landscape`, or handed to the sensor with `auto`. |
+| `power` | `power` | The screen turned `on` or `off`. No command sends it yet. |
+| `set_clipboard` | none | The clipboard replaced (`clipboard set`). |
+
+### Clear reasons
+
+| Reason | Meaning |
+| --- | --- |
+| `no_receiver` | Nothing that takes a touch is at the point. |
+| `no_commit_words` | No commit rule matched the words of the element or, for a neutral affirmative such as OK, its dialog. |
+| `exempt` | An exempt rule removed the only words that matched. |
+| `not_labeled_input` | The input lands on no element, and no rule for keys or links matched it. |
+
+### Effects
+
+| Effect | What the input does |
+| --- | --- |
+| `publish` | Makes content visible to others. |
+| `schedule` | Queues a post or a message for later. |
+| `send` | Delivers a message, or starts a call. |
+| `delete` | Destroys data. |
+| `purchase` | Spends money. |
+| `social` | Changes who the account is connected to, visibly. |
+| `system` | Changes device state that can cut off the device or the agent. |
+| `confirm` | Confirms an action whose effect the label does not say. |
+| `unlabeled` | Lands on an element with no words, so nothing says what it does. |
+
+## Device reads
+
+`clipboard get` prints `{"value": <text or null>}`, null when the clipboard holds no text. `screenshot` saves a JPEG under the state root, in `devices/<serial>/screenshots/`, readable only by the user, and prints `{"value": <path>}`. Neither sends input, so no ref changes.
 
 ## Snapshot payload
 

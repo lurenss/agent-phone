@@ -10,7 +10,7 @@ import pytest
 from fakes import J7_SERIAL, FakePhone, info_for
 from support import ROOT, FakeClock, node, screen_of
 
-from agent_phone.cli.driver import DEFAULT_POLICY
+from agent_phone.cli.policy import DEFAULT_POLICY
 from agent_phone.core.act.act import act
 from agent_phone.core.act.hit import context_labels, plan_point, receiver_at
 from agent_phone.core.act.intent import Click, Request

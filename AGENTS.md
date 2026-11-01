@@ -11,7 +11,7 @@ uv sync                         # install the package and the dev tools
 uv run pytest                   # every test, including the architecture and no-sleep gates
 uv run ruff check               # lint
 uv run ruff format --check .    # formatting
-uv run agent-phone devices      # the CLI; `snapshot`, `find`, `get`, `is`, `server start|stop|status` and `skills list|get` are the other commands
+uv run agent-phone devices      # the CLI; `agent-phone --help` lists every command, from `snapshot` and `find` to `click` and `open-url`
 probes/android/server_lifetime.sh                         # re-run a platform probe against the phone
 uv run python -I probes/android/unit2_probe.py <check>    # facts, watchdog, bench, idle, concurrent, stop, foreign
 uv run python -I probes/android/unit3_probe.py <check>    # windows, freshness, bench, commands (reading the screen)

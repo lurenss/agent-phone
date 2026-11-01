@@ -1,19 +1,21 @@
 ---
 name: agent-phone
 description: >
-  Read what an Android phone shows through its accessibility tree, over adb, with the agent-phone
-  CLI. Use when an AI agent must see an Android screen: list the connected devices, snapshot the
-  active window as compact lines with refs, outline a long screen and drill into one list, read a
-  dialog, the keyboard or the notification shade, find elements by role, name, text or resource-id,
-  or read one property of an element. Also use to free the phone for another adb tool. Triggers on
-  "android", "phone screen", "adb", "accessibility tree", "snapshot the phone", "agent-phone".
+  Read and drive an Android phone through its accessibility tree, over adb, with the agent-phone
+  CLI. Use when an AI agent must see an Android screen or act on it: list the connected devices,
+  snapshot the active window as compact lines with refs, outline a long screen and drill into one
+  list, find elements, read one property of an element, tap, type into a field, scroll, press back
+  or home, launch or stop an app, open a link or a Settings page, rotate the screen, read or set the
+  clipboard, or save a screenshot. Every input passes a commit gate, so a tap that would post, send,
+  delete or pay needs the user's grant. Triggers on "android", "phone screen", "adb", "accessibility
+  tree", "snapshot the phone", "tap on the phone", "agent-phone".
 ---
 
 # agent-phone
 
 agent-phone is a CLI that reads an Android phone's screen through the accessibility tree, over adb. It is a tool, not an agent. The loop of observe, act and observe again runs in you. Each command prints one JSON object on one line and exits.
 
-agent-phone only reads today. It sends no taps, no text and no keys. Input commands arrive in a later version.
+agent-phone reads the screen and sends input. Every input names what it acts on by a ref from a snapshot you just took, and a policy engine refuses any input that would post, send, delete, pay or change the phone's state unless you grant that effect.
 
 ## Start here
 
@@ -103,12 +105,62 @@ agent-phone is @p4n8c:e4 --property enabled       # one boolean of the element, 
 - The refs in `matches` belong to the snapshot that `find` records, whose id is `data.id`.
 - `get` reads `text`, `value`, `bounds` or `states`. `is` checks `visible`, `enabled`, `checked`, `focused` or `selected`. Neither records a snapshot.
 
+## Act on a ref
+
+```bash
+agent-phone snapshot --settle                                  # look first, and take the ref
+agent-phone click @q7m2k:e7 --wait-for 'name=Brightness'      # tap, then wait for the effect
+agent-phone set-text @r2c8w:e3 'display'                       # replace a field's text
+agent-phone scroll down @r2c8w:e5                              # swipe the list; down shows what is below
+agent-phone press back                                         # also home, recents and enter
+```
+
+- An input needs a ref from the newest snapshot of its device. `press` and every other input without a ref need that snapshot too. An input with no current observation fails with `OBSERVE_FIRST`.
+- Before it sends anything, agent-phone finds the ref's element again, checks that it is visible, enabled and at the same place on two reads, and plans a point where the touch reaches exactly that element. A disabled or moving element is waited for up to `--timeout-ms` (5000 by default).
+- `NOT_ACTIONABLE` means the element cannot take this input, such as a tap on a plain text or text into a button. `UNSTABLE` means it kept moving. `OCCLUDED` means another window, such as the keyboard, or another element covers it.
+- `click --long` holds the touch. `set-text` replaces the whole text through the accessibility action, with no keyboard and no tap, and reads the field back.
+- `--wait-for QUERY` waits until a match shows after the input, and `--wait-for-gone QUERY` until it goes. A query is `name=…`, `text=…`, `value=…`, `role=…` or `id=…`, and `^=` or `*=` match a prefix or a part. The result's `after` is a snapshot of the screen the wait ended on, with fresh refs for your next input.
+- `delivery` is `delivered_verified` when the wait saw its effect appear, and `delivered_unverified` otherwise. Read the screen before you trust an unverified input.
+
+## Grant only the commit your user asked for
+
+```bash
+agent-phone click @m9q4t:e21                    # COMMIT_REFUSED: details.effects lists "schedule"
+agent-phone click @m9q4t:e21 --commit schedule  # sent, because the user asked to schedule it
+```
+
+- The engine reads every word of the element the touch lands on, its children's words and its resource-id included. A tap that would publish, schedule, send, delete, purchase, follow or block, change the system, confirm, or hit an element with no words fails with `COMMIT_REFUSED`, and nothing is sent.
+- `--commit` grants one effect for one input, such as `--commit schedule`. Grant only the effect your user asked for. A grant for `publish` does not open a `schedule` tap.
+- `press enter` commits `send`, and `open-url` with a `tel:` or `sms:` link does too.
+- `DENIED` comes from a rule of the device's profile or a policy file. No flag opens it. A device profile can protect a package, and then `stop` of that package is `DENIED`.
+- `--policy FILE` adds a policy file of your own, such as one that exempts a label you know only navigates.
+- `LOCALE_UNSUPPORTED` means the phone's language has no rules, so agent-phone does not judge what it cannot read.
+
+## Drive the device
+
+```bash
+agent-phone launch com.android.settings
+agent-phone stop com.android.settings
+agent-phone open-url 'intent:#Intent;action=android.settings.DISPLAY_SETTINGS;end'
+agent-phone open-url https://example.com --package com.android.chrome
+agent-phone rotate landscape        # portrait and landscape lock it; auto hands it back to the sensor
+agent-phone clipboard get
+agent-phone clipboard set 'text to paste'
+agent-phone screenshot              # data.value is the path of the image under the state folder
+```
+
+- `launch`, `stop`, `open-url`, `rotate` and `clipboard set` are inputs, so they spend every ref like a tap does.
+- `open-url` opens a link with the VIEW action. An intent is written as `intent:#Intent;action=<action>;end`, with `package=<package>;` before `end` when one app must open it. Nothing else an intent can carry is accepted.
+- `clipboard get` and `screenshot` only read. A screenshot is evidence for a person and takes about a second, so leave it out of the loop.
+
 ## Retry only what did not reach the phone
 
 Every error carries `delivery` and `retry`.
 
 - `retry` is `safe` only when `delivery` is `not_delivered`. Nothing reached the phone, and you can run the same command again.
-- Any other `delivery` means input may have reached the phone. Read the screen before you do anything else. Every command today only reads, so its errors are `not_delivered`, but branch on `retry` all the same.
+- Any other `delivery` means input may have reached the phone. Read the screen before you do anything else.
+- Every input spends every ref taken before it. Running the same input again fails with `STALE_REF` and `details.reason` `spent` until you take a new snapshot, so a blind retry cannot repeat a tap. `not_delivered` is the one case after which the same command can work again.
+- `delivery_uncertain` means the request went out and no answer came back. The tap may have landed.
 - `DEVICE_BUSY` means another process drives the phone. Nothing was sent. Run the command again when that process is done.
 - `SERVER_UNAVAILABLE` means the server on the phone did not answer, often because another tool holds the phone's one accessibility connection. Run `agent-phone server stop`, then the command again.
 
@@ -146,8 +198,10 @@ agent-phone skills get phone      # this guide, in data.content
 
 1. **A plain snapshot right after a change.** It can show the screen from before the change. Use `--settle`.
 2. **A compact or full snapshot of a long feed.** Take `--skeleton`, then `--root` on the list you need, or use `find`.
-3. **Tapping printed bounds with `adb shell input tap`.** Nothing checks that the element is still there, and a wrong tap can post, send or delete.
+3. **Tapping printed bounds with `adb shell input tap`.** Nothing checks that the element is still there, and a wrong tap can post, send or delete. Use `click` with a ref.
 4. **Fixed sleeps.** The screen does not change on a timer. Use `snapshot --settle`.
 5. **Branching on `message`.** Branch on `error.code` and `retry`.
 6. **Leaving the server up when you hand the phone over.** Run `agent-phone server stop`.
 7. **Two state folders for one phone.** Each has its own lock, so two processes can drive the phone at once.
+8. **A `--commit` your user did not ask for.** The gate exists because a wrong commit cannot be undone. Grant the one effect the user asked for, for the one input that does it.
+9. **Retrying an input whose `delivery` is not `not_delivered`.** Take a snapshot and look first.

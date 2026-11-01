@@ -6,8 +6,10 @@ from __future__ import annotations
 import argparse
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import NoReturn
 
+from agent_phone.cli.input_args import INPUTS, InputCommand, add_inputs, input_command
 from agent_phone.core.commands.devices import DevicesCommand
 from agent_phone.core.commands.find import DEFAULT_LIMIT, FindCommand
 from agent_phone.core.commands.get import GetCommand, GetProperty
@@ -34,15 +36,19 @@ Command = (
     | IsCommand
     | SkillsListCommand
     | SkillsGetCommand
+    | InputCommand
 )
 SKILL_NAMES = {name: skill for skill in SKILLS for name in (skill.name, skill.alias)}
 
 
 @dataclass(frozen=True, slots=True)
 class Invocation:
+    """`policies` are the caller's policy files, which only input commands take."""
+
     name: str
     serial: Serial | None
     command: Command
+    policies: tuple[Path, ...] = ()
 
 
 class Parser(argparse.ArgumentParser):
@@ -84,6 +90,7 @@ def build() -> Parser:
     actions.add_parser("start", parents=[after], help="start the server, or confirm it runs")
     actions.add_parser("stop", parents=[after], help="stop the server so another tool can use the device")
     actions.add_parser("status", parents=[after], help="say whether the server runs and how long it is idle")
+    add_inputs(commands, after)
     add_skills(commands)
     return parser
 
@@ -250,4 +257,8 @@ def parse_args(argv: Sequence[str]) -> Invocation:
             command = SkillsListCommand()
         case "skills":
             command = SkillsGetCommand(SKILL_NAMES[parsed.name])
-    return Invocation(parsed.command, Serial(parsed.device) if parsed.device else None, command)
+        case name if name in INPUTS:
+            command = input_command(parsed)
+    serial = Serial(parsed.device) if parsed.device else None
+    name = parsed.command if parsed.command != "clipboard" else f"clipboard {parsed.action}"
+    return Invocation(name, serial, command, tuple(getattr(parsed, "policy", ())))

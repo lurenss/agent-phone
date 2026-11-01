@@ -104,7 +104,7 @@ def test_drift_catches_planted_names():
     planted = [
         "`agent-phone snapshot --sideways`",
         "`snapshot --limit 3`",
-        "`--commit`",
+        "`--comit`",
         "```bash\nagent-phone tap @k3x9q:e1\n```",
         "`--surface popup`",
         "`agent-phone get e4`",

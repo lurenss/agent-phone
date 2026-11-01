@@ -24,7 +24,9 @@ SKILLS = (
         "agent-phone",
         "phone",
         "The usage guide: devices, snapshots and refs, skeleton and drill-down, settle, surfaces, "
-        "find, get and is, errors and retry, and the on-device server. Load it first.",
+        "find, get and is, taps, text, scrolls and keys, the commit gate, launch, stop, links, "
+        "rotation, the clipboard and screenshots, errors and retry, and the on-device server. "
+        "Load it first.",
     ),
 )
 
