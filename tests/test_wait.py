@@ -28,8 +28,6 @@ from agent_phone.core.snapshot.snapshot import RefToken, SettleState, Snapshot, 
 from agent_phone.core.wait.clock import POLL_GAP_S
 from agent_phone.core.wait.predicate import Foreground, Gone, Present, Settled
 
-pytestmark = pytest.mark.xfail(strict=True, reason="wait is a stub until the next commit")
-
 POLICY = merge((parse_policy(tomllib.loads(DEFAULT_POLICY.read_text(encoding="utf-8")), "default.toml"),))
 SETTINGS = fixture_screen("settings-home")
 SETTINGS_PACKAGE = Package("com.android.settings")
@@ -120,7 +118,10 @@ def test_a_timeout_is_refused_and_carries_the_last_read(tmp_path):
 
 
 def test_a_timeout_with_nothing_to_describe_is_still_a_timeout(tmp_path):
-    ctx, _, _ = context(tmp_path, screen_of())
+    status_bar_only = screen_of(
+        node("android.widget.FrameLayout", package="com.android.systemui", bounds="[0,0][1080,60]")
+    )
+    ctx, _, _ = context(tmp_path, status_bar_only)
     outcome = timed_out(run(ctx, WaitCommand((Present(Q("Brightness")),), timeout_ms=100)))
     assert outcome.details == {"after": None}
 

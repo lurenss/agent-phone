@@ -61,7 +61,8 @@ def holds(predicate: Predicate, previous: Screen | None, current: Screen) -> boo
     """Present and Gone match the lines of a compact view of the active window, as `find` does.
     A read with no active window, or with no line, decides neither, so Gone does not hold on a
     frame between two screens.
-    Gone by ref needs the ref's stored fingerprint and arrives with the wait command (unit 5)."""
+    Gone by ref would need the ref's stored fingerprint, and no command asks for it: `wait` and the
+    `--wait-for-gone` flags take queries, so it stays NOT_SUPPORTED."""
     match predicate:
         case Settled():
             if previous is None:

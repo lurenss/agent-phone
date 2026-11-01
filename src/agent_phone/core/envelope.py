@@ -76,7 +76,10 @@ def delivery_keys(disposition: Disposition) -> dict[str, object]:
 
 
 def error_object(code: ErrorCode, message: str, details: Mapping[str, object]) -> dict[str, object]:
-    return {"code": code.value, "message": message, "hint": HINTS.get(code), "details": dict(details)}
+    """A snapshot in `details`, such as the last read of a `wait` that timed out, prints as the
+    snapshot payload does."""
+    shown = {key: snapshot_data(v) if isinstance(v, Snapshot) else v for key, v in details.items()}
+    return {"code": code.value, "message": message, "hint": HINTS.get(code), "details": shown}
 
 
 def payload_data(payload: object) -> dict[str, object]:
