@@ -142,7 +142,8 @@ def classify(policy: Policy, action: InputAction, site: Site | None, locale: str
 
     The verdict comes from the rules in force. A denial that names effects reads them from
     `policy.strict` as well (`model.Policy`), on every path an input takes to an effect: the
-    receiver's words, the affirmative's context, a key and a link scheme.
+    receiver's words, the question a button takes, a key and a link scheme. A denial that names
+    words reads that question too, taken on either reading.
 
     Raises `Refusal(LOCALE_UNSUPPORTED)` when commit rules would read an input and the device's
     language is not in `policy.languages`.
@@ -156,22 +157,26 @@ def classify(policy: Policy, action: InputAction, site: Site | None, locale: str
             f"what this input would do. The rules cover {', '.join(sorted(policy.languages))}.",
             {"locale": locale, "languages": sorted(policy.languages)},
         )
-    found, exempted = effects_of(action, site, reads, reading_of(policy.rules, site, language))
-    strict, _ = effects_of(action, site, reads, reading_of(policy.strict, site, language))
-    effects = {effect for effect, _ in found}
+    reading = reading_of(policy.rules, site, language)
+    judged = effects_of(action, site, reads, reading)
+    strict = effects_of(action, site, reads, reading_of(policy.strict, site, language))
+    effects = {effect for effect, _ in judged.found}
     receiver, context = seen_by(reads, site)
-    for rule in reading_of(policy.rules, site, language).denies:
-        evidence = denial(rule, action, receiver, context, effects | {effect for effect, _ in strict})
+    question = tuple(dict.fromkeys((*judged.question, *strict.question)))
+    for rule in reading.denies:
+        evidence = denial(
+            rule, action, receiver, question, context, effects | {effect for effect, _ in strict.found}
+        )
         if evidence is not None:
             return Denied(rule.origin.rule, rule.origin.reason, rule.origin.source, evidence)
     if effects:
-        return Commits(frozenset(effects), tuple(evidence for _, evidence in found))
+        return Commits(frozenset(effects), tuple(evidence for _, evidence in judged.found))
     if reads is not Reads.EVERYTHING:
         return Clear(ClearReason.NOT_LABELED_INPUT)
     if site is None or site.receiver is None:
         return Clear(ClearReason.NO_RECEIVER)
-    if exempted:
-        return Clear(ClearReason.EXEMPT, tuple(dict.fromkeys(exempted)))
+    if judged.exempted:
+        return Clear(ClearReason.EXEMPT, tuple(dict.fromkeys(judged.exempted)))
     return Clear(ClearReason.NO_COMMIT_WORDS)
 
 
@@ -200,14 +205,21 @@ def seen_by(reads: Reads, site: Site | None) -> tuple[Sequence[Label], Sequence[
     return (site.receiver.labels if site.receiver is not None else ()), site.context
 
 
-def effects_of(
-    action: InputAction, site: Site | None, reads: Reads, reading: Reading
-) -> tuple[list[Found], list[RuleId]]:
-    """The effects `action` carries under one reading, and the exempt rules that removed a label."""
-    found: list[Found] = []
-    exempted: list[RuleId] = []
+@dataclass(frozen=True, slots=True)
+class Judgement:
+    """What one reading made of an input: the effects it carries, the exempt rules that removed a
+    label, and the labels of the question the receiver took, which are empty when it took none."""
+
+    found: list[Found]
+    exempted: list[RuleId]
+    question: tuple[Label, ...] = ()
+
+
+def effects_of(action: InputAction, site: Site | None, reads: Reads, reading: Reading) -> Judgement:
+    """What `action` carries under one reading."""
+    judged = Judgement([], [])
     if reads is Reads.EVERYTHING and site is not None and site.receiver is not None:
-        found, exempted = judge_receiver(
+        judged = judge_receiver(
             reading.commits,
             reading.ignores,
             reading.exempts,
@@ -215,6 +227,7 @@ def effects_of(
             site.receiver.labels,
             site.context,
         )
+    found = judged.found
     match action:
         case Key(key=key):
             found = [
@@ -226,7 +239,7 @@ def effects_of(
             found = [
                 found_by(rule, Source.URI, uri) for rule in reading.commits if scheme in rule.uri_schemes
             ]
-    return found, exempted
+    return Judgement(found, judged.exempted, judged.question)
 
 
 def found_by(rule: CommitRule, source: Source, label: str) -> Found:
@@ -247,15 +260,17 @@ def judge_receiver(
     inherits: Sequence[InheritRule],
     receiver: Sequence[Label],
     context: Sequence[Label],
-) -> tuple[list[Found], list[RuleId]]:
-    """The effects of a tap on `receiver`, and the exempt rules that removed a label from it.
+) -> Judgement:
+    """The effects of a tap on `receiver`, the exempt rules that removed a label from it, and the
+    question it took.
 
     A receiver with no naming label and no resource-id left after the ignore rules is
     unlabeled: nothing says what it does. A receiver whose own words do not say what it does
     takes the effects of the words around it as well as its own: a neutral affirmative ("OK"),
     and a button whose every effect is `confirm`, which the rules define as a label that does not
     name its effect. Its own effects never replace its dialog's, because a rule that gives the
-    button's own words an effect would otherwise hide the dialog from every denial."""
+    button's own words an effect would otherwise hide the dialog from every denial. The labels it
+    read there are returned too, because a deny rule's words read them as well."""
     ignored = {node_id for rule in ignores for node_id in rule.node_ids}
     own = [label for label in receiver if label.node_resource_id not in ignored]
     around = [label for label in context if label.node_resource_id not in ignored]
@@ -274,9 +289,11 @@ def judge_receiver(
     found = phrases_in(commits, own_kept, Source.RECEIVER)
     if not any(label.naming or label.field is LabelField.RESOURCE_ID for label in own):
         found.append((Effect.UNLABELED, Evidence(None, Source.UNLABELED, None, None)))
+    question: tuple[Label, ...] = ()
     if is_affirmative(inherits, own_kept) or (found and all(e is Effect.CONFIRM for e, _ in found)):
-        found = [*found, *phrases_in(commits, kept(around), Source.CONTEXT)]
-    return found, exempted
+        question = tuple(kept(around))
+        found = [*found, *phrases_in(commits, question, Source.CONTEXT)]
+    return Judgement(found, exempted, question)
 
 
 def is_affirmative(inherits: Sequence[InheritRule], labels: Sequence[Label]) -> bool:
@@ -310,19 +327,30 @@ def denial(
     rule: DenyRule,
     action: InputAction,
     receiver: Sequence[Label],
+    question: Sequence[Label],
     context: Sequence[Label],
     effects: set[Effect],
 ) -> tuple[Evidence, ...] | None:
-    """The evidence for `rule` when every condition it names holds, else None."""
+    """The evidence for `rule` when every condition it names holds, else None. A rule's `words`
+    are read in the receiver and in the question the receiver took (`judge_receiver`): a button
+    that does what its question says is judged by the question's words too."""
     evidence: list[Evidence] = []
-    readings = ((rule.words, receiver, Source.RECEIVER), (rule.context_words, context, Source.CONTEXT))
-    for phrases, labels, source in readings:
+    readings = (
+        (rule.words, ((receiver, Source.RECEIVER), (question, Source.CONTEXT))),
+        (rule.context_words, ((context, Source.CONTEXT),)),
+    )
+    for phrases, where in readings:
         if not phrases:
             continue
-        hits = [(label, phrase) for label in labels if (phrase := phrase_in(phrases, label)) is not None]
+        hits = [
+            Evidence(rule.origin.rule, source, label.value, phrase)
+            for labels, source in where
+            for label in labels
+            if (phrase := phrase_in(phrases, label)) is not None
+        ]
         if not hits:
             return None
-        evidence.extend(Evidence(rule.origin.rule, source, label.value, phrase) for label, phrase in hits)
+        evidence.extend(hits)
     if rule.effects and not rule.effects & effects:
         return None
     if rule.stops:

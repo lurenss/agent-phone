@@ -339,9 +339,6 @@ def test_contrast_on_the_j7_a_button_that_itself_says_mobile_data_is_denied(tmp_
     assert outcome.details["rule"] == "j7.vpn-lockdown"
 
 
-@pytest.mark.xfail(
-    strict=True, reason="R2-4: a deny rule's words do not follow a dialog button to its question"
-)
 @pytest.mark.parametrize(
     ("title", "grant"),
     [("Turn off mobile data?", Grant(frozenset({Effect.SYSTEM}))), ("Turn off Wi-Fi?", Grant.none())],

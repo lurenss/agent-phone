@@ -389,9 +389,6 @@ def test_a_button_that_says_a_word_a_denial_names_is_denied_and_a_cancel_beside_
     )
 
 
-@pytest.mark.xfail(
-    strict=True, reason="R2-4: a deny rule's words do not follow a dialog button to its question"
-)
 @pytest.mark.parametrize(("title", "label"), QUESTIONS)
 def test_a_neutral_button_is_denied_by_the_words_of_its_question(title, label):
     screen = dialog(title, "Cancel", label)
@@ -402,9 +399,6 @@ def test_a_neutral_button_is_denied_by_the_words_of_its_question(title, label):
     assert {e.source for e in verdict.evidence} == {Source.CONTEXT}, "the denial names the question"
 
 
-@pytest.mark.xfail(
-    strict=True, reason="R2-4: a deny rule's words do not follow a dialog button to its question"
-)
 @pytest.mark.parametrize("case", sorted(WEAKENS_THE_AFFIRMATIVE))
 def test_a_consumer_file_cannot_stop_a_denial_reading_the_question_of_a_neutral_button(case):
     screen = dialog("Turn off mobile data?", "Cancel", "OK")
