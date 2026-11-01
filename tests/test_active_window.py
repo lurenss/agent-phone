@@ -102,9 +102,15 @@ def second_display(label="", bounds="[0,0][540,1920]", display=4):
     )
 
 
-def test_a_window_of_another_display_is_never_active_even_when_it_comes_first():
-    screen = screen_of(status_bar(), second_display(), app())
-    assert actives(screen) == [("test.app", "application")]
+@pytest.mark.parametrize(
+    "windows",
+    [
+        pytest.param((second_display(), app(), status_bar()), id="first of the dump"),
+        pytest.param((status_bar(), second_display(), app()), id="first that could hold focus"),
+    ],
+)
+def test_a_window_of_another_display_is_never_active_even_when_it_comes_first(windows):
+    assert actives(screen_of(*windows)) == [("test.app", "application")]
 
 
 def test_a_window_of_another_display_is_not_in_the_screen_at_all():
