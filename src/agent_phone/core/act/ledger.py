@@ -17,17 +17,24 @@ Written only by this class, under the device lock.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from agent_phone.core.device import DeviceIdentity
 from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.phone import InputAction, Permit
 from agent_phone.core.policy.engine import Grant, Verdict
+from agent_phone.core.refs.store import write_atomically
+
+UNREFUNDED: list[Permit] = []
+"""Every permit this process spent and did not refund, across ledgers. The CLI's last-resort
+handler reads it through `unrefunded()`, because an exception that escaped a command can no
+longer reach the ledger that spent the permit."""
 
 
 class Ledger:
     def __init__(self, root: Path, device: DeviceIdentity) -> None:
-        self._root = root
+        self._path = root / "devices" / device.serial / "ledger.json"
         self._device = device
         self._open: list[Permit] = []
 
@@ -35,32 +42,53 @@ class Ledger:
         """A ledger file from another boot is restarted: refs from that boot already fail on
         their boot id, so its epoch carries no information. A file that cannot be read is
         refused, because restarting it could make a spent ref current again."""
-        path = self._root / "devices" / self._device.serial / "ledger.json"
         try:
-            document = json.loads(path.read_text())
+            document = json.loads(self._path.read_text())
             boot_id, epoch = document["boot_id"], int(document["epoch"])
         except FileNotFoundError:
             return 0
         except (OSError, ValueError, KeyError, TypeError) as error:
             raise Refusal(
                 ErrorCode.INTERNAL,
-                f"The ledger file {path} cannot be read. Delete it, and take new snapshots, "
+                f"The ledger file {self._path} cannot be read. Delete it, and take new snapshots, "
                 "because every ref made before is gone.",
             ) from error
         return epoch if boot_id == self._device.boot_id else 0
 
     def spend(self, action: InputAction, verdict: Verdict, grant: Grant) -> Permit:
-        # TODO: e = epoch() + 1; write {"boot_id", "epoch": e} to a temp file, fsync, rename,
-        # fsync the directory; then permit = Permit(self._device, e, action, verdict, grant);
-        # self._open.append(permit); return permit
-        raise NotImplementedError
+        epoch = self.epoch() + 1
+        self._write(epoch)
+        permit = Permit(self._device, epoch, action, verdict, grant)
+        self._open.append(permit)
+        UNREFUNDED.append(permit)
+        return permit
 
     def refund(self, permit: Permit) -> None:
         """Put the epoch back to `permit.epoch - 1`. Refunding twice, or a permit that is not the
         newest spent one, is a bug and raises INTERNAL instead of rewinding past another input."""
-        raise NotImplementedError
+        if not self._open or self._open[-1] is not permit or self.epoch() != permit.epoch:
+            raise Refusal(
+                ErrorCode.INTERNAL,
+                f"A refund of epoch {permit.epoch} does not match the newest spend of the ledger. "
+                "Nothing was rewound.",
+            )
+        self._write(permit.epoch - 1)
+        self._open.pop()
+        UNREFUNDED.remove(permit)
 
-    def unrefunded(self) -> bool:
-        """True when this process spent a permit it did not refund. The CLI's last-resort error
-        handler reports `delivery_uncertain` then, because it cannot know how far input got."""
-        raise NotImplementedError
+    def _write(self, epoch: int) -> None:
+        """Temp file, fsync, rename, then fsync the directory, so the new epoch is on disk before
+        the caller goes on."""
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        write_atomically(self._path, json.dumps({"boot_id": self._device.boot_id, "epoch": epoch}))
+        directory = os.open(self._path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+
+
+def unrefunded() -> bool:
+    """True when this process spent a permit it did not refund. The CLI's last-resort error
+    handler reports `delivery_uncertain` then, because it cannot know how far input got."""
+    return bool(UNREFUNDED)
