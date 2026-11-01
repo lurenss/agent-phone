@@ -81,14 +81,14 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
 | `OBSERVE_FIRST` | Input was sent after the device's latest snapshot, so a query or an input without a target needs a new snapshot first. |
 | `AMBIGUOUS_TARGET` | More than one live element matches, and nothing was sent. `details.matches` is their number, for a query and for a ref that now matches several elements. Narrow the query, or take a ref from `find`. |
 | `NOT_FOUND` | No element matches the query, the snapshot has no ref with that number, nothing on screen scrolls, or no app handles the link or intent. |
-| `NO_SURFACE` | The window asked for is not on screen. No window has input focus (the screen is off), or `--surface` finds none, or `--window` is not an id of this read. The message lists the windows that are. |
+| `NO_SURFACE` | The window asked for is not on screen. No window has input focus (the screen is off), or `--surface` finds none, or `--window` is not an id of this read. The message lists the windows that are. A wait reads again after an empty dump, so it reports `NO_SURFACE` only at its deadline, and only when none of its reads showed a screen. A `snapshot` without `--settle` reads once and reports it at once. |
 | `NOT_ACTIONABLE` | The element cannot take this input. `details.reason` is `hidden` or `disabled` when it stayed so until the deadline, and `no_tap`, `not_a_field`, `not_scrollable`, `no_area` or `wrong_axis` (a sideways scroll of a list that runs down, a sideways scroll of a pager whose page is a list that covers its whole height, or an up or down scroll of a collection that runs across) when it never can. |
 | `UNSTABLE` | The element moved between two reads. |
 | `OCCLUDED` | No point of the element would reach it: another window covers it, another element takes the touch there, such as a list that scrolls and is drawn above it, two elements overlap in an unknown order, or its window has no input focus. |
 | `COMMIT_REFUSED` | The input would commit an effect that `--commit` did not grant, in `ask` mode. `details` lists the `effects`, the `granted` effects and the `evidence`. `dangerously-skip` never raises it. |
 | `DENIED` | A deny rule forbids the input whatever the caller grants, and in either permission mode. `details` names the `rule`, its `source` and the `evidence`. A device profile's protected package is denied this way. A deny rule reads a tap, a set-text, a scroll and Enter, and never back, home or recents. |
 | `LOCALE_UNSUPPORTED` | The device language has no policy rules, so input that commit rules read, a tap or Enter, cannot be judged. |
-| `TIMEOUT` | A wait reached its deadline. For `wait`, nothing was sent, `delivery` is `not_delivered`, and `details.after` is the snapshot of the last read, or null when that read had no window to describe. For `--wait-for` on an input, the input went out, `delivery` says how far, and `data.after` is that snapshot. |
+| `TIMEOUT` | A wait reached its deadline. For `wait`, nothing was sent, `delivery` is `not_delivered`, and `details.after` is the snapshot of the last screen it read, or null when that screen had no window to describe. For `--wait-for` on an input, the input went out, `delivery` says how far, and `data.after` is that snapshot. A wait that read a screen and then only empty dumps is a `TIMEOUT` with that screen. |
 | `TRANSPORT` | adb or the server failed, or the device returned output that does not parse. |
 | `ACTION_FAILED` | The input went out, and reading the screen back contradicts what was asked, such as a field that does not hold the text `set-text` sent. |
 | `INTERNAL` | A defect in agent-phone. |
@@ -209,12 +209,13 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
 
 ## Wait payload
 
-`agent-phone wait [--for QUERY]... [--gone QUERY]... [--app PACKAGE] [--settled] [--timeout-ms N]` reads the screen until every condition holds on one read. `--for` and `--gone` take the query that `--wait-for` and `--wait-for-gone` take, `--app` holds when the window that has focus belongs to that package, and `--settled` holds when two reads in a row print the same lines. At least one condition is required, or the command is `INVALID_ARGS` and reads nothing. The default timeout is 10,000 ms.
+`agent-phone wait [--for QUERY]... [--gone QUERY]... [--app PACKAGE] [--settled] [--timeout-ms N]` reads the screen until every condition holds on one read. `--for` and `--gone` take the query that `--wait-for` and `--wait-for-gone` take, `--app` holds when the window that has focus belongs to that package, and `--settled` holds when two reads in a row print the same lines, and an empty read between them starts that count again. At least one condition is required, or the command is `INVALID_ARGS` and reads nothing. The default timeout is 10,000 ms.
 
 `wait` sends no input, so it is a read: it never has a permit, and running it again is safe.
 
 - When the conditions hold, the result is `ok: true` with no `delivery` and no `retry`, like every read. `data` is the [snapshot payload](#snapshot-payload) of the read they held on, recorded at the current epoch, so its refs serve the next command and it is the observation that the next input needs. `settled` is `settled` when `--settled` was asked and `unchecked` otherwise.
-- When the deadline comes first, the result is an error with `code` `TIMEOUT`, `delivery` `not_delivered` and `retry` `safe`. `error.details.after` is the snapshot of the last read, recorded the same way, so the agent sees what the screen showed instead. Its `settled` is `unsettled` when `--settled` was asked.
+- When the deadline comes first, the result is an error with `code` `TIMEOUT`, `delivery` `not_delivered` and `retry` `safe`. `error.details.after` is the snapshot of the last screen it read, recorded the same way, so the agent sees what the screen showed instead. Its `settled` is `unsettled` when `--settled` was asked.
+- When no read of the wait showed a screen, the result is an error with `code` `NO_SURFACE`, with the same `delivery` and `retry`, and no `details.after`. It comes at the deadline and not on the first read, so a screen that is off takes the whole timeout to report it.
 
 ```json
 {"v":1,"ok":false,"command":"wait","permission_mode":"ask","device":"0a1b2c3d4e5f6a7b","delivery":"not_delivered","retry":"safe",
@@ -233,7 +234,7 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
     "  @q7m2k:e7 button \"Display\" \"Brightness, Blue light filter, Home scre…\" [0,910,1920,1080]"]}}}}
 ```
 
-Every condition has to hold on the same read. `--for` holds when a line of the active window matches, and `--gone` holds when the window prints lines and none matches, so `--gone` for something that never showed holds at once. A read with no active window, or with no line, such as the blank frame between two screens, holds neither. A read that fails, such as `NO_SURFACE` for a screen that is off, ends the command with that error and not with `TIMEOUT`.
+Every condition has to hold on the same read. `--for` holds when a line of the active window matches, and `--gone` holds when the window prints lines and none matches, so `--gone` for something that never showed holds at once. A read with no active window, or with no line, such as the blank frame between two screens, holds neither. A read with no window on the default display, such as the empty dump between two screens, holds no condition, and that includes `--gone`, because an empty dump is no evidence that anything left the screen. The wait reads again until its deadline, and then ends `TIMEOUT` with the last screen it read, or `NO_SURFACE` when none of its reads showed one. The same holds for `--wait-for` on an input and for `snapshot --settle`. Any other failed read, such as `TRANSPORT`, ends the command at once with its own error.
 
 ## Input payload
 
@@ -494,5 +495,5 @@ The tree of `--surface all` also has a line at depth 0 that opens each window: `
 | State | Meaning |
 | --- | --- |
 | `settled` | Two reads in a row gave the same lines. |
-| `unsettled` | The settle deadline passed first, and this is the last read. |
+| `unsettled` | The settle deadline passed first, and this is the last screen read. |
 | `unchecked` | One read, with no settle asked (`A2-5`). |

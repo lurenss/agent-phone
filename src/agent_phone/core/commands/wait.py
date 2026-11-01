@@ -1,7 +1,9 @@
 """`agent-phone wait [--for QUERY]... [--gone QUERY]... [--app PACKAGE] [--settled]
 [--timeout-ms N]`. Read-only: it reads the screen until every condition holds on one read and
-returns that read as a snapshot. A timeout is TIMEOUT with the last read in `details.after`.
-Either way nothing is sent, so it spends no permit and a retry is safe."""
+returns that read as a snapshot. A timeout is TIMEOUT with the last screen read in `details.after`.
+A read with no window holds no condition and is read again, so a wait whose every read had no window
+ends with NO_SURFACE at its deadline. Either way nothing is sent, so it spends no permit and a retry
+is safe."""
 
 from __future__ import annotations
 

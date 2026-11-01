@@ -46,7 +46,7 @@ Steps:
 - `--gone` holds at once for a thing that was never there. Wait for a page with `--for` first, and use `--gone` only to prove something left.
 - A condition is read against the active window's compact lines, by name. Settings home lists "Brightness" in the detail of its Display tile, so `--for 'name=Brightness'` holds only on the Display page, while `--for 'text=Brightness'` holds on both.
 - A timeout is an error envelope with exit code 1. The screen it ended on is `error.details.after`, and there is no `data`.
-- A screen that is off ends `wait` with `NO_SURFACE` at once, not with `TIMEOUT`. Doctor's `stop screen` line catches it first.
+- A screen that is off ends `wait` with `NO_SURFACE` at its deadline, after the whole timeout, not at once and not with `TIMEOUT`. An empty read before that is read again. Doctor's `stop screen` line catches it first.
 - The record's `ms` includes the process start and, on a cold server, the server start. Read the wait's own cost from a warm run.
 - `wait --app` holds when Settings is the first window of the dump that is not a strip or the keyboard. It can hold before Settings has drawn its lines, so wait for a line too when you need one.
 - The first journey step is a plain `snapshot`, because an input that follows no observation fails with `OBSERVE_FIRST`. Every later input follows a `wait`.

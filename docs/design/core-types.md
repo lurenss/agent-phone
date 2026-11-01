@@ -164,7 +164,7 @@ The second test is the plan's "every tap must target an element the consumer dec
 
 ### Flow
 
-Every input runs `act()` (`core/act/act.py`). It resolves the target, checks that the node is actionable and stable, plans the input, judges it, applies the permission mode, spends a permit, injects, and verifies. Each step before the spend raises `Refusal` and leaves the device untouched. Everything after `inject` is caught and reported as `Acted`. Reads run `observe()` (`core/wait/observe.py`) and `capture()` (`core/snapshot/capture.py`), so `snapshot`, `wait`, auto-wait and act-then-wait share one polling loop and one way to record what was seen.
+Every input runs `act()` (`core/act/act.py`). It resolves the target, checks that the node is actionable and stable, plans the input, judges it, applies the permission mode, spends a permit, injects, and verifies. Each step before the spend raises `Refusal` and leaves the device untouched. Everything after `inject` is caught and reported as `Acted`. Reads run `observe()` (`core/wait/observe.py`) and `capture()` (`core/snapshot/capture.py`), so `snapshot --settle`, `wait` and act-then-wait share one polling loop, and every command records what it saw the same way. The auto-wait for a target polls with `until`. `observe` counts an empty read (`NO_SURFACE`) as a read on which no condition holds and reads again, and it raises `NO_SURFACE` only when every read up to the deadline was empty.
 
 ### Load-bearing decision 1: the ledger makes the retry rule structural
 

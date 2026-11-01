@@ -174,7 +174,7 @@ One thing a wait checks on a read (`Predicate`, `core/wait/predicate.py`): `Pres
 
 ### Wait
 
-The read-only command that reads the screen until every condition holds on one read (`wait`, `core/commands/wait.py`). It returns the snapshot of that read, recorded at the current epoch, so it is also the observation that the next input needs. A timeout is `TIMEOUT` with the last read's snapshot in `details.after`. It sends nothing, so it spends no permit and its retry is safe. `--wait-for` on an input runs the same loop (`observe`, `core/wait/observe.py`) after the input and turns what it saw into the input's `delivery`. *Avoid:* "auto-wait", which is what an input does before it is sent.
+The read-only command that reads the screen until every condition holds on one read (`wait`, `core/commands/wait.py`). It returns the snapshot of that read, recorded at the current epoch, so it is also the observation that the next input needs. A read with no window counts as a read on which nothing holds and is read again, so a timeout is `TIMEOUT` with the last screen's snapshot in `details.after`, and `NO_SURFACE` only when no read showed a screen. It sends nothing, so it spends no permit and its retry is safe. `--wait-for` on an input runs the same loop (`observe`, `core/wait/observe.py`) after the input and turns what it saw into the input's `delivery`. *Avoid:* "auto-wait", which is what an input does before it is sent.
 
 ## Batches
 

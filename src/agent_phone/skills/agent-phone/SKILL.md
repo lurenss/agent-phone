@@ -88,7 +88,7 @@ agent-phone wait --for 'role=field name=Search' --timeout-ms 20000
 - `--timeout-ms` is 10000 by default. On a timeout `ok` is false, `error.code` is `TIMEOUT`, `delivery` is `not_delivered` and `retry` is `safe`. `error.details.after` is a snapshot of the last read, so you see what the screen showed instead.
 - The snapshot is recorded like any other. Its refs work for your next command, and it is the observation that the next input needs after an input: no `OBSERVE_FIRST`.
 - `wait` sends nothing. It spends no refs, has no `delivery` when it succeeds, and is safe to run again.
-- `--gone` holds at once for something that was never there, so wait for it to show with `--for` first. A read that shows no line, such as the blank frame between two screens, holds neither `--for` nor `--gone`.
+- `--gone` holds at once for something that was never there, so wait for it to show with `--for` first. A read that shows no line, such as the blank frame between two screens, holds neither `--for` nor `--gone`, and neither does an empty dump with no window at all. `wait` reads again after it.
 
 Choose between `wait` and `--wait-for`:
 
@@ -111,7 +111,7 @@ By default a snapshot describes the active window. That is the first window that
 - A dialog over an app hides the app. The app has no lines until the dialog closes.
 - In landscape, a keyboard can take the whole screen. The app then has no lines, and a query for its field is `NOT_FOUND`. `press back` hides the keyboard and leaves the field on screen. `set-text` needs no keyboard.
 - A popup menu is a second window of the app, listed after the window that has focus, so it appears in `others` and the snapshot shows the window under it. Its items cannot be tapped, and the window under it is `OCCLUDED`. Close it with `press back`.
-- `NO_SURFACE` means the window you asked for is not on screen, or the screen is off. The message lists the windows that are.
+- `NO_SURFACE` means the window you asked for is not on screen, or the screen is off. The message lists the windows that are. A `wait`, `snapshot --settle` or `--wait-for` reads again after an empty dump, so it reports `NO_SURFACE` only after its whole timeout, and only when no read showed a screen.
 - `find` takes the same `--surface`, `--window` and `--root` flags.
 
 ## Find what you know

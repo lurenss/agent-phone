@@ -26,10 +26,6 @@ EMPTY = Refusal(
 SETTINGS = fixture_screen("settings-home")
 DISPLAY_TILE = 7
 
-ended_the_wait = pytest.mark.xfail(
-    strict=True, reason="observe lets the first empty read end the wait with NO_SURFACE"
-)
-
 
 def page(*names):
     """A Settings window that shows each name as a line of text."""
@@ -56,7 +52,6 @@ def ended_at(clock, phone, timeout_ms):
     assert phone.reads > 1
 
 
-@ended_the_wait
 def test_a_for_that_sees_two_empty_reads_and_then_the_screen_holds(tmp_path):
     code, wire, phone, clock = waited(
         tmp_path, [EMPTY, EMPTY, page("Display", "Brightness")], "--for", "name=Brightness"
@@ -66,7 +61,6 @@ def test_a_for_that_sees_two_empty_reads_and_then_the_screen_holds(tmp_path):
     assert phone.reads == 3 and clock.pauses == [POLL_GAP_S, POLL_GAP_S]
 
 
-@ended_the_wait
 def test_an_input_whose_wait_for_sees_empty_reads_is_verified_when_the_screen_comes_back(tmp_path):
     code, wire = invoke(["snapshot"], FakeHub([J7], screens=[SETTINGS]), tmp_path)
     taken = wire["data"]["id"]
@@ -83,7 +77,6 @@ def test_an_input_whose_wait_for_sees_empty_reads_is_verified_when_the_screen_co
     assert wire["data"]["after"]["tree"] == ['text "Brightness" [0,0,1080,90]']
 
 
-@ended_the_wait
 def test_a_gone_does_not_hold_on_an_empty_read(tmp_path):
     saving, saved = page("Saving", "Saved"), page("Saved")
     code, wire, phone, _ = waited(tmp_path, [EMPTY, saving, saved], "--gone", "name=Saving")
@@ -91,7 +84,6 @@ def test_a_gone_does_not_hold_on_an_empty_read(tmp_path):
     assert phone.reads == 3
 
 
-@ended_the_wait
 def test_empty_reads_after_the_thing_was_last_seen_do_not_say_it_went(tmp_path):
     code, wire, phone, clock = waited(
         tmp_path, [page("Saving"), EMPTY], "--gone", "name=Saving", "--timeout-ms", "500"
@@ -101,7 +93,6 @@ def test_empty_reads_after_the_thing_was_last_seen_do_not_say_it_went(tmp_path):
     ended_at(clock, phone, 500)
 
 
-@ended_the_wait
 @pytest.mark.parametrize(
     "flags",
     [
@@ -119,7 +110,6 @@ def test_a_wait_whose_every_read_is_empty_ends_no_surface_at_its_deadline(tmp_pa
     ended_at(clock, phone, 500)
 
 
-@ended_the_wait
 def test_a_screen_and_then_empty_reads_to_the_deadline_is_a_timeout_with_that_screen(tmp_path):
     code, wire, phone, clock = waited(
         tmp_path, [SETTINGS, EMPTY], "--for", "name=Brightness", "--timeout-ms", "500"
@@ -132,7 +122,6 @@ def test_a_screen_and_then_empty_reads_to_the_deadline_is_a_timeout_with_that_sc
     ended_at(clock, phone, 500)
 
 
-@ended_the_wait
 def test_a_settled_wait_that_saw_only_one_screen_is_a_timeout_that_says_unsettled(tmp_path):
     code, wire, phone, clock = waited(tmp_path, [SETTINGS, EMPTY], "--settled", "--timeout-ms", "500")
     assert code == 1 and wire["error"]["code"] == "TIMEOUT"
@@ -140,7 +129,6 @@ def test_a_settled_wait_that_saw_only_one_screen_is_a_timeout_that_says_unsettle
     ended_at(clock, phone, 500)
 
 
-@ended_the_wait
 def test_an_input_whose_wait_for_sees_a_screen_and_then_only_empty_reads_times_out_on_that_screen(tmp_path):
     _, wire = invoke(["snapshot"], FakeHub([J7], screens=[SETTINGS]), tmp_path)
     hub = FakeHub([J7], screens=[SETTINGS], after_input=[SETTINGS, EMPTY])
@@ -154,7 +142,6 @@ def test_an_input_whose_wait_for_sees_a_screen_and_then_only_empty_reads_times_o
     assert wire["data"]["after"]["app"] == "com.android.settings"
 
 
-@ended_the_wait
 def test_an_input_whose_wait_for_sees_only_empty_reads_ends_no_surface_at_its_deadline(tmp_path):
     _, wire = invoke(["snapshot"], FakeHub([J7], screens=[SETTINGS]), tmp_path)
     clock = FakeClock()
@@ -171,7 +158,6 @@ def test_an_input_whose_wait_for_sees_only_empty_reads_ends_no_surface_at_its_de
     assert 0.5 <= clock.time <= 0.5 + 3 * POLL_GAP_S
 
 
-@ended_the_wait
 def test_any_other_refusal_between_empty_reads_still_ends_the_wait_at_once(tmp_path):
     lost = Refusal(ErrorCode.TRANSPORT, "the server did not answer")
     code, wire, phone, clock = waited(tmp_path, [EMPTY, lost, SETTINGS], "--for", "name=Brightness")
@@ -179,7 +165,6 @@ def test_any_other_refusal_between_empty_reads_still_ends_the_wait_at_once(tmp_p
     assert phone.reads == 2 and clock.pauses == [POLL_GAP_S]
 
 
-@ended_the_wait
 def test_an_empty_read_between_two_equal_screens_starts_settling_again(tmp_path):
     hub = FakeHub([J7], screens=[page("Wi-Fi"), EMPTY, page("Wi-Fi"), page("Wi-Fi")])
     code, wire = invoke(["snapshot", "--settle"], hub, tmp_path, clock=FakeClock())
@@ -187,14 +172,12 @@ def test_an_empty_read_between_two_equal_screens_starts_settling_again(tmp_path)
     assert hub.phones[0].reads == 4
 
 
-@ended_the_wait
 def test_settling_that_begins_on_an_empty_read_settles_on_the_screen_that_follows(tmp_path):
     hub = FakeHub([J7], screens=[EMPTY, page("Wi-Fi"), page("Wi-Fi")])
     code, wire = invoke(["snapshot", "--settle"], hub, tmp_path, clock=FakeClock())
     assert code == 0 and wire["data"]["settled"] == "settled" and hub.phones[0].reads == 3
 
 
-@ended_the_wait
 def test_settling_on_a_screen_that_stays_empty_ends_no_surface_at_the_settle_deadline(tmp_path):
     clock = FakeClock()
     hub = FakeHub([J7], screens=[EMPTY])
