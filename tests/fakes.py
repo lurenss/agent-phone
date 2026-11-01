@@ -7,6 +7,7 @@ import io
 import json
 from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import TextIO
 
 from support import FakeClock
 
@@ -68,19 +69,22 @@ class FakeServer:
 class FakePhone:
     """A device that shows the screens it is given, one per read, the last one forever. A screen
     that is a Refusal is raised instead, like a backend that cannot read. Each input it receives
-    is kept in `permits`. A delivered input switches to the `after_input` screens, when given."""
+    is kept in `permits`. A delivered input switches to the `after_input` screens, when given. With
+    `after_each`, the nth delivered input switches to its nth screen, and the last one stays."""
 
     def __init__(
         self,
         info: DeviceInfo,
         *screens: Screen | Refusal,
         after_input: Sequence[Screen | Refusal] = (),
+        after_each: Sequence[Screen | Refusal] = (),
         delivery: Delivery | None = None,
         clipboard: str | None = "",
     ) -> None:
         self._info = info
         self._screens = tuple(screens)
         self._after_input = tuple(after_input)
+        self._after_each = tuple(after_each)
         self._delivery = delivery or Sent(Ack.ACKNOWLEDGED, "fake")
         self._at = 0
         self.reads = 0
@@ -110,6 +114,11 @@ class FakePhone:
         if isinstance(self._delivery, Sent):
             if self._after_input:
                 self._screens, self._at = self._after_input, 0
+            if self._after_each:
+                self._screens, self._at = (
+                    (self._after_each[min(len(self.permits), len(self._after_each)) - 1],),
+                    0,
+                )
             if isinstance(permit.action, SetClipboard):
                 self.clip = permit.action.text
         return self._delivery
@@ -130,6 +139,7 @@ class FakeHub:
         screens: Sequence[Screen | Refusal] = (),
         open_problem: Refusal | None = None,
         after_input: Sequence[Screen | Refusal] = (),
+        after_each: Sequence[Screen | Refusal] = (),
         delivery: Delivery | None = None,
     ) -> None:
         self._connected = tuple(connected)
@@ -142,6 +152,7 @@ class FakeHub:
         self._screens = tuple(screens)
         self._open_problem = open_problem
         self._after_input = tuple(after_input)
+        self._after_each = tuple(after_each)
         self._delivery = delivery
 
     def connected(self) -> tuple[Connected, ...]:
@@ -161,17 +172,21 @@ class FakeHub:
         if self._open_problem is not None:
             raise self._open_problem
         phone = FakePhone(
-            self._infos[serial], *self._screens, after_input=self._after_input, delivery=self._delivery
+            self._infos[serial],
+            *self._screens,
+            after_input=self._after_input,
+            after_each=self._after_each,
+            delivery=self._delivery,
         )
         self.phones.append(phone)
         return phone
 
 
-def invoke(argv, hub, root=None, lock_wait_s=0.0, clock: Clock | None = None):
+def invoke(argv, hub, root=None, lock_wait_s=0.0, clock: Clock | None = None, stdin: TextIO | None = None):
     """Run one command line against `hub` and return its exit code and its one envelope."""
     out = io.StringIO()
     settings = Settings(state_root=root or Path("/nonexistent-agent-phone-root"), lock_wait_s=lock_wait_s)
-    code = run(argv, hub, settings, out, clock or FakeClock())
+    code = run(argv, hub, settings, out, clock or FakeClock(), **({} if stdin is None else {"stdin": stdin}))
     lines = out.getvalue().splitlines()
     assert len(lines) == 1, "one command prints one envelope"
     return code, json.loads(lines[0])
