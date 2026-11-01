@@ -124,3 +124,20 @@ def test_a_batch_that_names_a_protected_package_in_its_steps_is_refused_before_i
     with pytest.raises(SystemExit, match="may change the phone"):
         evidence.record(request(run, ["agent-phone", "batch", str(steps)], False))
     assert list(run.iterdir()) == []
+
+
+@pytest.mark.xfail(strict=True, reason="list reads every .json file of the run folder as a record")
+def test_list_skips_a_batch_steps_file_kept_in_the_run_folder(tmp_path, capsys):
+    (tmp_path / "three-steps.json").write_text('[["press", "back"]]')
+    record = {
+        "label": "batch",
+        "argv": ["agent-phone", "batch", str(tmp_path / "three-steps.json")],
+        "input": True,
+        "started_utc": "2026-11-01T04:30:06.436+00:00",
+        "ms": 2843,
+        "exit": 0,
+    }
+    (tmp_path / "batch.json").write_text(json.dumps(record))
+    assert evidence.listing(str(tmp_path)) == 0
+    out = capsys.readouterr().out
+    assert "1 records, 1 inputs" in out and "input: agent-phone batch" in out
