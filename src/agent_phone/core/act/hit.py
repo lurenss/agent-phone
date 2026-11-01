@@ -26,7 +26,7 @@ from agent_phone.core.labels import Label, own_labels
 from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.phone import Swipe
 from agent_phone.core.role import COLLECTIONS, Role, consumes_touch, role_of, simple_name, takes_touch
-from agent_phone.core.screen import Flag, Node, NodeId, Screen, Window
+from agent_phone.core.screen import Node, NodeId, Screen, Window
 
 SWIPE_SPAN = 0.6
 SWIPE_MS = 275
@@ -59,7 +59,9 @@ def receiver_at(screen: Screen, window: Window, point: Point) -> Receiver:
 
 
 def receiver_in(screen: Screen, node: Node, point: Point) -> Receiver:
-    if Flag.VISIBLE not in node.attrs.flags or not node.attrs.bounds.contains(point):
+    """A node the dump marks not visible to the user still takes a touch inside its bounds: a view
+    at alpha 0, such as a sheet that fades in, is not visible to the user and still takes touches."""
+    if not node.attrs.bounds.contains(point):
         return None
     taking: list[tuple[Node, NodeId | Ambiguous]] = []
     for child in node.children:
