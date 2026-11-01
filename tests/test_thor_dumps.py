@@ -65,3 +65,22 @@ def test_wait_for_an_app_holds_with_that_app_on_the_thor_screen(tmp_path):
     hub = FakeHub([PHONE], screens=[thor("thor-netflix")])
     code, wire = invoke(["wait", "--app", "com.netflix.mediaclient", "--timeout-ms", "200"], hub, tmp_path)
     assert code == 0 and wire["data"]["app"] == "com.netflix.mediaclient"
+
+
+IN_BUG_3 = pytest.mark.xfail(
+    strict=True, reason="a window that misses the display by a bar or less is not seen as filling it"
+)
+
+
+@pytest.mark.parametrize("name", [pytest.param(name, marks=IN_BUG_3) for name in THOR_DUMPS])
+def test_a_full_screen_app_on_the_thor_is_not_a_dialog(name):
+    dialog = select_surface(thor(name)).dialog
+    assert dialog is False
+
+
+@pytest.mark.parametrize("name", ["thor-launcher", "thor-youtube"])
+@IN_BUG_3
+def test_the_dialog_surface_does_not_take_a_full_screen_app_on_the_thor(name, tmp_path):
+    hub = FakeHub([PHONE], screens=[thor(name)])
+    code, wire = invoke(["snapshot", "--surface", "dialog"], hub, tmp_path)
+    assert code == 1 and wire["error"]["code"] == "NO_SURFACE"
