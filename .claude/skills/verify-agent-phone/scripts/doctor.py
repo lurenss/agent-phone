@@ -115,16 +115,26 @@ def server(serial: str) -> None:
 
 def protected(serial: str) -> None:
     """Each package that the serial's profile in examples/devices protects must still run."""
+    processes = None
     for path in sorted((REPO / "examples" / "devices").glob("*.toml")):
         profile = tomllib.loads(path.read_text(encoding="utf-8"))
         if profile.get("device", {}).get("serial") != serial:
             continue
         for entry in profile.get("protected", []):
             package = entry["package"]
-            pattern = package.replace(".", "[.]")
-            pids = shell(serial, f"pgrep -f '{pattern}'").split()
+            processes = processes if processes is not None else shell(serial, "ps -A -o PID,NAME")
+            pids = pids_of(processes, package)
             found = f"running, pid {' '.join(pids)}" if pids else "not running; do not start or stop it"
             say("ok" if pids else "note", f"protected {package}", found)
+
+
+def pids_of(ps: str, package: str) -> list[str]:
+    """The pids of the package's processes: named the package, or the package and `:<name>` for
+    a process the app declares, as SocksTun's `hev.sockstun:native` on the J7. A substring match
+    would count `dev.eden.eden_emulator.nightly` as `dev.eden.eden_emulator`, as `pgrep -f` did on
+    the Thor."""
+    rows = (line.strip().partition(" ") for line in ps.splitlines())
+    return [pid for pid, _, name in rows if name.strip().split(":")[0] == package]
 
 
 def main() -> int:

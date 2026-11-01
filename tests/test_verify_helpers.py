@@ -165,3 +165,17 @@ def test_the_doctor_names_the_focus_of_display_0_when_another_screen_is_listed_f
 
 def test_the_doctor_says_so_when_display_0_has_no_focus_line():
     assert doctor.display_focus(TWO_SCREENS.split("  Display: mDisplayId=0")[0]) is None
+
+
+THOR_PS = """  PID NAME
+29769 dev.eden.eden_emulator
+29822 dev.eden.eden_emulator.nightly
+14361 hev.sockstun:native
+"""
+
+
+def test_the_doctor_finds_a_package_and_its_named_processes_and_no_package_that_extends_it():
+    assert doctor.pids_of(THOR_PS, "dev.eden.eden_emulator") == ["29769"]
+    assert doctor.pids_of(THOR_PS, "dev.eden.eden_emulator.nightly") == ["29822"]
+    assert doctor.pids_of(THOR_PS, "hev.sockstun") == ["14361"]
+    assert doctor.pids_of(THOR_PS, "hev.socks") == []
