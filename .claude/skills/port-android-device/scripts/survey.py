@@ -11,6 +11,11 @@ asks, and back declines it), back, the About-phone page by intent, a scroll down
 swipes, back, home. Before each input it reads the screen, because agent-phone refuses an input
 without a fresh observation (`OBSERVE_FIRST`).
 
+A scroll names its target: the ref of the collection with the largest area in the read just before
+it. A scroll with no target is `AMBIGUOUS_TARGET` when two elements scroll, as on Android 15's
+About-phone page. A read with no collection skips the scroll and writes an `input` line with
+`skipped`.
+
 For the launcher, Settings and the dialog it takes one settled read, checks it against the app that
 `dumpsys window displays` names for display 0, saves a raw dump as `probes/android/raw/<name>-<screen>
 .raw.xml` for `fixtures.py`, and times 20 snapshots and 10 settled snapshots.
@@ -48,6 +53,9 @@ ABOUT = "intent:#Intent;action=android.settings.DEVICE_INFO_SETTINGS;end"
 BLUETOOTH = "intent:#Intent;action=android.bluetooth.adapter.action.{}"
 RUNS, SETTLES, BUDGET = 20, 10, 8 * 1024
 REF = re.compile(r"@\w+:e\d+ ")
+COLLECTION = re.compile(r"\s*(@\w+:e\d+) (?:scroll|list|grid|pager)\b")
+BOUNDS = re.compile(r"\[(-?\d+),(-?\d+),(-?\d+),(-?\d+)\]$")
+NO_SCROLLER = "no scrolling element"
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +65,10 @@ class Step:
     name: str
     words: tuple[str, ...]
     shows: Screen | None = None
+
+    @property
+    def scrolls(self) -> bool:
+        return self.words[0] == "scroll"
 
 
 def journey(bluetooth_on: bool | None) -> tuple[Step, ...]:
@@ -94,6 +106,20 @@ class Seen:
     def shape(self) -> tuple[str, ...]:
         """The tree without its refs, which change with every read."""
         return tuple(REF.sub("", line) for line in self.call.data.get("tree", []))
+
+
+def area(line: str) -> int:
+    bounds = BOUNDS.search(line)
+    if bounds is None:
+        return 0
+    left, top, right, bottom = map(int, bounds.groups())
+    return (right - left) * (bottom - top)
+
+
+def scroll_target(seen: Seen) -> str | None:
+    """The ref of the collection with the largest area on the read, or the first of two that tie."""
+    found = [(area(line), m[1]) for line in seen.call.data.get("tree", []) if (m := COLLECTION.match(line))]
+    return max(found, key=lambda item: item[0])[1] if found else None
 
 
 def read_screen(rec: Recorder, label: str) -> Seen:
@@ -215,7 +241,27 @@ def survey(rec: Recorder, journal: Journal, facts: dict, name: str) -> None:
     previous = Seen(rec.look("start"))
     launcher_app = None
     for number, step in enumerate(journey(facts.get("bluetooth_on")), 1):
-        sent = rec.send(f"step-{number}", *step.words)
+        words = step.words
+        if step.scrolls:
+            if not rec.fresh:
+                previous = Seen(rec.look(f"before-{number}"))
+            if (target := scroll_target(previous)) is None:
+                journal.emit(
+                    check="input",
+                    step=number,
+                    name=step.name,
+                    argv=list(step.words),
+                    delivery=None,
+                    verified_by=None,
+                    error=None,
+                    after_app=previous.app,
+                    after_dialog=previous.dialog,
+                    changed=None,
+                    skipped=NO_SCROLLER,
+                )
+                continue
+            words = (*step.words, target)
+        sent = rec.send(f"step-{number}", *words)
         if step.shows is None:
             got = Capture(read_screen(rec, f"after-{number}"), None, 1, True)
         else:

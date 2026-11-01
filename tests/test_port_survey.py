@@ -3,6 +3,7 @@ a dialog, About with a list that scrolls. It refuses an input with no read since
 survey that skipped a read would show `OBSERVE_FIRST` on its input lines."""
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -47,9 +48,9 @@ def react(phone: FakePhone, words: tuple[str, ...]) -> str:
             return "dialog" if phone.has_bluetooth else phone.screen
         case ("open-url", url) if "DEVICE_INFO_SETTINGS" in url:
             return "about"
-        case ("scroll", "down") if phone.screen == "about":
+        case ("scroll", "down", _) if phone.screen == "about":
             return "about-down"
-        case ("scroll", "up") if phone.screen == "about-down":
+        case ("scroll", "up", _) if phone.screen == "about-down":
             return "about"
     raise FakePhone.Refused("NOT_FOUND")
 
@@ -90,6 +91,11 @@ def checks(lines: list[dict], name: str) -> list[dict]:
     return [line for line in lines if line["check"] == name]
 
 
+def untargeted(words) -> list[str]:
+    """A scroll names a ref after its direction, and the journey lists it without."""
+    return list(words[:2] if words[0] == "scroll" else words)
+
+
 def records(tmp_path: Path) -> list[dict]:
     found = [json.loads(p.read_text()) for p in tmp_path.glob("*.json") if p.name != "facts.json"]
     return sorted(found, key=lambda r: r["started_utc"])
@@ -99,13 +105,16 @@ def test_the_only_inputs_are_the_journey_in_order_and_none_is_a_tap(tmp_path):
     fake = phone()
     code, lines = run(tmp_path, fake)
     assert code == 0
-    assert [list(words) for words in fake.inputs] == INPUTS
+    assert [untargeted(words) for words in fake.inputs] == INPUTS
     assert not {c[0] for c in fake.commands} & {"click", "set-text", "launch", "stop"}
     sent = [r["argv"][3:] for r in records(tmp_path) if r["input"]]
-    assert sent == INPUTS
-    assert checks(lines, "inputs")[0]["sent"] == [
+    assert [untargeted(words) for words in sent] == INPUTS
+    assert all(words[2].startswith("@") for words in fake.inputs if words[0] == "scroll")
+    expected = [
         "agent-phone -d S1 " + " ".join(f"'{w}'" if ";" in w else w for w in words) for words in INPUTS
     ]
+    for got, want in zip(checks(lines, "inputs")[0]["sent"], expected, strict=True):
+        assert re.fullmatch(re.escape(want) + (r" @\w+:e\d+" if " scroll " in want else ""), got), got
 
 
 def test_every_input_follows_a_read_so_none_is_refused_for_want_of_an_observation(tmp_path):

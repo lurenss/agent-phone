@@ -10,9 +10,9 @@ The status, in order:
   read, every snapshot of a measured screen failed, or a key press (home, back) came back with an error.
 - `works with limits` when it can, and any of these holds: done-when 4 is not met, the dialog or
   Settings was never shown, an input other than a key press failed, a back key changed no screen, a
-  scroll failed or moved nothing, a settled read named another app than the focus did, a fixture is an
-  anomaly, the policy has no rules for the language, the phone has a second display, or keys go to
-  another display than 0.
+  scroll failed, was skipped or moved nothing, a settled read named another app than the focus did, a
+  fixture is an anomaly, the policy has no rules for the language, the phone has a second display, or
+  keys go to another display than 0.
 - `works` otherwise.
 
 A sweep does not change the status: what an app shows is that app's, not the device's.
@@ -112,6 +112,8 @@ def limits(ev: Evidence) -> list[str]:
             found.append(f"The key press '{name}' changed no screen.")
     for name in SCROLLS:
         step = ev.step(name)
+        if step and step.get("skipped"):
+            found.append(f"The input '{name}' was skipped: {step['skipped']}.")
         if step and not step.get("error") and step.get("changed") is False:
             found.append(f"The input '{name}' moved nothing.")
     for read in ev.checks("screen_read"):

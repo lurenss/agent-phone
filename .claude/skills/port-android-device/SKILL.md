@@ -99,6 +99,7 @@ Read `$RUN/survey.jsonl` line by line:
 - A `warm_snapshot` with errors or a wrong screen is a bug.
 - A median over 400 ms means the device is slow. Record it; it is not a failure.
 - A `<screen>_not_shown` line, a `screen_read` with `agrees: false` (the settled read named another app than the focus), an `aborted` line, or an `input` line whose `delivery` is not delivered, needs an explanation before you go on. Check a screenshot through `evidence.py`.
+- An `input` line with `skipped: "no scrolling element"` is a scroll that the survey did not send, because the read before it had no scroll, list, grid or pager. The card lists it as a limit. A scroll that is sent names the largest collection of that read, because agent-phone refuses a scroll with no target when two elements scroll (`AMBIGUOUS_TARGET`, seen on Android 15's About-phone page).
 - The script reads the screen before every input, as agent-phone requires, and aborts with nothing sent if it cannot.
 
 ### 5. Fixtures, and the fix loop
