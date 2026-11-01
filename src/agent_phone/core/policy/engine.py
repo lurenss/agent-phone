@@ -9,7 +9,7 @@ property the commit table tests: each commit phrase is planted in text, in conte
 hint, in a resource-id, in a class name and in a child's text, and every placement must give
 the same verdict.
 
-What an input lets the engine read is `reads_of`. A tap and Enter are read by commit rules and
+What an input lets the engine read is `reads.reads_of`. A tap and Enter are read by commit rules and
 deny rules. A set-text and a scroll are read by deny rules only, because typing and scrolling
 commit nothing, and a composer whose hint says "Send a message" must not need `--commit send`.
 
@@ -27,18 +27,7 @@ from enum import Enum
 from agent_phone.core.device import Package
 from agent_phone.core.labels import Label, LabelField, Surface, cleaned, normalized, words
 from agent_phone.core.outcome import ErrorCode, Refusal
-from agent_phone.core.phone import (
-    Activate,
-    InputAction,
-    Key,
-    KeyName,
-    LongPress,
-    OpenUri,
-    SetText,
-    Stop,
-    Swipe,
-    Tap,
-)
+from agent_phone.core.phone import InputAction, Key, OpenUri, Stop
 from agent_phone.core.policy.model import (
     CommitRule,
     DenyRule,
@@ -52,6 +41,7 @@ from agent_phone.core.policy.model import (
     RuleId,
     Scope,
 )
+from agent_phone.core.policy.reads import Reads, reads_of
 from agent_phone.core.screen import WindowKind
 
 
@@ -68,29 +58,6 @@ class Site:
     window_kind: WindowKind
     receiver: Surface | None
     context: tuple[Label, ...]
-
-
-class Reads(Enum):
-    """How much of the screen the engine reads for an input."""
-
-    NOTHING = "nothing"
-    DENIALS = "denials"
-    EVERYTHING = "everything"
-
-
-def reads_of(action: InputAction) -> Reads:
-    """A tap and Enter act on an element, so commit rules read it. Enter is judged like a tap on
-    the view that has focus. A set-text and a scroll act on an element too, but they commit
-    nothing, so only deny rules read it. Back, home and recents read nothing, so that a deny rule
-    cannot trap the agent on a screen. Launch, stop, a link, a rotation and the clipboard act on no
-    element of the screen."""
-    match action:
-        case Tap() | LongPress() | Activate() | Key(key=KeyName.ENTER):
-            return Reads.EVERYTHING
-        case SetText() | Swipe():
-            return Reads.DENIALS
-        case _:
-            return Reads.NOTHING
 
 
 class Source(Enum):

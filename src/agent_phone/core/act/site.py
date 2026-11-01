@@ -9,7 +9,7 @@ on something gets the same kind of site:
 
 The receiver is the node's label surface, with the words of its row added for a toggle, and the
 context is the rest of its window. Whether commit rules read them too is the engine's call
-(`engine.reads_of`), not this module's.
+(`reads.reads_of`), not this module's.
 
 Back, home and recents get no site from here. They are the agent's way off a screen, and a deny
 rule that traps the agent on the screen is worse than the screen.
