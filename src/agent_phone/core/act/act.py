@@ -2,9 +2,10 @@
 
     resolve -> actionable and stable -> plan -> judge -> spend -> inject -> verify
 
-Everything before `spend` raises `Refusal` and leaves the device untouched. Everything after
-`inject` is caught and reported as `Acted` with the disposition the delivery earned, because
-from that point on "nothing happened" can no longer be claimed.
+Everything before `spend` raises `Refusal` and leaves the device untouched. Everything from
+`inject` on is caught and reported as `Acted` with the disposition the delivery earned, because
+from that point on "nothing happened" can no longer be claimed. A backend that raises inside
+`inject` may have sent part of the input, so that is `Acted` with `delivery_uncertain`.
 """
 
 from __future__ import annotations
@@ -78,7 +79,16 @@ def act(ctx: Context, request: Request) -> Outcome:
         return Refused.of(refusal)
 
     permit = ctx.ledger.spend(planned.action, verdict, request.grant)
-    delivery = ctx.phone.inject(permit)
+    try:
+        delivery = ctx.phone.inject(permit)
+    except Exception as error:
+        code, message = (
+            (error.code, error.message)
+            if isinstance(error, Refusal)
+            else (ErrorCode.INTERNAL, f"{type(error).__name__}: {error}")
+        )
+        report = ActionReport(planned.action, planned.target, verdict, None)
+        return Acted(SentState.UNCERTAIN, report, None, code, message)
     if isinstance(delivery, NotSent):
         ctx.ledger.refund(permit)
         return Refused(delivery.code, delivery.detail)

@@ -51,6 +51,9 @@ def run(
         name = invocation.name
         outcome, device = execute(invocation, hub, settings, clock or SystemClock())
     except Refusal as refusal:
+        if unrefunded():
+            out.write(encode(floor_envelope(name, device, refusal, unrefunded=True)) + "\n")
+            return 1
         outcome = Refused.of(refusal)
     except PhoneError as error:
         outcome, device = error.outcome, error.device

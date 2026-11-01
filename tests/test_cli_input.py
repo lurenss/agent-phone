@@ -5,7 +5,6 @@ reached a device and what never did."""
 import os
 import shutil
 
-import pytest
 from fakes import EMULATOR_SERIAL, J7_SERIAL, FakeHub, FakePhone, info_for, invoke
 from support import ROOT, fixture_screen, node, screen_of
 
@@ -237,7 +236,6 @@ def test_an_intent_with_anything_but_an_action_and_a_package_is_refused_before_i
     assert code == 2 and wire["error"]["code"] == "INVALID_ARGS" and sent(hub) == []
 
 
-@pytest.mark.xfail(strict=True, reason="a refusal after the input went out is printed as not_delivered")
 def test_a_failure_after_an_input_went_out_is_never_reported_as_not_delivered(tmp_path):
     class ClosesBadly(FakePhone):
         def close(self):

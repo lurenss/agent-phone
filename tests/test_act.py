@@ -5,7 +5,6 @@ received, so "sends no input" is an observation and not a claim."""
 
 import tomllib
 
-import pytest
 from fakes import EMULATOR_SERIAL, J7_SERIAL, FakePhone, info_for
 from support import FakeClock, consumer_of, fixture_screen, labelled, node, screen_of
 
@@ -338,7 +337,6 @@ def test_a_sideways_scroll_of_a_list_that_runs_down_is_refused(tmp_path):
     assert phone.permits == []
 
 
-@pytest.mark.xfail(strict=True, reason="an exception from inject escapes act() after the spend")
 def test_a_backend_that_fails_inside_inject_reports_the_input_as_uncertain(tmp_path):
     class Fails(FakePhone):
         def inject(self, permit):
