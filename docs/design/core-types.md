@@ -205,7 +205,7 @@ agent_phone/core/
   snapshot/  surface.py view.py budget.py snapshot.py capture.py
   refs/      fingerprint.py resolve.py store.py   (store.py also holds the device lock)
   policy/    model.py rules.py reads.py engine.py
-  act/       intent.py hit.py site.py ledger.py act.py
+  act/       intent.py hit.py axis.py site.py ledger.py act.py
   wait/      clock.py predicate.py observe.py until.py
   commands/  snapshot.py click.py set_text.py press.py stop.py wait.py screenshot.py devices.py server.py
 agent_phone/adapters/uiautomator2/  phone.py parse.py rpc.py delivery.py address.py shell.py adb.py server.py
