@@ -17,11 +17,19 @@ from agent_phone.core.act.intent import Click, Request
 from agent_phone.core.act.ledger import Ledger
 from agent_phone.core.context import Context
 from agent_phone.core.device import Package
-from agent_phone.core.labels import LabelField, surface_of, words
+from agent_phone.core.labels import LabelField, normalized, surface_of, words
 from agent_phone.core.outcome import Acted, ErrorCode, Refused
 from agent_phone.core.phone import NodeAddress, Tap
 from agent_phone.core.policy.engine import Clear, Commits, Site, classify
-from agent_phone.core.policy.rules import CommitRule, Effect, InheritRule, merge, parse_policy
+from agent_phone.core.policy.rules import (
+    CommitRule,
+    Effect,
+    ExemptRule,
+    InheritRule,
+    Policy,
+    merge,
+    parse_policy,
+)
 from agent_phone.core.refs.resolve import RefTarget
 from agent_phone.core.refs.store import SnapshotStore
 from agent_phone.core.screen import Screen
@@ -30,8 +38,14 @@ from agent_phone.core.snapshot.snapshot import SettleState
 
 TABLE_DOC = tomllib.loads((ROOT / "tests" / "policy" / "commit_table.toml").read_text(encoding="utf-8"))
 TABLE = TABLE_DOC["case"]
-POLICY = merge((parse_policy(tomllib.loads(DEFAULT_POLICY.read_text(encoding="utf-8")), "default.toml"),))
+DEFAULT = parse_policy(tomllib.loads(DEFAULT_POLICY.read_text(encoding="utf-8")), "default.toml")
+POLICY = merge((DEFAULT,))
 PLACEMENTS = ("text", "content_desc", "hint", "resource_id", "class_name", "child_text")
+NO_CONSENT_YET = pytest.mark.xfail(strict=True, reason="the consent effect does not exist yet")
+
+
+def awaiting_consent(effects) -> list:
+    return [NO_CONSENT_YET] if "consent" in effects else []
 
 
 def tapped(label: str, placement: str, question: str | None = None) -> Screen:
@@ -57,7 +71,7 @@ def tapped(label: str, placement: str, question: str | None = None) -> Screen:
     )
 
 
-def verdict_of(screen: Screen):
+def verdict_of(screen: Screen, policy: Policy = POLICY):
     button = screen.nodes[1]
     point = plan_point(screen, button)
     receiver = screen.node(receiver_at(screen, screen.windows[0], point))
@@ -68,7 +82,7 @@ def verdict_of(screen: Screen):
         context_labels(screen, receiver),
     )
     address = NodeAddress(Package("test.app"), "", "", "", "", button.attrs.bounds, (0,), None)
-    return classify(POLICY, Tap(point, address), site, "en-US")
+    return classify(policy, Tap(point, address), site, "en-US")
 
 
 def effects_of(verdict) -> set[str]:
@@ -77,7 +91,13 @@ def effects_of(verdict) -> set[str]:
 
 
 CASES = [
-    pytest.param(case["label"], placement, set(case["effects"]), id=f"{case['label']}-{placement}")
+    pytest.param(
+        case["label"],
+        placement,
+        set(case["effects"]),
+        id=f"{case['label']}-{placement}",
+        marks=awaiting_consent(case["effects"]),
+    )
     for case in TABLE
     for placement in PLACEMENTS
 ]
@@ -104,6 +124,7 @@ def test_the_table_has_a_row_for_every_phrase_of_the_default_policy():
             assert covered, f"{rule.origin.rule} has no table row for {' '.join(phrase.words)!r}"
 
 
+@NO_CONSENT_YET
 def test_the_table_lists_only_effects_that_exist():
     known = {effect.value for effect in Effect}
     assert all(set(case["effects"]) <= known for case in TABLE)
@@ -134,6 +155,7 @@ AFFIRMATIVE_CASES = [
         row["question"],
         set(row["effects"]),
         id=f"{row['label']}-{placement}",
+        marks=awaiting_consent(row["effects"]),
     )
     for row in AFFIRMATIVES
     for placement in NAMING_PLACEMENTS
@@ -147,7 +169,16 @@ def test_an_affirmative_under_a_question_that_commits_gives_its_own_effects_and_
     assert effects_of(verdict_of(tapped(label, placement, question))) == effects
 
 
-@pytest.mark.parametrize("label", sorted({row["label"] for row in AFFIRMATIVES}))
+@pytest.mark.parametrize(
+    "label",
+    [
+        pytest.param(
+            label,
+            marks=awaiting_consent([e for case in TABLE if case["label"] == label for e in case["effects"]]),
+        )
+        for label in sorted({row["label"] for row in AFFIRMATIVES})
+    ],
+)
 def test_the_words_of_a_class_or_an_id_are_no_affirmative(label):
     """An affirmative is a label the user reads: `ok` in a resource-id says nothing about what the
     button does, and the question under it is not read for it."""
@@ -161,3 +192,36 @@ def test_the_table_has_a_row_for_every_affirmative_of_the_default_policy():
     for rule in POLICY.of_kind(InheritRule):
         for phrase in rule.words:
             assert phrase.words in rows, f"{rule.origin.rule} has no affirmative row for {phrase.words!r}"
+
+
+DECLINES = TABLE_DOC["decline"]
+DECLINE_CASES = [
+    pytest.param(row["label"], placement, row["question"], id=f"{row['label']}-{placement}")
+    for row in DECLINES
+    for placement in NAMING_PLACEMENTS
+]
+
+
+@pytest.mark.parametrize(("label", "placement", "question"), DECLINE_CASES)
+def test_a_decline_under_a_question_that_commits_stays_clear(label, placement, question):
+    """The way out of a dialog stays open. A decline never reads its question, and one that holds
+    a consent word is exempt."""
+    assert effects_of(verdict_of(tapped(label, placement, question))) == set()
+
+
+@NO_CONSENT_YET
+def test_the_table_has_a_row_for_every_decline_the_default_policy_exempts():
+    rows = {normalized(row["label"]) for row in DECLINES}
+    exempt = [label for rule in POLICY.of_kind(ExemptRule) for label in rule.labels]
+    assert exempt, "the default policy exempts the declines that hold a consent word"
+    assert set(exempt) <= rows, f"no decline row for {sorted(set(exempt) - rows)}"
+
+
+@NO_CONSENT_YET
+def test_every_exempted_decline_would_give_consent_without_its_exemption():
+    """A label in the exemption that commits nothing without it is dead data."""
+    exempt = sorted(label for rule in POLICY.of_kind(ExemptRule) for label in rule.labels)
+    assert exempt, "the default policy exempts the declines that hold a consent word"
+    without = merge((DEFAULT, parse_policy({"disable": ["default.consent-declined"]}, "consumer.toml")))
+    for label in exempt:
+        assert effects_of(verdict_of(tapped(label, "text"), without)) == {"consent"}, label

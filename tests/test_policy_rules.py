@@ -65,6 +65,7 @@ def test_example_policies_scope_their_rules_to_their_app():
     assert exempt.scope.packages == {"com.facebook.pages.app"}
 
 
+@pytest.mark.xfail(strict=True, reason="the consent rule and its exemption are not in the default yet")
 def test_shipped_layers_merge_in_order_and_the_profile_deny_is_marked():
     profile, _ = load(PROFILE, trusted=True)
     layers = (load(DEFAULT), (profile, frozenset()), load(INSTAGRAM), load(BUSINESS_SUITE))
@@ -73,7 +74,7 @@ def test_shipped_layers_merge_in_order_and_the_profile_deny_is_marked():
     sources = [r.origin.source for r in merged.rules]
     assert list(dict.fromkeys(sources)) == [DEFAULT, PROFILE, INSTAGRAM, BUSINESS_SUITE]
     assert sources == sorted(sources, key=[DEFAULT, PROFILE, INSTAGRAM, BUSINESS_SUITE].index)
-    assert len(ids) == len(set(ids)) == 20
+    assert len(ids) == len(set(ids)) == 22
     deny = {r.origin.rule: refuses_to_disable(layers, r.origin.rule) for r in merged.of_kind(DenyRule)}
     assert deny == {
         "j7.vpn-lockdown": True,

@@ -8,6 +8,12 @@
 # are the union of the button's own words and the question's: an affirmative does what its dialog
 # says and keeps what it says itself. Every affirmative of the default policy has a row, and the
 # question of a row never commits the effect the label already carries, so the union shows.
+#
+# The [[decline]] rows come last. A decline is a button that gives nothing, planted under a question
+# that commits, in the placements a user reads, and it must stay clear: the way out of a consent
+# screen has to stay open. A decline that holds a consent word, such as "Don't allow", is exempt in
+# the default policy, and every label of that exemption has a row. The rest hold no consent word
+# and need no rule.
 
 [[case]]
 label = "Share"
@@ -318,6 +324,66 @@ label = "Riavvia"
 effects = ["system"]
 
 [[case]]
+label = "Authorize"
+effects = ["consent"]
+
+[[case]]
+label = "Authorise"
+effects = ["consent"]
+
+[[case]]
+label = "Accept"
+effects = ["consent"]
+
+[[case]]
+label = "Agree"
+effects = ["consent"]
+
+[[case]]
+label = "Allow"
+effects = ["consent"]
+
+[[case]]
+label = "Consent"
+effects = ["consent"]
+
+[[case]]
+label = "Grant access"
+effects = ["consent"]
+
+[[case]]
+label = "Autorizza"
+effects = ["consent"]
+
+[[case]]
+label = "Accetta"
+effects = ["consent"]
+
+[[case]]
+label = "Accetto"
+effects = ["consent"]
+
+[[case]]
+label = "Consenti"
+effects = ["consent"]
+
+[[case]]
+label = "Concedi"
+effects = ["consent"]
+
+[[case]]
+label = "Consenso"
+effects = ["consent"]
+
+[[case]]
+label = "Accept and continue"
+effects = ["consent"]
+
+[[case]]
+label = "Accetta e continua"
+effects = ["consent"]
+
+[[case]]
 label = "Confirm"
 effects = ["confirm"]
 
@@ -385,17 +451,17 @@ effects = ["delete"]
 [[affirmative]]
 label = "Accept"
 question = "Delete this post?"
-effects = ["delete"]
+effects = ["consent", "delete"]
 
 [[affirmative]]
 label = "Agree"
 question = "Delete this post?"
-effects = ["delete"]
+effects = ["consent", "delete"]
 
 [[affirmative]]
 label = "Allow"
 question = "Delete this post?"
-effects = ["delete"]
+effects = ["consent", "delete"]
 
 [[affirmative]]
 label = "Apply"
@@ -425,12 +491,12 @@ effects = ["delete"]
 [[affirmative]]
 label = "Accetta"
 question = "Elimina questo post?"
-effects = ["delete"]
+effects = ["consent", "delete"]
 
 [[affirmative]]
 label = "Consenti"
 question = "Elimina questo post?"
-effects = ["delete"]
+effects = ["consent", "delete"]
 
 [[affirmative]]
 label = "Applica"
@@ -496,3 +562,183 @@ effects = ["delete"]
 label = "Rimuovi"
 question = "Invia questo messaggio?"
 effects = ["delete", "send"]
+
+[[decline]]
+label = "Don't allow"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Don’t allow"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Do not allow"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Don't accept"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Don’t accept"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Do not accept"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Don't agree"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Don’t agree"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Do not agree"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "I don't agree"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "I don’t agree"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "I do not agree"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Don't authorize"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Don’t authorize"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Do not authorize"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Don't authorise"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Don’t authorise"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Do not authorise"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Don't consent"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Don’t consent"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Do not consent"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Don't grant access"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Don’t grant access"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Do not grant access"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Non accetto"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Deny"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Not now"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "No thanks"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Decline"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Disagree"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Rifiuta"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "RIFIUTA"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Rifiuta e continua"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Non consentire"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Modifica preferenze"
+question = "Delete this post?"
+effects = []
+
+[[decline]]
+label = "Manage preferences"
+question = "Delete this post?"
+effects = []
