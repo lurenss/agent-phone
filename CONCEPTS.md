@@ -1,6 +1,6 @@
 # Concepts
 
-The words agent-phone's code, docs and tests use, each with the type that owns it. Read it before `docs/design/core-types.md`, which explains why the types have their shape. Some entries describe behavior that later units of `docs/plan.md` build, such as resolving refs, input, the ledger and the policy engine's verdicts. Those entries describe the types in `core/` as the design doc lays them out.
+The words agent-phone's code, docs and tests use, each with the type that owns it. Read it before `docs/design/core-types.md`, which explains why the types have their shape. Some entries describe behavior that later units of `docs/plan.md` build, such as the `wait` command. Those entries describe the types in `core/` as the design doc lays them out.
 
 ## Reading the screen
 
@@ -136,11 +136,19 @@ Consecutive words that a commit or deny rule looks for in one label (`Phrase`). 
 
 ### Device profile
 
-Owner data for one phone (`DeviceProfile`), such as `examples/devices/j7.toml`: the packages it protects and its own policy tables. No policy file can disable a profile's deny rules.
+Owner data for one phone (`DeviceProfile`), such as `examples/devices/j7.toml`: the packages it protects, its own policy tables and the policy files it names. It is read from `profiles/*.toml` under the state root and applies to the device whose serial it names (`cli/policy.py`). Each protected package compiles into two deny rules, one for `stop` and one for a delete or system tap on a screen that names it. No policy file can disable a profile's deny rules.
+
+### Hit plan and receiver
+
+Where a tap lands and which node takes it (`core/act/hit.py`). The server's click is a touch at a point (A2-11), so a tap reaches whatever is there. `plan_point` picks a point of the target where Android's dispatch, reverse drawing order and deepest consumer first, hands the touch to exactly the target, under no other window. The receiver is the node that takes the touch. The policy engine judges the receiver's label surface, so the words it judges are the words the touch lands on.
+
+### Auto-wait
+
+What act() does with a target that is not ready yet (`NotYet`, `core/act/act.py`). While the element is hidden, disabled, at another place than on the read before, or covered, act() reads again until the request's deadline and then reports the last refusal. A refusal that waiting cannot clear, such as a spent ref, fails at once.
 
 ### Verdict and grant
 
-What the policy engine says about one input (`Verdict`: `Clear`, `Commits` or `Denied`), and what the caller allowed (`Grant`). A grant opens only the effects it names.
+What the policy engine says about one input (`Verdict`: `Clear`, `Commits` or `Denied`), and what the caller allowed (`Grant`, `--commit <effect>`). A grant opens only the effects it names, and no grant opens `Denied`.
 
 ### Ledger, epoch and permit
 
