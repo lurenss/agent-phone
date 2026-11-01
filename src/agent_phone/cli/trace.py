@@ -66,9 +66,10 @@ class Trace:
 
 
 def redacted(argv: Sequence[str], command: object) -> list[str]:
-    """`argv` with the text that `set-text` or `clipboard set` typed shown as `<N chars>`. Every
-    word equal to the text goes, wherever it stands, so a text that a flag value repeats is not
-    left behind. The command's own words stay."""
+    """`argv` with the text that `set-text` or `clipboard set` typed shown as `<N chars>`, wherever
+    it stands, also inside a longer word such as the query `value=hunter2`. The command's own words
+    and the flag names stay, because a flag name holds no text a caller typed. A flag written with
+    its value (`--wait-for=value=hunter2`) keeps its name and loses the text in its value."""
     match command:
         case SetTextCommand(text=text):
             keep = 1
@@ -77,7 +78,16 @@ def redacted(argv: Sequence[str], command: object) -> list[str]:
         case _:
             return list(argv)
     shown = f"<{len(text)} chars>"
-    return [word if at < keep or word != text else shown for at, word in enumerate(argv)]
+
+    def hide(word: str) -> str:
+        if not text:
+            return shown if word == text else word
+        if word.startswith("-"):
+            name, equals, value = word.partition("=")
+            return name + equals + value.replace(text, shown)
+        return word.replace(text, shown)
+
+    return [word if at < keep else hide(word) for at, word in enumerate(argv)]
 
 
 def step_record(

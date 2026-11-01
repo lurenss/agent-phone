@@ -333,7 +333,7 @@ Each batch writes one JSONL file, `<state root>/traces/<serial>/<UTC timestamp>-
 | --- | --- | --- |
 | `line` | string | `step`. |
 | `i` | int | The step's index, from 0. |
-| `argv` | array of strings | The step's arguments. The text argument of `set-text` and `clipboard set`, wherever it stands, is replaced by `<N chars>`. |
+| `argv` | array of strings | The step's arguments. The text that `set-text` or `clipboard set` typed is replaced by `<N chars>` wherever it stands, also inside a longer word such as the query `value=hunter2`. Command words and flag names stay. |
 | `started_utc` | string | When the step started, in UTC with milliseconds. |
 | `ms` | int | How long the step took. |
 | `ok` | bool | The step's `ok`. |

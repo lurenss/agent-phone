@@ -69,7 +69,6 @@ def test_the_text_of_set_text_and_clipboard_set_is_replaced_by_its_length(argv, 
     assert redacted(argv, parse_args(argv).command) == shown
 
 
-@pytest.mark.xfail(strict=True, reason="only a word equal to the text is redacted, not one that holds it")
 @pytest.mark.parametrize(
     ("argv", "shown"),
     [
