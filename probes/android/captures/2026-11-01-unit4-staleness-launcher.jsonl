@@ -1,0 +1,28 @@
+{"check": "staleness_round", "screen": "launcher-home", "app": "com.sec.android.app.launcher", "settled": "settled", "gap_s": 0.0, "round": 0, "refs": 10, "ok": 10, "failed": []}
+{"check": "staleness_round", "screen": "launcher-home", "app": "com.sec.android.app.launcher", "settled": "settled", "gap_s": 0.0, "round": 1, "refs": 10, "ok": 10, "failed": []}
+{"check": "staleness_round", "screen": "launcher-home", "app": "com.sec.android.app.launcher", "settled": "settled", "gap_s": 0.0, "round": 2, "refs": 10, "ok": 10, "failed": []}
+{"check": "staleness_round", "screen": "launcher-home", "app": "com.sec.android.app.launcher", "settled": "settled", "gap_s": 0.0, "round": 3, "refs": 10, "ok": 10, "failed": []}
+{"check": "staleness_round", "screen": "launcher-home", "app": "com.sec.android.app.launcher", "settled": "settled", "gap_s": 0.0, "round": 4, "refs": 10, "ok": 10, "failed": []}
+{"check": "staleness_round", "screen": "launcher-home", "app": "com.sec.android.app.launcher", "settled": "settled", "gap_s": 0.0, "round": 5, "refs": 10, "ok": 10, "failed": []}
+{"check": "staleness_round", "screen": "launcher-home", "app": "com.sec.android.app.launcher", "settled": "settled", "gap_s": 0.0, "round": 6, "refs": 10, "ok": 10, "failed": []}
+{"check": "staleness_round", "screen": "launcher-home", "app": "com.sec.android.app.launcher", "settled": "settled", "gap_s": 0.0, "round": 7, "refs": 10, "ok": 10, "failed": []}
+{"check": "staleness_round", "screen": "launcher-home", "app": "com.sec.android.app.launcher", "settled": "settled", "gap_s": 0.0, "round": 8, "refs": 10, "ok": 10, "failed": []}
+{"check": "staleness_round", "screen": "launcher-home", "app": "com.sec.android.app.launcher", "settled": "settled", "gap_s": 0.0, "round": 9, "refs": 10, "ok": 10, "failed": []}
+{"check": "staleness", "screen": "launcher-home", "gap_s": 0.0, "rounds": 10, "refs": 100, "stale": 0, "rate": 0.0}
+{"check": "staleness_round", "screen": "launcher-home", "app": "com.sec.android.app.launcher", "settled": "settled", "gap_s": 2.0, "round": 0, "refs": 10, "ok": 10, "failed": []}
+{"check": "staleness_round", "screen": "launcher-home", "app": "com.sec.android.app.launcher", "settled": "settled", "gap_s": 2.0, "round": 1, "refs": 10, "ok": 10, "failed": []}
+{"check": "staleness_round", "screen": "launcher-home", "app": "com.sec.android.app.launcher", "settled": "settled", "gap_s": 2.0, "round": 2, "refs": 10, "ok": 10, "failed": []}
+{"check": "staleness_round", "screen": "launcher-home", "app": "com.sec.android.app.launcher", "settled": "settled", "gap_s": 2.0, "round": 3, "refs": 10, "ok": 10, "failed": []}
+{"check": "staleness_round", "screen": "launcher-home", "app": "com.sec.android.app.launcher", "settled": "settled", "gap_s": 2.0, "round": 4, "refs": 10, "ok": 10, "failed": []}
+{"check": "staleness", "screen": "launcher-home", "gap_s": 2.0, "rounds": 5, "refs": 50, "stale": 0, "rate": 0.0}
+{"check": "staleness_round", "screen": "launcher-home", "app": "com.sec.android.app.launcher", "settled": "settled", "gap_s": 10.0, "round": 0, "refs": 10, "ok": 10, "failed": []}
+{"check": "staleness_round", "screen": "launcher-home", "app": "com.sec.android.app.launcher", "settled": "settled", "gap_s": 10.0, "round": 1, "refs": 10, "ok": 10, "failed": []}
+{"check": "staleness_round", "screen": "launcher-home", "app": "com.sec.android.app.launcher", "settled": "settled", "gap_s": 10.0, "round": 2, "refs": 10, "ok": 10, "failed": []}
+{"check": "staleness_round", "screen": "launcher-home", "app": "com.sec.android.app.launcher", "settled": "settled", "gap_s": 10.0, "round": 3, "refs": 10, "ok": 10, "failed": []}
+{"check": "staleness_round", "screen": "launcher-home", "app": "com.sec.android.app.launcher", "settled": "settled", "gap_s": 10.0, "round": 4, "refs": 10, "ok": 10, "failed": []}
+{"check": "staleness", "screen": "launcher-home", "gap_s": 10.0, "rounds": 5, "refs": 50, "stale": 0, "rate": 0.0}
+{"check": "staleness_round", "screen": "launcher-home", "app": "com.sec.android.app.launcher", "settled": "settled", "gap_s": 65.0, "round": 0, "refs": 10, "ok": 10, "failed": []}
+{"check": "staleness_round", "screen": "launcher-home", "app": "com.sec.android.app.launcher", "settled": "settled", "gap_s": 65.0, "round": 1, "refs": 10, "ok": 10, "failed": []}
+{"check": "staleness_round", "screen": "launcher-home", "app": "com.sec.android.app.launcher", "settled": "settled", "gap_s": 65.0, "round": 2, "refs": 10, "ok": 10, "failed": []}
+{"check": "staleness", "screen": "launcher-home", "gap_s": 65.0, "rounds": 3, "refs": 30, "stale": 0, "rate": 0.0}
+{"check": "inputs_sent", "inputs": []}
