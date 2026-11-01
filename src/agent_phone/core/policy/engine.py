@@ -267,9 +267,9 @@ def judge_receiver(
     A receiver with no naming label and no resource-id left after the ignore rules is
     unlabeled: nothing says what it does. A receiver whose own words do not say what it does
     takes the effects of the words around it as well as its own: a neutral affirmative ("OK"),
-    and a button whose every effect is `confirm`, which the rules define as a label that does not
-    name its effect. Its own effects never replace its dialog's, because a rule that gives the
-    button's own words an effect would otherwise hide the dialog from every denial. The labels it
+    and a button whose words carry `confirm` at all, a label that does not name its effect. A
+    rule may add effects to a button and never take its question away, so its own effects never
+    replace its dialog's, and any `confirm` is enough. The labels it
     read there are returned too, because a deny rule's words read them as well."""
     ignored = {node_id for rule in ignores for node_id in rule.node_ids}
     own = [label for label in receiver if label.node_resource_id not in ignored]
@@ -290,7 +290,7 @@ def judge_receiver(
     if not any(label.naming or label.field is LabelField.RESOURCE_ID for label in own):
         found.append((Effect.UNLABELED, Evidence(None, Source.UNLABELED, None, None)))
     question: tuple[Label, ...] = ()
-    if is_affirmative(inherits, own_kept) or (found and all(e is Effect.CONFIRM for e, _ in found)):
+    if is_affirmative(inherits, own_kept) or any(e is Effect.CONFIRM for e, _ in found):
         question = tuple(kept(around))
         found = [*found, *phrases_in(commits, question, Source.CONTEXT)]
     return Judgement(found, exempted, question)

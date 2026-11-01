@@ -130,15 +130,19 @@ def test_a_button_keeps_its_own_effects_and_takes_those_of_its_dialog(title, lab
     assert {e.source for e in verdict.evidence} == {Source.RECEIVER, Source.CONTEXT}
 
 
-@pytest.mark.parametrize(
-    ("label", "effects"),
-    [("Send", {Effect.SEND}), ("Confirm and send", {Effect.CONFIRM, Effect.SEND})],
-)
-def test_a_button_whose_own_words_say_more_than_confirm_does_not_take_its_dialogs_effects(label, effects):
-    screen = dialog("Delete this post?", "Cancel", label)
-    verdict = tap_on(screen, button(screen, label))
-    assert isinstance(verdict, Commits) and verdict.effects == effects, (
-        f"{label!r} says what it does, so the question under it adds nothing: {verdict}"
+def test_a_button_whose_own_words_name_their_effect_does_not_take_its_dialogs_effects():
+    screen = dialog("Delete this post?", "Cancel", "Send")
+    verdict = tap_on(screen, button(screen, "Send"))
+    assert isinstance(verdict, Commits) and verdict.effects == {Effect.SEND}, (
+        f"'Send' says what it does, so the question under it adds nothing: {verdict}"
+    )
+
+
+def test_a_button_whose_words_also_confirm_takes_its_dialogs_effects_as_well():
+    screen = dialog("Delete this post?", "Cancel", "Confirm and send")
+    verdict = tap_on(screen, button(screen, "Confirm and send"))
+    assert isinstance(verdict, Commits) and verdict.effects == {Effect.CONFIRM, Effect.SEND, Effect.DELETE}, (
+        f"a confirm does what its question says, whatever else the button says: {verdict}"
     )
 
 
@@ -377,9 +381,6 @@ CONSUMER_CONFIRM_POSTS = parse_policy(
 )
 
 
-@pytest.mark.xfail(
-    strict=True, reason="a button reads its question only when every effect of its own words is confirm"
-)
 @pytest.mark.parametrize(
     ("label", "consumer"),
     [("Confirm", CONSUMER_CONFIRM_POSTS), ("Confirm and send", None)],
