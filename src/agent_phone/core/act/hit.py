@@ -9,8 +9,8 @@ point, not the node the caller meant. This module makes those the same node, or 
    block. A dialog over an app needs no rule of its own: the dump of a dialog leaves the app
    beneath it out (A2-7).
 2. Inside the window, dispatch follows Android's: children containing the point in reverse
-   drawing order, deepest node that takes a touch first (`role.takes_touch`). A visible scrolling
-   view takes it too, unless it is the target or holds it, because `ScrollView` and
+   drawing order, deepest node that takes a touch first (`role.takes_touch`). A scrolling view takes
+   it too, unless it is the target or holds it, because `ScrollView` and
    `RecyclerView` keep ACTION_DOWN. Equal or missing drawing order between two branches that both
    hold a taker is ambiguous, and an ambiguous point is never used.
 3. `plan_point` tries the visible center, then the four quadrant centers, and returns the
@@ -63,8 +63,8 @@ def receiver_in(screen: Screen, node: Node, point: Point, target: Node | None = 
     """A node the dump marks not visible to the user still takes a touch inside its bounds: a view
     at alpha 0, such as a sheet that fades in, is not visible to the user and still takes touches.
 
-    A visible scrolling view takes the touch too, unless it is the `target` or holds it: a list
-    keeps ACTION_DOWN, but a row inside its own list is reached first, deepest node first."""
+    A scrolling view takes the touch too, unless it is the `target` or holds it: a list keeps
+    ACTION_DOWN, but a row inside its own list is reached first, deepest node first."""
     if not node.attrs.bounds.contains(point):
         return None
     taking: list[tuple[Node, NodeId | Ambiguous]] = []
@@ -83,9 +83,10 @@ def receiver_in(screen: Screen, node: Node, point: Point, target: Node | None = 
 
 
 def scrolls_over(node: Node, target: Node | None) -> bool:
-    """A visible scrolling view that is not the target and does not hold it."""
+    """A scrolling view that is not the target and does not hold it, whether or not the dump calls it
+    visible: `ScrollView` and `RecyclerView` keep ACTION_DOWN at any alpha, as a clickable view does."""
     held = target is not None and node.id <= target.id < node.end
-    return node.has(Flag.SCROLLABLE) and node.has(Flag.VISIBLE) and not held
+    return node.has(Flag.SCROLLABLE) and not held
 
 
 def visible_area(screen: Screen, node: Node) -> Rect:

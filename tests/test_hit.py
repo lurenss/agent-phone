@@ -224,9 +224,6 @@ ALPHA_0 = (
 )
 
 
-@pytest.mark.xfail(
-    strict=True, reason="R2-3: scrolls_over requires the dump to call the scrolling view visible"
-)
 def test_a_scrolling_view_the_dump_calls_invisible_takes_the_touch_when_drawn_over_the_target():
     fading = screen_of(
         app(button("Save", "[0,500][1080,600]", drawing_order=1), sheet(2, visible_to_user=False))
@@ -236,9 +233,6 @@ def test_a_scrolling_view_the_dump_calls_invisible_takes_the_touch_when_drawn_ov
     assert blocked.details["blocked_by"] == ["another element ('androidx.recyclerview.widget.RecyclerView')"]
 
 
-@pytest.mark.xfail(
-    strict=True, reason="R2-3: scrolls_over requires the dump to call the scrolling view visible"
-)
 def test_a_swipe_that_starts_on_a_scrolling_view_the_dump_calls_invisible_is_occluded():
     below = node(SCROLLER, scrollable=True, drawing_order=1, bounds="[0,200][1080,1700]")
     screen = screen_of(app(below, sheet(2, visible_to_user=False)))

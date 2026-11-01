@@ -485,9 +485,6 @@ def test_a_blank_frame_between_two_screens_proves_nothing_gone(tmp_path):
     assert any("Brightness" in line.name for line in done.after.lines), "the wait stopped on the blank frame"
 
 
-@pytest.mark.xfail(
-    strict=True, reason="R2-3: scrolls_over requires the dump to call the scrolling view visible"
-)
 def test_a_tap_under_a_sheet_the_dump_calls_invisible_is_occluded_and_sends_nothing(tmp_path):
     """The sheet's list is fading in over Save. It takes the touch, so the tap would be swallowed
     while the report says that Save received it."""
