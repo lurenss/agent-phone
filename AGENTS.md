@@ -75,6 +75,7 @@ The framework enforces these on every device:
 - Never stop a package that the device profile marks as protected.
 - Install nothing on the device. The only footprint is `/data/local/tmp/u2.jar` (`A3-1`) and the empty file `/data/local/tmp/ap-lastuse` that the idle watchdog reads (`A3-8`). `agent-phone server stop` removes the second.
 - Only one process drives a device at a time (`A3-4`).
+- To try what the CLI does with its arguments, such as whether a flag parses, cut it off from the phone: `ADB=false uv run agent-phone ...` stops at `TRANSPORT` before it reaches any device. Every call that may reach a phone goes through the verify skill's `evidence.py`, which records it. A unit 6 experiment ran `batch --commit` against the connected J7 to see whether the flag was refused, and only the parser stood between it and an unrecorded input.
 - Raw dumps contain private screen content. Keep them in `probes/android/raw/`, which git ignores. Commit only fixtures that pass `tests/test_fixtures_are_redacted.py`.
 
 The development phone, Lorenzo's Samsung J7, adds these:
