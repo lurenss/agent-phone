@@ -1,0 +1,17 @@
+# Lorenzo's AYN Thor profile. Copied to ~/.agent-phone/profiles/ on that Mac.
+# Two screens: display 0 (the top screen, where launch and every input go) and display 4 (the
+# bottom screen). Android 13, Italian UI.
+
+[device]
+serial = "8c9d0e1f"
+name = "thor"
+
+[[protected]]
+package = "dev.eden.eden_emulator.nightly"
+labels = ["Eden Nightly"]
+reason = "A Switch emulator. Stopping it while a game runs loses the game's unsaved progress."
+
+[[protected]]
+package = "dev.eden.eden_emulator"
+labels = ["Eden"]
+reason = "A Switch emulator. Stopping it while a game runs loses the game's unsaved progress."
