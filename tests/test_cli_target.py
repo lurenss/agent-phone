@@ -4,7 +4,6 @@ case checks what reached the fake device, so "sends nothing" is an observation."
 
 import re
 
-import pytest
 from fakes import J7_SERIAL, FakeHub, invoke
 from support import fixture_screen, node, screen_of
 
@@ -20,9 +19,6 @@ BRIGHTNESS = screen_of(
         package="com.android.settings",
         bounds="[0,0][1080,1920]",
     )
-)
-NO_CANDIDATES = pytest.mark.xfail(
-    strict=True, reason="the hint names details.candidates, which a query refusal never carries"
 )
 
 
@@ -129,7 +125,6 @@ def test_a_target_that_is_neither_a_ref_nor_a_query_is_refused_before_any_device
         assert code == 2 and wire["error"]["code"] == "INVALID_ARGS" and hub.phones == [], argv
 
 
-@NO_CANDIDATES
 def test_an_ambiguous_target_hint_names_only_details_the_error_carries(tmp_path):
     snapshot(tmp_path)
     code, wire = invoke(["click", "role=button"], FakeHub([J7], screens=[SETTINGS]), tmp_path)
