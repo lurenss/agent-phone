@@ -371,6 +371,29 @@ def test_a_button_with_commit_words_of_its_own_is_denied_under_a_question_that_a
     )
 
 
+CONSUMER_CONFIRM_POSTS = parse_policy(
+    {"commit": [{"id": "c.confirm-posts", "effect": "social", "words": ["confirm"], "reason": "r"}]},
+    "consumer.toml",
+)
+
+
+@pytest.mark.xfail(
+    strict=True, reason="a button reads its question only when every effect of its own words is confirm"
+)
+@pytest.mark.parametrize(
+    ("label", "consumer"),
+    [("Confirm", CONSUMER_CONFIRM_POSTS), ("Confirm and send", None)],
+    ids=["a-consumer-gives-confirm-a-second-effect", "a-confirm-that-also-sends"],
+)
+def test_a_button_whose_words_confirm_reads_its_question_whatever_else_they_say(label, consumer):
+    screen = dialog("Uninstall SafeTunnel?", "Cancel", label)
+    layers = (DEFAULT, PROTECTS_TUNNEL, *(() if consumer is None else (consumer,)))
+    verdict = tap_on(screen, button(screen, label), merge(layers))
+    assert isinstance(verdict, Denied) and verdict.rule == "profile.protect.com.example.tunnel.app-info", (
+        f"a rule can add an effect to a confirming button and never take its question away: got {verdict}"
+    )
+
+
 J7_DENIES = merge((DEFAULT, PROFILE))
 QUESTIONS = [("Turn off mobile data?", "OK"), ("Turn off Wi-Fi?", "OK"), ("Disconnect the VPN?", "Yes")]
 WEAKENS_THE_AFFIRMATIVE = {
