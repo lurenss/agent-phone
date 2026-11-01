@@ -85,6 +85,8 @@ class FakePhone:
     inputs: list[tuple[str, ...]] = field(default_factory=list)
     dumps: list[str] = field(default_factory=list)
     snapshot_failures: int = 0
+    raw_dir: Path | None = None
+    raw_xml: Callable[["FakePhone"], str] | None = None
 
     class Refused(Exception):
         def __init__(self, code: str) -> None:
@@ -119,6 +121,8 @@ class FakePhone:
         else:
             assert argv[1].endswith("raw_dump.py"), argv
             self.dumps.append(argv[3])
+            if self.raw_dir is not None and self.raw_xml is not None:
+                (self.raw_dir / f"{argv[3]}.raw.xml").write_text(self.raw_xml(self))
             out = f"/raw/{argv[3]}.raw.xml 12 nodes\n"
         return subprocess.CompletedProcess(argv, 0, out.encode(), b"")
 

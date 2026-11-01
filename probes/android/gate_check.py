@@ -8,9 +8,14 @@ takes a touch, a set-text for each text field. It judges the same way `act()` do
 `classify`, so run it before a live input whose refusal you want to see. A live input sent only to
 check that the gate refuses it goes out if the gate does not (A6-6). Raw dumps come from
 `probes/android/raw/`, which git ignores.
+
+`judge` is the same judgement as a function, for a script that counts verdicts, such as the
+port-android-device skill's `sweep.py`. It reads the dump at the J7's size when run as a script.
 """
 
 import argparse
+from collections.abc import Iterator
+from dataclasses import dataclass
 from pathlib import Path
 
 from agent_phone.adapters.uiautomator2.parse import parse_hierarchy
@@ -21,45 +26,77 @@ from agent_phone.core.geometry import Point, Size
 from agent_phone.core.labels import display_name
 from agent_phone.core.outcome import Refusal
 from agent_phone.core.phone import SetText, Tap
-from agent_phone.core.policy.engine import Clear, Commits, Denied, classify
+from agent_phone.core.policy.engine import Clear, Commits, Denied, Verdict, classify
+from agent_phone.core.policy.rules import Policy
 from agent_phone.core.role import Role, role_of, takes_touch
+from agent_phone.core.screen import Screen
 
-parser = argparse.ArgumentParser(prog="gate_check.py")
-parser.add_argument("raw", type=Path)
-parser.add_argument("locale")
-parser.add_argument("--profile", type=Path)
-parser.add_argument("--action", choices=("tap", "set-text"), default="tap")
-parser.add_argument("--policy", type=Path, action="append", default=[])
-args = parser.parse_args()
-policy = load_policy(args.policy, load_profile(args.profile) if args.profile else None)
-screen = parse_hierarchy(args.raw.read_text(), Size(1080, 1920), None)
-active = screen.active_window()
-print("active", active.package if active else None)
-for window in screen.windows:
-    for node in screen.subtree(window.root):
-        role = role_of(node.attrs)
-        if args.action == "tap" and not takes_touch(node.attrs):
-            continue
-        if args.action == "set-text" and role is not Role.TEXT_FIELD:
-            continue
-        b = node.attrs.bounds
-        address = address_of(screen, node)
-        action = (
-            Tap(Point((b.left + b.right) // 2, (b.top + b.bottom) // 2), address)
-            if args.action == "tap"
-            else SetText(address, "text", secret=False)
-        )
-        name = display_name(screen, node, role)[:60]
-        try:
-            verdict = classify(policy, action, element_site(screen, node), args.locale)
-        except Refusal as refusal:
-            print(f"  refused {refusal.code.value:<20} {role.value:<8} {name!r}")
-            continue
-        match verdict:
-            case Clear():
-                said = "clear"
-            case Commits(effects=effects):
-                said = "commits " + ",".join(sorted(e.value for e in effects))
-            case Denied(rule=rule):
-                said = f"denied {rule}"
-        print(f"  {said:<28} {window.package[:28]:<28} {role.value:<8} {name!r}")
+
+@dataclass(frozen=True, slots=True)
+class Judged:
+    """One element an input could target, the package of its window, and what the gate said: a
+    verdict, or the `Refusal` that `classify` raised."""
+
+    package: str
+    role: Role
+    name: str
+    outcome: Verdict | Refusal
+
+
+def judge(screen: Screen, policy: Policy, locale: str, action: str = "tap") -> Iterator[Judged]:
+    """A `tap` for each element that takes a touch, or a `set-text` for each text field."""
+    for window in screen.windows:
+        for node in screen.subtree(window.root):
+            role = role_of(node.attrs)
+            if action == "tap" and not takes_touch(node.attrs):
+                continue
+            if action == "set-text" and role is not Role.TEXT_FIELD:
+                continue
+            b = node.attrs.bounds
+            address = address_of(screen, node)
+            act = (
+                Tap(Point((b.left + b.right) // 2, (b.top + b.bottom) // 2), address)
+                if action == "tap"
+                else SetText(address, "text", secret=False)
+            )
+            name = display_name(screen, node, role)[:60]
+            try:
+                outcome = classify(policy, act, element_site(screen, node), locale)
+            except Refusal as refusal:
+                outcome = refusal
+            yield Judged(window.package, role, name, outcome)
+
+
+def describe(outcome: Verdict) -> str:
+    match outcome:
+        case Clear():
+            return "clear"
+        case Commits(effects=effects):
+            return "commits " + ",".join(sorted(e.value for e in effects))
+        case Denied(rule=rule):
+            return f"denied {rule}"
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(prog="gate_check.py")
+    parser.add_argument("raw", type=Path)
+    parser.add_argument("locale")
+    parser.add_argument("--profile", type=Path)
+    parser.add_argument("--action", choices=("tap", "set-text"), default="tap")
+    parser.add_argument("--policy", type=Path, action="append", default=[])
+    args = parser.parse_args()
+    policy = load_policy(args.policy, load_profile(args.profile) if args.profile else None)
+    screen = parse_hierarchy(args.raw.read_text(), Size(1080, 1920), None)
+    active = screen.active_window()
+    print("active", active.package if active else None)
+    for judged in judge(screen, policy, args.locale, args.action):
+        if isinstance(judged.outcome, Refusal):
+            code = judged.outcome.code.value
+            print(f"  refused {code:<20} {judged.role.value:<8} {judged.name!r}")
+        else:
+            said = describe(judged.outcome)
+            print(f"  {said:<28} {judged.package[:28]:<28} {judged.role.value:<8} {judged.name!r}")
+
+
+if __name__ == "__main__":
+    main()
