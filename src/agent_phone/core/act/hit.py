@@ -21,15 +21,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from agent_phone.core.act.axis import clear_height, span
 from agent_phone.core.act.intent import Direction
 from agent_phone.core.geometry import Point, Rect
 from agent_phone.core.labels import Label, own_labels, owned
 from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.phone import Swipe
-from agent_phone.core.role import COLLECTIONS, Role, role_of, simple_name, takes_touch
+from agent_phone.core.role import COLLECTIONS, role_of, takes_touch
 from agent_phone.core.screen import Flag, Node, NodeId, Screen, Window
 
-SWIPE_SPAN = 0.6
 SWIPE_MS = 275
 """As long as uiautomator2's own scroll (55 steps of about 5 ms), so the list scrolls and does not fling."""
 
@@ -190,59 +190,29 @@ def outside_labels(screen: Screen, window: Window, own: set[NodeId]) -> tuple[La
     )
 
 
-def runs_across(screen: Screen, node: Node) -> bool:
-    """A pager, a horizontal scroll view, or a collection with two rows side by side. A sideways
-    swipe on a list that runs down lands on one row, and a row can act on a swipe: Samsung's
-    Phone and Contacts call on one, and a notification is dismissed by one. The mirror holds too:
-    an up or down swipe on a collection that runs across lands on one card, and on the recents
-    screen it dismisses the app (`runs_down` tells such a collection from a grid)."""
-    if role_of(node.attrs) is Role.PAGER or simple_name(node.attrs.class_name) == "HorizontalScrollView":
-        return True
-    rows = [b for child in node.children if not (b := screen.node(child).attrs.bounds).empty]
-    pairs = zip(rows, rows[1:], strict=False)
-    return any(a.left != b.left and a.top < b.bottom and b.top < a.bottom for a, b in pairs)
-
-
-def runs_down(screen: Screen, node: Node) -> bool:
-    """A collection with an item entirely below another, such as a grid of photos: its items may sit
-    side by side, and it still scrolls up and down."""
-    rows = [b for child in node.children if not (b := screen.node(child).attrs.bounds).empty]
-    return bool(rows) and max(b.top for b in rows) >= min(b.bottom for b in rows)
-
-
 def swipe_across(screen: Screen, node: Node, direction: Direction) -> Swipe:
-    """A swipe over SWIPE_SPAN of the collection's visible area. `Direction.DOWN` shows what is
-    below, so the finger moves up. The swipe starts and ends inside the collection, under no
-    other window, and its start lands on the collection or something inside it."""
+    """A swipe over `axis.SWIPE_SPAN` of the collection's visible area. `Direction.DOWN` shows what
+    is below, so the finger moves up. The swipe starts and ends inside the collection, under no
+    other window, and its start lands on the collection or something inside it. A sideways swipe
+    keeps to a height at which it crosses no row of a list that runs down inside the collection
+    (`axis.clear_height`), and is refused as `wrong_axis` when there is none."""
     area = visible_area(screen, node)
     if area.empty:
         raise Refusal(ErrorCode.NOT_ACTIONABLE, "The element has no visible area.", {"reason": "no_area"})
     window = screen.window_of(node.id)
     require_active(window)
     middle = area.center()
-    near, far = (1 - SWIPE_SPAN) / 2, (1 + SWIPE_SPAN) / 2
-    height, width = area.bottom - area.top, area.right - area.left
+    left, right = span(area.left, area.right - area.left)
+    upper, lower = span(area.top, area.bottom - area.top)
     match direction:
         case Direction.DOWN:
-            start, end = (
-                Point(middle.x, area.top + int(height * far)),
-                Point(middle.x, area.top + int(height * near)),
-            )
+            start, end = Point(middle.x, lower), Point(middle.x, upper)
         case Direction.UP:
-            start, end = (
-                Point(middle.x, area.top + int(height * near)),
-                Point(middle.x, area.top + int(height * far)),
-            )
-        case Direction.RIGHT:
-            start, end = (
-                Point(area.left + int(width * far), middle.y),
-                Point(area.left + int(width * near), middle.y),
-            )
-        case Direction.LEFT:
-            start, end = (
-                Point(area.left + int(width * near), middle.y),
-                Point(area.left + int(width * far), middle.y),
-            )
+            start, end = Point(middle.x, upper), Point(middle.x, lower)
+        case Direction.LEFT | Direction.RIGHT:
+            y = clear_height(screen, node, area)
+            ends = (Point(left, y), Point(right, y))
+            start, end = ends if direction is Direction.LEFT else ends[::-1]
     taker = receiver_in(screen, screen.node(window.root), start, node)
     inside = taker is None or (isinstance(taker, int) and node.id <= taker < node.end)
     if not inside:

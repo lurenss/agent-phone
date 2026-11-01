@@ -119,15 +119,10 @@ def page_of(inner):
     )
 
 
-def xfail(reason):
-    return [pytest.mark.xfail(strict=True, reason=f"R2-2: {reason}")]
+def shape(name, screen_, expected):
+    return pytest.param(screen_, expected, id=name)
 
 
-def shape(name, screen_, expected, marks=()):
-    return pytest.param(screen_, expected, id=name, marks=marks)
-
-
-NEXT_CARD = "a card clipped to an empty strip at the edge is the next card, off screen"
 SHAPES = [
     shape("two cards side by side", screen(collection(card(100), card(1020))), ACROSS),
     shape("a vertical list", screen(collection(row(200, 700), row(700, 1200), row(1200, 1700))), DOWN),
@@ -158,13 +153,11 @@ SHAPES = [
         "a card whose next card is clipped to nothing at the right edge",
         screen(collection(card(40, 1000), strip("[1080,200][1080,1700]"))),
         ACROSS,
-        xfail(NEXT_CARD),
     ),
     shape(
         "a card whose previous card is clipped to nothing at the left edge",
         screen(collection(card(40, 1000), strip("[0,200][0,1700]"))),
         ACROSS,
-        xfail(NEXT_CARD),
     ),
     shape(
         "an empty strip below the rows, level with none of them",
@@ -175,19 +168,16 @@ SHAPES = [
         "one card in a row, 81 % wide",
         screen(collection(card(100, 880))),
         ACROSS,
-        xfail("one visible child with space on both sides is one card in a row"),
     ),
     shape(
         "one card in a row, exactly 90 % wide",
         screen(collection(card(54, 972))),
         ACROSS,
-        xfail("at most 90 % of the width is one card in a row"),
     ),
     shape(
         "one card in a row, exactly 75 % tall",
         screen(collection(card(100, 880, bottom=1325))),
         ACROSS,
-        xfail("at least 75 % of the height is one card in a row"),
     ),
     shape("one child that spans the whole width", screen(collection(card(0, 1080))), DOWN),
     shape("one child that spans 92 % of the width", screen(collection(card(40, 1000))), DOWN),
@@ -199,7 +189,6 @@ SHAPES = [
             collection(node("android.widget.FrameLayout", bounds="[0,200][1080,1700]")),
         ),
         ACROSS,
-        xfail("a list whose parent is a pager and that shows one page runs across"),
     ),
     shape(
         "two cards side by side with a footer below them",
@@ -212,13 +201,11 @@ SHAPES = [
             )
         ),
         ACROSS,
-        xfail("a lone item below side-by-side items is a footer, not a second row of a grid"),
     ),
     shape(
         "a row of three photos and one more below them",
         screen(collection(*(photo(c, 0) for c in range(3)), photo(0, 1), bounds="[0,300][1080,1100]")),
         ACROSS,
-        xfail("a grid needs two rows of at least two items"),
     ),
 ]
 
@@ -244,7 +231,6 @@ NAV_PAGER = "swipeable_nav_view_pager_inner_recycler_view"
 TELL_TO_TAP = "tap the tab or button"
 
 
-@pytest.mark.xfail(strict=True, reason="R2-2: a sideways swipe of a pager starts on a row of its page's list")
 def test_a_sideways_swipe_of_a_pager_over_a_list_that_covers_it_is_refused_with_the_tab_to_tap(tmp_path):
     feed = feed_of_the_j7()
     for rid in ("swipeable_tab_view_pager", NAV_PAGER):
@@ -256,9 +242,6 @@ def test_a_sideways_swipe_of_a_pager_over_a_list_that_covers_it_is_refused_with_
         assert TELL_TO_TAP in outcome.message.lower(), outcome.message
 
 
-@pytest.mark.xfail(
-    strict=True, reason="R2-2: a list whose parent is a pager and that shows one page runs across"
-)
 def test_the_nav_pager_of_the_j7_feed_runs_across_so_an_up_or_down_scroll_of_it_is_refused(tmp_path):
     outcome, sent = scroll(tmp_path, feed_of_the_j7(), NAV_PAGER, Direction.DOWN)
     assert sent == [], f"the finger moving up over the card is the swipe that dismisses: {sent}"
@@ -282,7 +265,6 @@ NO_GAP = page_of(collection(row(200, 700), row(700, 1200), row(1200, 1700)))
 A_TRAY = page_of(collection(card(100), card(1020)))
 
 
-@pytest.mark.xfail(strict=True, reason="R2-2: a sideways swipe of a pager starts on a row of its page's list")
 @pytest.mark.parametrize("direction", [Direction.LEFT, Direction.RIGHT])
 def test_a_pager_whose_page_list_leaves_no_clear_height_refuses_a_sideways_swipe(tmp_path, direction):
     outcome, sent = scroll(tmp_path, NO_GAP, "outer", direction)
@@ -294,7 +276,6 @@ def test_a_pager_whose_page_list_leaves_no_clear_height_refuses_a_sideways_swipe
     assert TELL_TO_TAP in outcome.message.lower(), outcome.message
 
 
-@pytest.mark.xfail(strict=True, reason="R2-2: a sideways swipe of a pager starts on a row of its page's list")
 @pytest.mark.parametrize("direction", [Direction.LEFT, Direction.RIGHT])
 def test_a_sideways_swipe_of_a_pager_keeps_to_the_gap_between_the_rows_of_its_page(tmp_path, direction):
     outcome, sent = scroll(tmp_path, GAP_BETWEEN_ROWS, "outer", direction)
