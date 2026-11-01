@@ -48,6 +48,9 @@ evidence = importlib.util.module_from_spec(evidence_spec)
 evidence_spec.loader.exec_module(evidence)
 
 
+COLLECTIONS = ("scroll", "list", "grid", "pager")
+
+
 @dataclass(frozen=True)
 class Screen:
     """What `snapshot` says about one screen of the fake phone."""
@@ -186,10 +189,32 @@ class FakePhone:
         wants_button = "--for" in words and words[words.index("--for") + 1] == "role=button"
         return screen.app == app and (not wants_button or any(" button " in f" {t}" for t in screen.tree))
 
+    def scrollers(self) -> list[str]:
+        """The refs of the collections on the current screen, as its last snapshot printed them."""
+        return [
+            f"@s{self.epoch:04d}:e{i}"
+            for i, line in enumerate(self.current.tree, 1)
+            if line.split(" ")[0] in COLLECTIONS
+        ]
+
+    def check_scroll_target(self, words: tuple[str, ...]) -> None:
+        """How `scroll DIRECTION [TARGET]` finds its collection: with no target, the only one on the
+        screen, and two are `AMBIGUOUS_TARGET`. A ref of an earlier snapshot is `STALE_REF`."""
+        found = self.scrollers()
+        if len(words) < 3:
+            if len(found) != 1:
+                raise FakePhone.Refused("AMBIGUOUS_TARGET" if found else "NOT_FOUND")
+        elif words[2] not in found:
+            raise FakePhone.Refused(
+                "NOT_ACTIONABLE" if words[2].startswith(f"@s{self.epoch:04d}:") else "STALE_REF"
+            )
+
     def act(self, command: str, words: tuple[str, ...]) -> dict:
         if self.observed != self.epoch:
             return refusal(command, self.serial, "OBSERVE_FIRST")
         try:
+            if command == "scroll":
+                self.check_scroll_target(words)
             self.screen = self.react(self, words) if self.react else self.screen
         except FakePhone.Refused as refused:
             return refusal(command, self.serial, refused.code)
