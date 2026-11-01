@@ -6,6 +6,7 @@ from __future__ import annotations
 import io
 import json
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import TextIO
 
@@ -183,12 +184,25 @@ class FakeHub:
         return phone
 
 
-def invoke(argv, hub, root=None, lock_wait_s=0.0, clock: Clock | None = None, stdin: TextIO | None = None):
+def invoke(
+    argv,
+    hub,
+    root=None,
+    lock_wait_s=0.0,
+    clock: Clock | None = None,
+    stdin: TextIO | None = None,
+    env: Mapping[str, str] | None = None,
+):
     """Run one command line against `hub` and return its exit code and its one envelope. Each call
-    is a new process, so it starts with no permit that an earlier call left unrefunded."""
+    is a new process, so it starts with no permit that an earlier call left unrefunded. `env` is
+    what the process would read from its environment, so a test never touches the real one."""
     ledger.UNREFUNDED.clear()
     out = io.StringIO()
-    settings = Settings(state_root=root or Path("/nonexistent-agent-phone-root"), lock_wait_s=lock_wait_s)
+    settings = replace(
+        Settings.from_environment(env or {}),
+        state_root=root or Path("/nonexistent-agent-phone-root"),
+        lock_wait_s=lock_wait_s,
+    )
     code = run(argv, hub, settings, out, clock or FakeClock(), stdin)
     lines = out.getvalue().splitlines()
     assert len(lines) == 1, "one command prints one envelope"

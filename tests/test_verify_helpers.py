@@ -179,3 +179,17 @@ def test_the_doctor_finds_a_package_and_its_named_processes_and_no_package_that_
     assert doctor.pids_of(THOR_PS, "dev.eden.eden_emulator.nightly") == ["29822"]
     assert doctor.pids_of(THOR_PS, "hev.sockstun") == ["14361"]
     assert doctor.pids_of(THOR_PS, "hev.socks") == []
+
+
+def test_the_evidence_helper_drops_the_permission_mode_unless_a_journey_passes_it(
+    tmp_path, monkeypatch, capsys
+):
+    """A recorded run must start from the defaults an agent's plain shell has. The variable is set
+    here only to show that the helper strips it, and the command it runs is a bare `python`."""
+    monkeypatch.setenv("AGENT_PHONE_PERMISSION_MODE", "dangerously-skip")
+    show = ["python", "-c", "import os; print(os.environ.get('AGENT_PHONE_PERMISSION_MODE'))"]
+    assert evidence.main(["run", str(tmp_path), "plain", "--input", "--", *show]) == 0
+    assert capsys.readouterr().out == "None\n"
+    passed = ["--env", "AGENT_PHONE_PERMISSION_MODE=ask"]
+    assert evidence.main(["run", str(tmp_path), "named", "--input", *passed, "--", *show]) == 0
+    assert capsys.readouterr().out == "ask\n"
