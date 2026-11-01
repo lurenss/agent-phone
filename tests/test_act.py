@@ -313,7 +313,6 @@ def test_a_switch_that_takes_no_touch_is_never_tapped_for_its_row(tmp_path):
     assert phone.permits == []
 
 
-@pytest.mark.xfail(strict=True, reason="a toggle is judged without the words of its row")
 def test_a_toggle_is_judged_with_the_title_of_its_row(tmp_path):
     row = node(
         "android.widget.LinearLayout",

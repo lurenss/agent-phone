@@ -11,10 +11,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from agent_phone.core.act.hit import context_labels, plan_point, require_active, swipe_across
+from agent_phone.core.act.hit import context_labels, plan_point, require_active, row_labels, swipe_across
 from agent_phone.core.act.intent import ActionReport, Click, Fill, Request, Scroll, TargetReport
 from agent_phone.core.context import Context
-from agent_phone.core.labels import display_name, surface_of, typed_text
+from agent_phone.core.labels import Surface, display_name, surface_of, typed_text
 from agent_phone.core.outcome import Acted, ErrorCode, Outcome, Refusal, Refused, SentState
 from agent_phone.core.phone import (
     Ack,
@@ -29,7 +29,7 @@ from agent_phone.core.phone import (
 from agent_phone.core.policy.engine import Site, Verdict, classify, require
 from agent_phone.core.refs.fingerprint import path_of
 from agent_phone.core.refs.resolve import QueryTarget, RefTarget, Resolved, Target, locate, observed_snapshot
-from agent_phone.core.role import Role, role_of, takes_touch
+from agent_phone.core.role import CHOICES, Role, role_of, takes_touch
 from agent_phone.core.screen import Flag, Node, Screen
 from agent_phone.core.snapshot.capture import capture
 from agent_phone.core.snapshot.snapshot import SettleState, Snapshot
@@ -177,9 +177,10 @@ def _plan(
                 action: InputAction = (
                     LongPress(point, address, LONG_PRESS_MS) if long else Tap(point, address)
                 )
-                site = Site(
-                    window.package, window.kind, surface_of(screen, node), context_labels(screen, node)
-                )
+                surface = surface_of(screen, node)
+                if role in CHOICES:
+                    surface = Surface(node.id, surface.labels + row_labels(screen, node))
+                site = Site(window.package, window.kind, surface, context_labels(screen, node))
             case Fill(text=text):
                 require_active(window)
                 action = SetText(address_of(screen, node), text, secret=node.has(Flag.PASSWORD))

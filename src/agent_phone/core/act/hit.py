@@ -26,7 +26,7 @@ from agent_phone.core.geometry import Point, Rect
 from agent_phone.core.labels import Label, own_labels
 from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.phone import Swipe
-from agent_phone.core.role import consumes_touch, takes_touch
+from agent_phone.core.role import COLLECTIONS, consumes_touch, role_of, takes_touch
 from agent_phone.core.screen import Flag, Node, NodeId, Screen, Window, WindowKind
 
 SWIPE_SPAN = 0.6
@@ -140,6 +140,29 @@ def describe(screen: Screen, found: Receiver) -> str:
             attrs = screen.node(found).attrs
             name = attrs.text or attrs.content_desc or attrs.resource_id or attrs.class_name
             return f"another element ({name!r})"
+
+
+def row_labels(screen: Screen, node: Node) -> tuple[Label, ...]:
+    """The words of the row a toggle sits in, outside the toggle itself. A switch often says only
+    "On" or "Off", and its row says what it turns on. The row is the nearest ancestor that takes
+    a touch, else the child of the nearest collection that holds the toggle, else its parent."""
+    child = node
+    for ancestor in screen.ancestors(node.id):
+        if takes_touch(ancestor.attrs):
+            return labels_outside(screen, ancestor, node)
+        if role_of(ancestor.attrs) in COLLECTIONS:
+            return labels_outside(screen, child, node)
+        child = ancestor
+    return () if node.parent is None else labels_outside(screen, screen.node(node.parent), node)
+
+
+def labels_outside(screen: Screen, row: Node, node: Node) -> tuple[Label, ...]:
+    return tuple(
+        label
+        for member in screen.subtree(row.id)
+        if not node.id <= member.id < node.end
+        for label in own_labels(member)
+    )
 
 
 def context_labels(screen: Screen, node: Node) -> tuple[Label, ...]:
