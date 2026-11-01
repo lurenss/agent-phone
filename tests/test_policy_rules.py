@@ -65,7 +65,6 @@ def test_example_policies_scope_their_rules_to_their_app():
     assert exempt.scope.packages == {"com.facebook.pages.app"}
 
 
-@pytest.mark.xfail(strict=True, reason="the consent rule and its exemption are not in the default yet")
 def test_shipped_layers_merge_in_order_and_the_profile_deny_is_marked():
     profile, _ = load(PROFILE, trusted=True)
     layers = (load(DEFAULT), (profile, frozenset()), load(INSTAGRAM), load(BUSINESS_SUITE))

@@ -132,7 +132,7 @@ The rules that decide what an input commits (`Policy`, `core/policy/model.py`; `
 
 ### Effect
 
-What an input does that cannot be taken back (`Effect`): `publish`, `schedule`, `send`, `delete`, `purchase`, `social`, `system`, `confirm` or `unlabeled`. `--commit` grants effects, not words.
+What an input does that cannot be taken back (`Effect`): `publish`, `schedule`, `send`, `delete`, `purchase`, `social`, `system`, `consent`, `confirm` or `unlabeled`. `consent` gives a permission, a consent or an authorization that the user owns, such as "Allow" or "Accetta e continua". Its decline stays clear. `--commit` grants effects, not words.
 
 ### Phrase
 

@@ -148,6 +148,10 @@ def add_inputs(commands: argparse._SubParsersAction, after: argparse.ArgumentPar
 
 
 POLICY_HELP = "a policy file whose rules apply after the default and the device profile; repeatable"
+COMMIT_HELP = (
+    f"grant one effect the input commits ({', '.join(effect.value for effect in Effect)}); "
+    "only when your user asked for it; repeatable"
+)
 
 
 def command(
@@ -166,7 +170,7 @@ def command(
             choices=[e.value for e in Effect],
             default=[],
             metavar="EFFECT",
-            help="grant one effect the input commits; only when your user asked for it; repeatable",
+            help=COMMIT_HELP,
         )
     parser.add_argument(
         "--wait-for",

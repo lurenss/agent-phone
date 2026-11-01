@@ -158,20 +158,17 @@ def tap_in_act(root, screen, label: str) -> set[str]:
     return set()
 
 
-NO_CONSENT_YET = pytest.mark.xfail(strict=True, reason="the consent effect does not exist yet")
-
-
 @pytest.mark.parametrize(
     ("screen", "label", "effects"),
     [
-        pytest.param("netflix", "Accetta e continua", {"consent"}, marks=NO_CONSENT_YET),
+        ("netflix", "Accetta e continua", {"consent"}),
         ("netflix", "Rifiuta e continua", set()),
         ("netflix", "Modifica preferenze", set()),
-        pytest.param("grok", "Authorize", {"consent"}, marks=NO_CONSENT_YET),
+        ("grok", "Authorize", {"consent"}),
         ("grok", "Annulla", set()),
-        pytest.param("bluetooth", "CONSENTI", {"consent"}, marks=NO_CONSENT_YET),
+        ("bluetooth", "CONSENTI", {"consent"}),
         ("bluetooth", "RIFIUTA", set()),
-        pytest.param("permission", "Allow", {"consent"}, marks=NO_CONSENT_YET),
+        ("permission", "Allow", {"consent"}),
         ("permission", "Don't allow", set()),
     ],
 )

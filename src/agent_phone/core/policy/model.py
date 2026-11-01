@@ -45,6 +45,7 @@ class Effect(Enum):
     PURCHASE = "purchase"
     SOCIAL = "social"
     SYSTEM = "system"
+    CONSENT = "consent"
     CONFIRM = "confirm"
     UNLABELED = "unlabeled"
 

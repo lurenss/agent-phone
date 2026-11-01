@@ -41,11 +41,6 @@ TABLE = TABLE_DOC["case"]
 DEFAULT = parse_policy(tomllib.loads(DEFAULT_POLICY.read_text(encoding="utf-8")), "default.toml")
 POLICY = merge((DEFAULT,))
 PLACEMENTS = ("text", "content_desc", "hint", "resource_id", "class_name", "child_text")
-NO_CONSENT_YET = pytest.mark.xfail(strict=True, reason="the consent effect does not exist yet")
-
-
-def awaiting_consent(effects) -> list:
-    return [NO_CONSENT_YET] if "consent" in effects else []
 
 
 def tapped(label: str, placement: str, question: str | None = None) -> Screen:
@@ -96,7 +91,6 @@ CASES = [
         placement,
         set(case["effects"]),
         id=f"{case['label']}-{placement}",
-        marks=awaiting_consent(case["effects"]),
     )
     for case in TABLE
     for placement in PLACEMENTS
@@ -124,7 +118,6 @@ def test_the_table_has_a_row_for_every_phrase_of_the_default_policy():
             assert covered, f"{rule.origin.rule} has no table row for {' '.join(phrase.words)!r}"
 
 
-@NO_CONSENT_YET
 def test_the_table_lists_only_effects_that_exist():
     known = {effect.value for effect in Effect}
     assert all(set(case["effects"]) <= known for case in TABLE)
@@ -155,7 +148,6 @@ AFFIRMATIVE_CASES = [
         row["question"],
         set(row["effects"]),
         id=f"{row['label']}-{placement}",
-        marks=awaiting_consent(row["effects"]),
     )
     for row in AFFIRMATIVES
     for placement in NAMING_PLACEMENTS
@@ -169,16 +161,7 @@ def test_an_affirmative_under_a_question_that_commits_gives_its_own_effects_and_
     assert effects_of(verdict_of(tapped(label, placement, question))) == effects
 
 
-@pytest.mark.parametrize(
-    "label",
-    [
-        pytest.param(
-            label,
-            marks=awaiting_consent([e for case in TABLE if case["label"] == label for e in case["effects"]]),
-        )
-        for label in sorted({row["label"] for row in AFFIRMATIVES})
-    ],
-)
+@pytest.mark.parametrize("label", sorted({row["label"] for row in AFFIRMATIVES}))
 def test_the_words_of_a_class_or_an_id_are_no_affirmative(label):
     """An affirmative is a label the user reads: `ok` in a resource-id says nothing about what the
     button does, and the question under it is not read for it."""
@@ -209,7 +192,6 @@ def test_a_decline_under_a_question_that_commits_stays_clear(label, placement, q
     assert effects_of(verdict_of(tapped(label, placement, question))) == set()
 
 
-@NO_CONSENT_YET
 def test_the_table_has_a_row_for_every_decline_the_default_policy_exempts():
     rows = {normalized(row["label"]) for row in DECLINES}
     exempt = [label for rule in POLICY.of_kind(ExemptRule) for label in rule.labels]
@@ -217,7 +199,6 @@ def test_the_table_has_a_row_for_every_decline_the_default_policy_exempts():
     assert set(exempt) <= rows, f"no decline row for {sorted(set(exempt) - rows)}"
 
 
-@NO_CONSENT_YET
 def test_every_exempted_decline_would_give_consent_without_its_exemption():
     """A label in the exemption that commits nothing without it is dead data."""
     exempt = sorted(label for rule in POLICY.of_kind(ExemptRule) for label in rule.labels)

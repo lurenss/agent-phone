@@ -86,24 +86,19 @@ def button(screen: Screen, label: str) -> Node:
     return consumer_of(screen, labelled(screen, label))
 
 
-NO_CONSENT_YET = pytest.mark.xfail(strict=True, reason="the consent effect does not exist yet")
-
-
-@NO_CONSENT_YET
 def test_a_settings_tile_is_judged_by_its_title_and_not_by_its_summary():
     settings = fixture_screen("settings-home")
     for title in ("Notifications", "Display", "Sounds and vibration", "Connections"):
         assert tap_on(settings, button(settings, title)) == Clear(ClearReason.NO_COMMIT_WORDS)
     summaries_read = merge((DEFAULT, parse_policy({"disable": ["default.preference-summary"]}, "c.toml")))
     verdict = tap_on(settings, button(settings, "Notifications"), summaries_read)
-    assert isinstance(verdict, Commits) and {e.value for e in verdict.effects} == {"social", "consent"}
+    assert isinstance(verdict, Commits) and verdict.effects == {Effect.SOCIAL, Effect.CONSENT}
     assert {(e.rule, e.label, e.source) for e in verdict.evidence} == {
         ("default.social", "Block, Allow, Do not disturb", Source.RECEIVER),
         ("default.consent", "Block, Allow, Do not disturb", Source.RECEIVER),
     }
 
 
-@NO_CONSENT_YET
 def test_a_neutral_affirmative_does_what_its_dialog_says():
     screen = dialog("Delete this post?", "Cancel", "OK")
     ok = tap_on(screen, button(screen, "OK"))
@@ -112,7 +107,7 @@ def test_a_neutral_affirmative_does_what_its_dialog_says():
     assert tap_on(screen, button(screen, "Cancel")) == Clear(ClearReason.NO_COMMIT_WORDS)
     harmless = dialog("An app is asking to turn on Bluetooth.", "Deny", "Allow")
     allow = tap_on(harmless, button(harmless, "Allow"))
-    assert isinstance(allow, Commits) and {e.value for e in allow.effects} == {"consent"}, (
+    assert isinstance(allow, Commits) and allow.effects == {Effect.CONSENT}, (
         f"a permission dialog adds no effect of its own, so Allow gives its own consent alone: {allow}"
     )
     assert tap_on(harmless, button(harmless, "Deny")) == Clear(ClearReason.NO_COMMIT_WORDS)
@@ -159,10 +154,8 @@ def test_a_button_whose_words_also_confirm_takes_its_dialogs_effects_as_well():
 @pytest.mark.parametrize(
     ("description", "effects", "sources"),
     [
-        ("OK, Button", {"delete"}, {Source.CONTEXT}),
-        pytest.param(
-            "Allow,Button", {"consent", "delete"}, {Source.RECEIVER, Source.CONTEXT}, marks=NO_CONSENT_YET
-        ),
+        ("OK, Button", {Effect.DELETE}, {Source.CONTEXT}),
+        ("Allow,Button", {Effect.CONSENT, Effect.DELETE}, {Source.RECEIVER, Source.CONTEXT}),
     ],
 )
 def test_an_affirmative_described_with_a_role_suffix_does_what_its_dialog_says(description, effects, sources):
@@ -182,7 +175,7 @@ def test_an_affirmative_described_with_a_role_suffix_does_what_its_dialog_says(d
     )
     verdict = tap_on(screen, labelled_by_description(screen, description))
     shown = description.partition(",")[0]
-    assert isinstance(verdict, Commits) and {e.value for e in verdict.effects} == effects, (
+    assert isinstance(verdict, Commits) and verdict.effects == effects, (
         f"the agent sees button {shown!r}, as it does for the text, and so should the gate: {verdict}"
     )
     assert {e.source for e in verdict.evidence} == sources

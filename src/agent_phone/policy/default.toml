@@ -55,6 +55,13 @@ words = ["airplane mode", "mobile data", "vpn", "force stop", "disable", "factor
 reason = "Changes device state that can cut off the device or the agent."
 
 [[commit]]
+id = "default.consent"
+effect = "consent"
+words = ["authorize", "authorise", "accept", "agree", "allow", "consent", "grant access",
+         "autorizza", "accetta", "accetto", "consenti", "concedi", "consenso"]
+reason = "Gives a permission, a consent or an authorization that the user owns."
+
+[[commit]]
 id = "default.confirm"
 effect = "confirm"
 words = ["confirm", "submit", "conferma"]
@@ -71,6 +78,19 @@ id = "default.uri.contact"
 effect = "send"
 uri_schemes = ["tel", "sms", "smsto", "mms", "mailto"]
 reason = "Opens a call or a prefilled message."
+
+[[exempt]]
+id = "default.consent-declined"
+labels = ["don't allow", "don’t allow", "do not allow",
+          "don't accept", "don’t accept", "do not accept",
+          "don't agree", "don’t agree", "do not agree",
+          "i don't agree", "i don’t agree", "i do not agree",
+          "don't authorize", "don’t authorize", "do not authorize",
+          "don't authorise", "don’t authorise", "do not authorise",
+          "don't consent", "don’t consent", "do not consent",
+          "don't grant access", "don’t grant access", "do not grant access",
+          "non accetto"]
+reason = "A decline that holds a consent word. It gives nothing, and the way out of a consent screen must stay open."
 
 [[ignore]]
 id = "default.preference-summary"

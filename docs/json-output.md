@@ -284,6 +284,7 @@ A refused commit lists what the input would do, what was granted, and the labels
 | `purchase` | Spends money. |
 | `social` | Changes who the account is connected to, visibly. |
 | `system` | Changes device state that can cut off the device or the agent. |
+| `consent` | Gives a permission, a consent or an authorization that the user owns. |
 | `confirm` | Confirms an action whose effect the label does not say. |
 | `unlabeled` | Lands on an element with no words, so nothing says what it does. |
 
