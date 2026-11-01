@@ -1,7 +1,9 @@
 """What a command runs against: one device, its ledger, the store, the merged policy, a clock.
 
 Built once per process by the CLI (`cli/driver.py`), the only place a backend meets core, and
-only after the device lock is held. Commands receive it; nothing in core constructs one.
+only after the device lock is held. Commands receive it; nothing in core constructs one. `mode` is
+the permission mode the process was started in (`policy/mode.py`), `ask` unless the CLI says
+otherwise.
 """
 
 from __future__ import annotations
@@ -11,6 +13,7 @@ from dataclasses import dataclass
 from agent_phone.core.act.ledger import Ledger
 from agent_phone.core.device import DeviceInfo, DeviceProfile
 from agent_phone.core.phone import Phone
+from agent_phone.core.policy.mode import PermissionMode
 from agent_phone.core.policy.rules import Policy
 from agent_phone.core.refs.store import SnapshotStore
 from agent_phone.core.wait.clock import Clock
@@ -25,3 +28,4 @@ class Context:
     store: SnapshotStore
     ledger: Ledger
     clock: Clock
+    mode: PermissionMode = PermissionMode.ASK

@@ -8,6 +8,7 @@ import pytest
 from fakes import FakeHub, invoke
 from support import GOLDEN, ROOT, fixture_screen, node, screen_of, snapshot_of
 
+from agent_phone.cli.settings import Settings
 from agent_phone.core.commands.get import GetProperty
 from agent_phone.core.commands.is_ import IsProperty
 from agent_phone.core.device import (
@@ -22,9 +23,10 @@ from agent_phone.core.device import (
 )
 from agent_phone.core.envelope import payload_data, to_wire
 from agent_phone.core.geometry import Size
-from agent_phone.core.outcome import Disposition, ErrorCode, Read
+from agent_phone.core.outcome import Disposition, ErrorCode, Read, Refusal, Refused
 from agent_phone.core.phone import ServerStatus
 from agent_phone.core.policy.engine import ClearReason
+from agent_phone.core.policy.mode import PermissionMode
 from agent_phone.core.policy.rules import Effect
 from agent_phone.core.role import Role
 from agent_phone.core.screen import WindowKind
@@ -63,6 +65,7 @@ def json_blocks():
         ("### Is properties", IsProperty),
         ("### Clear reasons", ClearReason),
         ("### Effects", Effect),
+        ("### Permission modes", PermissionMode),
     ],
 )
 def test_each_value_table_lists_exactly_its_enum(heading, enum):
@@ -77,7 +80,7 @@ def test_the_example_snapshot_is_what_the_code_prints_for_its_fixture():
     assert [line.replace(f"@{data['id']}:", "@t0000:") for line in data["tree"]] == golden
     identity = DeviceIdentity(Serial(example["device"]), BootId("0"))
     snapshot = snapshot_of(fixture_screen("settings-home"), SnapshotId(data["id"]), identity)
-    assert to_wire("snapshot", identity.serial, Read(snapshot)) == example
+    assert to_wire("snapshot", identity.serial, Read(snapshot), mode=PermissionMode.ASK) == example
 
 
 def test_the_example_device_list_is_what_the_code_prints():
@@ -100,7 +103,7 @@ def test_the_example_device_list_is_what_the_code_prints():
         Listed(Connected(info.identity.serial, "SM_J730F", True), info, None, None),
         Listed(Connected(Serial("R58M1234567"), "", False), None, None, None),
     )
-    assert to_wire("devices", None, Read(DeviceList(rows))) == example
+    assert to_wire("devices", None, Read(DeviceList(rows)), mode=PermissionMode.ASK) == example
 
 
 def test_the_devices_table_lists_exactly_the_keys_a_row_can_carry():
@@ -184,6 +187,31 @@ def test_the_example_refused_commit_is_what_the_code_prints(tmp_path):
     _, taken = invoke(["snapshot"], hub, tmp_path)
     code, wire = invoke(["click", f"@{taken['data']['id']}:e1"], hub, tmp_path)
     assert code == 1 and wire == example
+
+
+def test_the_example_skipped_commit_is_what_the_code_prints(tmp_path):
+    example = next(block for block in json_blocks() if block.get("mode") == "dangerously-skip")
+    schedule = screen_of(
+        node(
+            "android.widget.FrameLayout",
+            node("android.widget.Button", text="Schedule reel", clickable=True, bounds="[0,1700][1080,1800]"),
+            bounds="[0,0][1080,1920]",
+        )
+    )
+    hub = FakeHub([Connected(Serial(example["device"]), "SM_J730F", True)], screens=[schedule])
+    _, taken = invoke(["snapshot"], hub, tmp_path)
+    skip = {"AGENT_PHONE_PERMISSION_MODE": "dangerously-skip"}
+    code, wire = invoke(["click", f"@{taken['data']['id']}:e1"], hub, tmp_path, env=skip)
+    printed = json.dumps(wire, ensure_ascii=False).replace(taken["data"]["id"], "m9q4t")
+    assert code == 0 and json.loads(printed) == example
+    assert set(example["data"]["gate"]) == {"verdict", "effects", "granted", "skipped"}
+
+
+def test_the_example_invalid_mode_is_what_the_code_prints():
+    example = next(block for block in json_blocks() if block.get("mode") is None and "mode" in block)
+    with pytest.raises(Refusal) as refused:
+        Settings.from_environment({"AGENT_PHONE_PERMISSION_MODE": "skip"})
+    assert to_wire("", None, Refused.of(refused.value), mode=None) == example
 
 
 def test_the_example_wait_timeout_is_what_the_code_prints_for_its_fixture(tmp_path):

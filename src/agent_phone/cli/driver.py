@@ -68,6 +68,7 @@ from agent_phone.core.context import Context
 from agent_phone.core.device import Package, Serial, select_device
 from agent_phone.core.outcome import Acted, Outcome, Read, Refusal, Refused, Value
 from agent_phone.core.phone import KeyName, Orientation, PhoneHub
+from agent_phone.core.policy.mode import PermissionMode
 from agent_phone.core.policy.rules import Effect
 from agent_phone.core.query import Query
 from agent_phone.core.refs.store import DeviceLock, SnapshotStore
@@ -116,6 +117,10 @@ class Driver:
     @property
     def serial(self) -> Serial:
         return self._ctx.info.identity.serial
+
+    @property
+    def mode(self) -> PermissionMode:
+        return self._ctx.mode
 
     def with_policies(self, policies: Sequence[Path]) -> Driver:
         """The same device, lock and ledger, judging under these caller policy files as well. They
@@ -385,6 +390,7 @@ def open_phone(
                 SnapshotStore(settings.state_root),
                 Ledger(settings.state_root, info.identity),
                 clock,
+                settings.permission_mode,
             )
         except Refusal as refusal:
             raise PhoneError(Refused.of(refusal), chosen) from refusal

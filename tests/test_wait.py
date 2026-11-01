@@ -21,6 +21,7 @@ from agent_phone.core.device import Package
 from agent_phone.core.envelope import encode, to_wire
 from agent_phone.core.outcome import Disposition, ErrorCode, Read, Refusal, Refused
 from agent_phone.core.phone import Key, KeyName
+from agent_phone.core.policy.mode import PermissionMode
 from agent_phone.core.policy.rules import merge, parse_policy
 from agent_phone.core.query import Q
 from agent_phone.core.refs.store import SnapshotStore
@@ -205,17 +206,20 @@ def test_a_wait_spends_no_permit_and_sends_no_input(tmp_path, command):
 def test_a_timeout_prints_the_last_read_and_is_safe_to_retry(tmp_path):
     ctx, _, _ = context(tmp_path, SETTINGS)
     outcome = run(ctx, WaitCommand((Present(Q("Brightness")),), timeout_ms=200))
-    wire = to_wire("wait", J7_SERIAL, outcome)
+    wire = to_wire("wait", J7_SERIAL, outcome, mode=PermissionMode.ASK)
     assert wire["ok"] is False and wire["delivery"] == "not_delivered" and wire["retry"] == "safe"
     assert wire["error"]["code"] == "TIMEOUT"
     shown = json.loads(encode(wire))["error"]["details"]["after"]
-    assert shown == to_wire("snapshot", J7_SERIAL, Read(outcome.details["after"]))["data"]
+    assert (
+        shown
+        == to_wire("snapshot", J7_SERIAL, Read(outcome.details["after"]), mode=PermissionMode.ASK)["data"]
+    )
     assert shown["app"] == "com.android.settings"
 
 
 def test_a_wait_that_held_prints_like_a_snapshot(tmp_path):
     ctx, _, _ = context(tmp_path, SETTINGS)
     done = run(ctx, WaitCommand((Present(Q("Display")),)))
-    wire = to_wire("wait", J7_SERIAL, done)
+    wire = to_wire("wait", J7_SERIAL, done, mode=PermissionMode.ASK)
     assert wire["ok"] is True and wire["command"] == "wait" and "delivery" not in wire
-    assert wire["data"] == to_wire("snapshot", J7_SERIAL, done)["data"]
+    assert wire["data"] == to_wire("snapshot", J7_SERIAL, done, mode=PermissionMode.ASK)["data"]

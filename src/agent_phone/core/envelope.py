@@ -1,11 +1,14 @@
 """The JSON contract (`docs/json-output.md`): one envelope per command, built from an Outcome.
 
-    {"v": 1, "ok": bool, "command": str, "device": serial | null,
+    {"v": 1, "ok": bool, "command": str, "mode": "ask" | "dangerously-skip" | null,
+     "device": serial | null,
      "delivery": <Disposition>, "retry": "safe" | "unsafe",     # only for Refused and Acted
      "data": {...} | "error": {"code", "message", "hint", "details"}}
 
 `delivery` and `retry` are computed here from the outcome type and nowhere else, and `retry`
-from `delivery` (`Disposition.retry_safe`). No caller can write them.
+from `delivery` (`Disposition.retry_safe`). No caller can write them. `mode` is the permission
+mode the process ran in, and null only when the environment named one that does not exist, so no
+mode was ever in force.
 """
 
 from __future__ import annotations
@@ -33,7 +36,8 @@ from agent_phone.core.phone import (
     Swipe,
     Tap,
 )
-from agent_phone.core.policy.engine import Clear, Commits, Denied, Verdict
+from agent_phone.core.policy.engine import Clear, Commits, Denied, Grant, Verdict
+from agent_phone.core.policy.mode import PermissionMode
 from agent_phone.core.snapshot.budget import render_line
 from agent_phone.core.snapshot.snapshot import Snapshot
 
@@ -53,8 +57,16 @@ HINTS: Mapping[ErrorCode, str] = {
 """Only codes whose recovery is not obvious from the message have a hint."""
 
 
-def to_wire(command: str, device: Serial | None, outcome: Outcome) -> dict[str, object]:
-    wire: dict[str, object] = {"v": VERSION, "ok": True, "command": command, "device": device}
+def to_wire(
+    command: str, device: Serial | None, outcome: Outcome, *, mode: PermissionMode | None
+) -> dict[str, object]:
+    wire: dict[str, object] = {
+        "v": VERSION,
+        "ok": True,
+        "command": command,
+        "mode": mode_value(mode),
+        "device": device,
+    }
     match outcome:
         case Read():
             wire["data"] = payload_data(outcome.payload)
@@ -69,6 +81,10 @@ def to_wire(command: str, device: Serial | None, outcome: Outcome) -> dict[str, 
             if outcome.error is not None:
                 wire["error"] = error_object(outcome.error, outcome.message, {})
     return wire
+
+
+def mode_value(mode: PermissionMode | None) -> str | None:
+    return None if mode is None else mode.value
 
 
 def delivery_keys(disposition: Disposition) -> dict[str, object]:
@@ -168,7 +184,7 @@ def acted_data(acted: Acted) -> dict[str, object]:
             "name": target.name,
             "at": None if target.point is None else [target.point.x, target.point.y],
         },
-        "gate": gate_data(report.verdict),
+        "gate": gate_data(report.verdict, report.grant),
         "verified_by": report.verified_by,
         "after": None if acted.after is None else snapshot_data(acted.after),
     }
@@ -203,13 +219,21 @@ def input_data(action: InputAction) -> dict[str, object]:
             return {"kind": "set_clipboard"}
 
 
-def gate_data(verdict: Verdict) -> dict[str, object]:
-    """Only a clear or a granted verdict is ever sent, so a denial has no wire form here."""
+def gate_data(verdict: Verdict, grant: Grant) -> dict[str, object]:
+    """Only a clear verdict or a commit that went out is ever sent, so a denial has no wire form
+    here. A commit's effects split into `granted`, which the caller's `--commit` named, and
+    `skipped`, which the permission mode let through with no grant. `skipped` is empty in `ask`,
+    because the gate sends nothing there until every effect is granted."""
     match verdict:
         case Clear(reason=reason):
             return {"verdict": "clear", "reason": reason.value}
         case Commits(effects=effects):
-            return {"verdict": "commits", "effects": sorted(effect.value for effect in effects)}
+            return {
+                "verdict": "commits",
+                "effects": sorted(effect.value for effect in effects),
+                "granted": sorted(effect.value for effect in effects & grant.effects),
+                "skipped": sorted(effect.value for effect in effects - grant.effects),
+            }
         case Denied():
             return {"verdict": "denied", "rule": verdict.rule}
 
@@ -239,7 +263,12 @@ def device_data(row: Listed) -> dict[str, object]:
 
 
 def floor_envelope(
-    command: str, device: Serial | None, error: BaseException, unrefunded: bool
+    command: str,
+    device: Serial | None,
+    error: BaseException,
+    unrefunded: bool,
+    *,
+    mode: PermissionMode | None,
 ) -> dict[str, object]:
     """The CLI's handler for an exception no command caught. INTERNAL, with `delivery_uncertain`
     when the ledger says this process spent a permit it did not refund, else `not_delivered`."""
@@ -249,6 +278,7 @@ def floor_envelope(
         "v": VERSION,
         "ok": False,
         "command": command,
+        "mode": mode_value(mode),
         "device": device,
         **delivery_keys(disposition),
         "error": error_object(ErrorCode.INTERNAL, message, {"exception": type(error).__name__}),

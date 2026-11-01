@@ -26,8 +26,6 @@ from agent_phone.core.phone import Stop, Tap
 from agent_phone.core.policy.rules import Effect
 from agent_phone.core.query import Q
 
-pytestmark = pytest.mark.xfail(strict=True, reason="the permission modes do not exist yet")
-
 J7 = Connected(J7_SERIAL, "SM_J730F", ready=True)
 VARIABLE = "AGENT_PHONE_PERMISSION_MODE"
 SKIP = {VARIABLE: "dangerously-skip"}

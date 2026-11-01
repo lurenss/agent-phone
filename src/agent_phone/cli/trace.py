@@ -106,6 +106,7 @@ def step_record(
         "line": "step",
         "i": index,
         "argv": redacted(argv, command),
+        "mode": envelope["mode"],
         "started_utc": started_utc,
         "ms": ms,
         "ok": envelope["ok"],

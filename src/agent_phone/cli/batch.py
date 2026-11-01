@@ -38,6 +38,7 @@ from agent_phone.core.envelope import VERSION, delivery_keys, floor_envelope, to
 from agent_phone.core.envelope import exit_code as outcome_code
 from agent_phone.core.outcome import Disposition, ErrorCode, Outcome, Refusal, Refused
 from agent_phone.core.phone import PhoneHub
+from agent_phone.core.policy.mode import PermissionMode
 from agent_phone.core.snapshot.snapshot import RefToken
 from agent_phone.core.wait.clock import Clock
 
@@ -83,6 +84,7 @@ class StepResult:
 @dataclass(frozen=True, slots=True)
 class BatchResult:
     device: Serial
+    mode: PermissionMode
     results: tuple[StepResult, ...]
     trace: Path
 
@@ -105,6 +107,7 @@ class BatchResult:
             "v": VERSION,
             "ok": failed is None,
             "command": "batch",
+            "mode": self.mode.value,
             "device": self.device,
         }
         if failed is not None:
@@ -218,7 +221,7 @@ def run_batch(
                     break
             stopped = None if results[-1].ok else results[-1].step.index
             trace.append(end_record(stopped, milliseconds(clock.now() - began)))
-        return BatchResult(driver.serial, tuple(results), trace.path)
+        return BatchResult(driver.serial, driver.mode, tuple(results), trace.path)
 
 
 def run_step(step: Step, driver: Driver, clock: Clock) -> StepResult:
@@ -233,13 +236,16 @@ def run_step(step: Step, driver: Driver, clock: Clock) -> StepResult:
         outcome = driver.run(step.command)
     except Refusal as refusal:
         if unrefunded(spent):
-            envelope, code = floor_envelope(step.name, driver.serial, refusal, unrefunded=True), 1
+            envelope = floor_envelope(step.name, driver.serial, refusal, unrefunded=True, mode=driver.mode)
+            code = 1
             return StepResult(step, started, milliseconds(clock.now() - began), envelope, code)
         outcome = Refused.of(refusal)
     except Exception as error:
-        envelope = floor_envelope(step.name, driver.serial, error, unrefunded=unrefunded(spent))
+        envelope = floor_envelope(
+            step.name, driver.serial, error, unrefunded=unrefunded(spent), mode=driver.mode
+        )
         return StepResult(step, started, milliseconds(clock.now() - began), envelope, 1)
-    envelope = to_wire(step.name, driver.serial, outcome)
+    envelope = to_wire(step.name, driver.serial, outcome, mode=driver.mode)
     return StepResult(step, started, milliseconds(clock.now() - began), envelope, outcome_code(outcome))
 
 

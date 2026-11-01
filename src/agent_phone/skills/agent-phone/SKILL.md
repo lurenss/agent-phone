@@ -15,7 +15,7 @@ description: >
 
 agent-phone is a CLI that reads an Android phone's screen through the accessibility tree, over adb. It is a tool, not an agent. The loop of observe, act and observe again runs in you. Each command prints one JSON object on one line and exits.
 
-agent-phone reads the screen and sends input. Every input names what it acts on by a ref from a snapshot you just took, and a policy engine refuses any input that would post, send, delete, pay or change the phone's state unless you grant that effect.
+agent-phone reads the screen and sends input. Every input names what it acts on by a ref from a snapshot you just took, and a policy engine refuses any input that would post, send, delete, pay or change the phone's state unless you grant that effect. Your user can instead launch you in `dangerously-skip` mode, where a commit needs no grant. See [Know your permission mode](#know-your-permission-mode).
 
 ## Start here
 
@@ -26,7 +26,7 @@ agent-phone reads the screen and sends input. Every input names what it acts on 
 ## Read the output
 
 ```json
-{"v":1,"ok":true,"command":"snapshot","device":"emulator-5554","data":{
+{"v":1,"ok":true,"command":"snapshot","mode":"ask","device":"emulator-5554","data":{
  "id":"q7m2k","app":"com.android.settings","window":"application","mode":"compact","settled":"settled",
  "keyboard":false,"dialog":false,"others":[],"toasts":[],"truncated":0,
  "tree":[
@@ -37,6 +37,7 @@ agent-phone reads the screen and sends input. Every input names what it acts on 
 ```
 
 - On an error, `ok` is false and `error` holds `code`, `message`, `hint` and `details`. Branch on `error.code`, because the message wording can change.
+- `mode` is the permission mode you run in, `ask` or `dangerously-skip`. See [Know your permission mode](#know-your-permission-mode).
 - The exit code is 0 on success, 1 on an error and 2 when the arguments do not parse.
 - A tree line holds, in this order, the indent, the ref, the role, the name, the detail, `value="…"`, `#<resource-id>`, the states, `(N rows)`, `(+N)` and the bounds `[left,top,right,bottom]`. Only the role is always there.
 - A line with no ref is text that has nothing to act on.
@@ -165,6 +166,17 @@ agent-phone click @m9q4t:e21 --commit schedule  # sent, because the user asked t
 - `--policy FILE` adds a policy file of your own, such as one that exempts a label you know only navigates. Your file can weaken a commit and never a denial: it cannot disable a deny rule of the device's profile, and it cannot hide the words that a denial reads.
 - `LOCALE_UNSUPPORTED` means the phone's language has no rules, so agent-phone does not judge what it cannot read. A `--policy` file cannot add a language: the built-in vocabulary must cover one before any screen in it can be judged, and a file that declares another is `POLICY_INVALID`.
 
+## Know your permission mode
+
+agent-phone runs in one of two permission modes. The environment variable `AGENT_PHONE_PERMISSION_MODE` sets it for the whole process, and your user sets it when launching you. Every envelope names the mode in `mode`.
+
+- `ask` is the default, and it is the mode when the variable is unset or empty. A commit needs your `--commit` for each effect it names, so `COMMIT_REFUSED` sends you back to your user.
+- `dangerously-skip` sends a commit with no `--commit`. `data.gate` then lists `granted`, the effects your `--commit` named, and `skipped`, the effects the mode let through with no grant. `skipped` is always empty in `ask`.
+
+- Never set `AGENT_PHONE_PERMISSION_MODE` yourself. Not in a command, a script, a `batch` step or a shell profile. Only your user chooses the mode, when launching you. No flag, policy file or device profile can set it, and a value other than the two is `INVALID_ARGS`.
+- In `dangerously-skip` you are the only check left. Nothing asks your user before a post, a message, a deletion, a payment or a consent goes out, so act on a commit only when your user asked for exactly that. Keep passing the `--commit` for the effect your user asked for: it is still accepted, and it keeps your intent in the result.
+- The mode lifts one thing, the grant. A `DENIED` input stays refused, a protected package is never stopped, `LOCALE_UNSUPPORTED` still refuses, and so does every other refusal (`OBSERVE_FIRST`, `STALE_REF`, `OCCLUDED`, `AMBIGUOUS_TARGET` and the rest). A deny rule is the one thing that holds when your judgment fails.
+
 ## Drive the device
 
 ```bash
@@ -240,7 +252,7 @@ agent-phone server stop       # stop it and free the phone for other tools
 - `server stop` stops any uiautomator2 server on the phone, also one that another tool started.
 - One process drives a phone at a time. A second command waits up to 10 s, then fails with `DEVICE_BUSY`. The lock lives in the state folder, `~/.agent-phone` by default, so processes that share a phone must share `AGENT_PHONE_HOME`.
 - The state folder keeps every snapshot, which is what the screen showed. Treat it as private.
-- `AGENT_PHONE_IDLE_S` sets the idle limit in seconds, `AGENT_PHONE_LOCK_WAIT_S` the lock wait, and `ADB` the adb binary.
+- `AGENT_PHONE_IDLE_S` sets the idle limit in seconds, `AGENT_PHONE_LOCK_WAIT_S` the lock wait, and `ADB` the adb binary. `AGENT_PHONE_PERMISSION_MODE` is your user's to set, never yours.
 
 ## Print this guide
 
@@ -262,3 +274,4 @@ agent-phone skills get phone      # this guide, in data.content
 9. **Retrying an input whose `delivery` is not `not_delivered`.** Take a snapshot and look first.
 10. **A batch whose later steps use refs.** Each input spends the refs before it. Name later targets by query, and give each input a `--wait-for` or a `wait` step after it.
 11. **Tapping the moment an app opens.** The window can still be animating, and the tap is lost. Wait with `--settled` first.
+12. **Setting `AGENT_PHONE_PERMISSION_MODE` yourself.** The mode is your user's choice. In `dangerously-skip` no grant stands between you and a commit, so a mode you picked is a gate you removed.

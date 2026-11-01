@@ -136,7 +136,6 @@ def test_no_consumer_rule_turns_a_denied_tap_into_anything_else(device, title, p
 
 
 MODES = ["ask", "dangerously-skip"]
-NO_MODES_YET = pytest.mark.xfail(strict=True, reason="the permission modes do not exist yet")
 CANCEL_SENDS = {"commit": [{"id": "c.cancel", "effect": "send", "words": ["cancel"], "reason": "r"}]}
 
 
@@ -179,7 +178,6 @@ class Held:
         return outcome, phone.permits
 
 
-@NO_MODES_YET
 @pytest.mark.parametrize("platform_ids", [True, False], ids=["platform-dialog", "app-drawn-dialog"])
 @pytest.mark.parametrize(("device", "title", "positive"), CASES, ids=[f"{t} {p}" for _, t, p in CASES])
 @pytest.mark.parametrize("value", MODES)
@@ -190,29 +188,29 @@ def test_no_consumer_rule_lets_a_denied_tap_through_in_either_mode(
     held = Held(tmp_path, dialog(title, positive, platform_ids), mode)
     base = merge((DEFAULT, DEVICE[device]))
     nothing, everything = Grant.none(), Grant(frozenset(Effect))
-    for grant in (nothing, everything):
-        outcome, sent = held.tap(base, positive, grant)
-        assert isinstance(outcome, Refused) and outcome.code is ErrorCode.DENIED and sent == []
     rule_ids = sorted({rule.origin.rule for rule in base.rules if not isinstance(rule, DenyRule)})
     layers = one_rule_layers(title, positive, rule_ids)
     grant = nothing if value == "dangerously-skip" else everything
-    opened = {}
+    taps = {
+        "no consumer layer, no grant": (base, nothing),
+        "no consumer layer, every grant": (base, everything),
+    }
     for name, doc in layers.items():
         try:
-            policy = merge((DEFAULT, DEVICE[device], parse_policy(doc, "consumer.toml")))
+            taps[name] = (merge((DEFAULT, DEVICE[device], parse_policy(doc, "consumer.toml"))), grant)
         except Refusal as refusal:
             assert refusal.code is ErrorCode.POLICY_INVALID, refusal
-            continue
-        outcome, sent = held.tap(policy, positive, grant)
+    opened = {}
+    for name, (policy, granted) in taps.items():
+        outcome, sent = held.tap(policy, positive, granted)
         if sent or not (isinstance(outcome, Refused) and outcome.code is ErrorCode.DENIED):
             opened[name] = "SENT" if sent else getattr(outcome, "code", outcome)
     assert not opened, (
-        f"in mode {value}, {len(opened)} of {len(layers)} consumer layers opened {positive!r} "
-        f"under {title!r}: " + "; ".join(f"{name}: {how}" for name, how in list(opened.items())[:5])
+        f"in mode {value}, {len(opened)} of {len(taps)} taps opened {positive!r} under {title!r}: "
+        + "; ".join(f"{name}: {how}" for name, how in list(opened.items())[:5])
     )
 
 
-@NO_MODES_YET
 @pytest.mark.parametrize("value", MODES)
 def test_the_mode_is_live_in_this_harness_a_commit_goes_out_only_in_skip_mode(tmp_path, value):
     """The control for the sweep above: with the mode set as the sweep sets it, a tap that commits

@@ -31,7 +31,8 @@ from agent_phone.core.phone import (
     SetText,
     Tap,
 )
-from agent_phone.core.policy.engine import Site, Verdict, classify, require
+from agent_phone.core.policy.engine import Site, Verdict, classify
+from agent_phone.core.policy.mode import admit
 from agent_phone.core.refs.fingerprint import path_of
 from agent_phone.core.refs.resolve import QueryTarget, RefTarget, Resolved, Target, locate, observed_snapshot
 from agent_phone.core.role import Role, role_of, takes_touch
@@ -72,7 +73,7 @@ def act(ctx: Context, request: Request) -> Outcome:
             held = tuple(holds(p, None, planned.before) for p in request.wait_for if is_effect(p))
             planned = replace(planned, held_before=held)
         verdict = classify(ctx.policy, planned.action, planned.site, ctx.info.locale)
-        require(verdict, request.grant)
+        admit(verdict, request.grant, ctx.mode)
     except Refusal as refusal:
         return Refused.of(refusal)
 
@@ -85,7 +86,7 @@ def act(ctx: Context, request: Request) -> Outcome:
             if isinstance(error, Refusal)
             else (ErrorCode.INTERNAL, f"{type(error).__name__}: {error}")
         )
-        report = ActionReport(planned.action, planned.target, verdict, None)
+        report = ActionReport(planned.action, planned.target, verdict, request.grant, None)
         return Acted(SentState.UNCERTAIN, report, None, code, message)
     if isinstance(delivery, NotSent):
         ctx.ledger.refund(permit)
@@ -254,7 +255,7 @@ def _after_send(ctx: Context, request: Request, delivery: Sent, planned: Planned
     returned in `after`, so the caller has fresh refs without another call.
     """
     sent = SentState.UNCERTAIN if delivery.ack is Ack.UNACKNOWLEDGED else SentState.UNVERIFIED
-    report = ActionReport(planned.action, planned.target, verdict, None)
+    report = ActionReport(planned.action, planned.target, verdict, request.grant, None)
     try:
         if isinstance(request.intent, Fill) and not request.wait_for:
             return _read_back(ctx, request.intent, planned, sent, report)
@@ -293,7 +294,7 @@ def _after_send(ctx: Context, request: Request, delivery: Sent, planned: Planned
 
 
 def _by(report: ActionReport, verified_by: str | None) -> ActionReport:
-    return ActionReport(report.action, report.target, report.verdict, verified_by)
+    return ActionReport(report.action, report.target, report.verdict, report.grant, verified_by)
 
 
 def record(ctx: Context, screen: Screen, settled: SettleState) -> Snapshot | None:

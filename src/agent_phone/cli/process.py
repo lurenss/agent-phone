@@ -61,18 +61,20 @@ def run(
         outcome, device = execute(invocation, hub, settings, clock or SystemClock(), stdin or sys.stdin)
     except Refusal as refusal:
         if unrefunded():
-            out.write(encode(floor_envelope(name, device, refusal, unrefunded=True)) + "\n")
+            floor = floor_envelope(name, device, refusal, unrefunded=True, mode=settings.permission_mode)
+            out.write(encode(floor) + "\n")
             return 1
         outcome = Refused.of(refusal)
     except PhoneError as error:
         outcome, device = error.outcome, error.device
     except Exception as error:
-        out.write(encode(floor_envelope(name, device, error, unrefunded=unrefunded())) + "\n")
+        floor = floor_envelope(name, device, error, unrefunded=unrefunded(), mode=settings.permission_mode)
+        out.write(encode(floor) + "\n")
         return 1
     if isinstance(outcome, BatchResult):
         out.write(encode(outcome.wire()) + "\n")
         return outcome.exit_code
-    out.write(encode(to_wire(name, device, outcome)) + "\n")
+    out.write(encode(to_wire(name, device, outcome, mode=settings.permission_mode)) + "\n")
     return exit_code(outcome)
 
 
@@ -146,7 +148,7 @@ def main() -> int:
     try:
         settings = Settings.from_environment()
     except Refusal as refusal:
-        sys.stdout.write(encode(to_wire("", None, Refused.of(refusal))) + "\n")
+        sys.stdout.write(encode(to_wire("", None, Refused.of(refusal), mode=None)) + "\n")
         return 2
     hub = U2Hub(SubprocessAdb(settings.adb), settings.idle_limit_s)
     return run(sys.argv[1:], hub, settings, sys.stdout)

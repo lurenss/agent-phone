@@ -48,6 +48,7 @@ from agent_phone.core.phone import (
     intent_of,
 )
 from agent_phone.core.policy.engine import Clear, ClearReason, Grant
+from agent_phone.core.policy.mode import PermissionMode
 from agent_phone.core.refs.store import SnapshotStore
 from agent_phone.core.snapshot.capture import capture
 
@@ -284,7 +285,7 @@ def test_a_link_with_a_line_break_is_refused_before_anything_is_sent(tmp_path, u
     outcome = open_url(ctx, OpenUrlCommand(uri))
     assert adb.scripts == [], "am start ran, and its echo of the link can read as 'nothing started'"
     assert isinstance(outcome, Refused) and outcome.code is ErrorCode.INVALID_ARGS
-    wire = to_wire("open-url", J7_SERIAL, outcome)
+    wire = to_wire("open-url", J7_SERIAL, outcome, mode=PermissionMode.ASK)
     assert (wire["delivery"], wire["retry"]) == ("not_delivered", "safe")
     assert ctx.ledger.epoch() == before.epoch, "a refused link spends nothing"
 

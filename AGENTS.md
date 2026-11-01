@@ -71,7 +71,7 @@ agent-phone drives real phones with real accounts. A wrong tap can post, send or
 
 The framework enforces these on every device:
 
-- Never send a commit action without the caller's explicit `--commit`. The policy engine decides what counts as a commit action from its rules. Tests never pass `--commit`.
+- Never send a commit action without the caller's explicit `--commit`, unless the person who launched the agent set `AGENT_PHONE_PERMISSION_MODE=dangerously-skip`. The policy engine decides what counts as a commit action from its rules. Tests never pass `--commit`. Tests never set the variable except to test the mode, and the verify skill's `evidence.py` drops it unless a journey passes it with `--env`. An agent never sets it. A deny rule and a protected package hold in both modes.
 - Never stop a package that the device profile marks as protected.
 - Install nothing on the device. The only footprint is `/data/local/tmp/u2.jar` (`A3-1`) and the empty file `/data/local/tmp/ap-lastuse` that the idle watchdog reads (`A3-8`). `agent-phone server stop` removes the second.
 - Only one process drives a device at a time (`A3-4`).

@@ -69,10 +69,13 @@ class TargetReport:
 
 @dataclass(frozen=True, slots=True)
 class ActionReport:
-    """What was sent, at what, under which verdict, and what proved it, for the envelope and
-    the trace. A secret field's text is never in it."""
+    """What was sent, at what, under which verdict and caller grant, and what proved it, for the
+    envelope and the trace. The grant is there because a mode that lets a commit through with no
+    grant must say which effects it let through (`envelope.gate_data`). A secret field's text is
+    never in it."""
 
     action: InputAction
     target: TargetReport | None
     verdict: Verdict
+    grant: Grant
     verified_by: str | None
