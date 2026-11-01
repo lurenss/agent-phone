@@ -8,19 +8,46 @@ is never installed (A3-1).
 
 from __future__ import annotations
 
+import base64
+from dataclasses import replace
+
 from agent_phone.adapters.uiautomator2.adb import Adb, first_line, parse_devices
+from agent_phone.adapters.uiautomator2.address import pin
+from agent_phone.adapters.uiautomator2.delivery import classify
 from agent_phone.adapters.uiautomator2.first_read import MAX_AGE_S, FirstRead, overlap
 from agent_phone.adapters.uiautomator2.parse import parse_hierarchy
 from agent_phone.adapters.uiautomator2.rpc import JsonRpc, Phase
 from agent_phone.adapters.uiautomator2.server import Forward, Server, touch_interval, touch_script
 from agent_phone.adapters.uiautomator2.shell import Shell
-from agent_phone.core.device import Connected, DeviceInfo, DeviceState, Serial
+from agent_phone.core.device import Capability, Connected, DeviceInfo, DeviceState, Power, Serial
 from agent_phone.core.outcome import ErrorCode, Refusal
-from agent_phone.core.phone import Delivery, Permit
+from agent_phone.core.phone import (
+    Activate,
+    Delivery,
+    Key,
+    KeyName,
+    Launch,
+    LongPress,
+    NotSent,
+    OpenUri,
+    Permit,
+    Rotate,
+    SetClipboard,
+    SetPower,
+    SetText,
+    Stop,
+    Swipe,
+    Tap,
+)
 from agent_phone.core.screen import Screen
 from agent_phone.core.wait.clock import Clock, SystemClock
 
 READ_TIMEOUT_S = 15.0
+SCREENSHOT_QUALITY = 90
+STEP_MS = 5
+"""UiDevice.swipe moves one step about every 5 ms."""
+KEY_CODES = {KeyName.BACK: 4, KeyName.HOME: 3, KeyName.RECENTS: 187, KeyName.ENTER: 66}
+CAPABILITIES = frozenset({Capability.CLIPBOARD, Capability.SCREENSHOT})
 DUMP_METHOD = "dumpWindowHierarchy"
 MAX_DEPTH = 50
 ALREADY_REGISTERED = "already registered"
@@ -35,10 +62,12 @@ class U2Phone:
         server: Server,
         idle_limit_s: int,
         clock: Clock,
+        shell: Shell,
         first: FirstRead | None = None,
     ) -> None:
-        self._info = info
+        self._info = replace(info, capabilities=CAPABILITIES)
         self._rpc = rpc
+        self._shell = shell
         self._forward = forward
         self._server = server
         self._clock = clock
@@ -57,28 +86,53 @@ class U2Phone:
         return parse_hierarchy(self._dump(), self._info.display, self._info.default_ime)
 
     def state(self) -> DeviceState:
-        raise NotImplementedError
+        raise NotImplementedError("no command reads the power or lock state yet")
 
     def inject(self, permit: Permit) -> Delivery:
         """Refuse a permit minted for another device identity (NotSent(WRONG_DEVICE)); it can
-        only happen through a wiring bug, and the check costs nothing. Then one call:
+        only happen through a wiring bug, and the check costs nothing. Then one call, never
+        retried (A2-6). The jar has no semantic click (A2-11), so `Activate` is NOT_SUPPORTED."""
+        if permit.device != self._info.identity:
+            return NotSent(ErrorCode.WRONG_DEVICE, f"The permit was made for {permit.device.serial}.")
+        self._keepalive()
+        match permit.action:
+            case Tap(point=p):
+                return classify(self._rpc.call("click", [p.x, p.y]))
+            case LongPress(point=p, duration_ms=ms):
+                return classify(self._rpc.call("click", [p.x, p.y, ms]))
+            case Activate():
+                return NotSent(ErrorCode.NOT_SUPPORTED, "This backend cannot click a node without a point.")
+            case Swipe(start=a, end=b, duration_ms=ms):
+                steps = max(2, ms // STEP_MS)
+                return classify(self._rpc.call("swipe", [a.x, a.y, b.x, b.y, steps]))
+            case SetText(field=field, text=text):
+                selector = pin(self._rpc, field)
+                if isinstance(selector, NotSent):
+                    return selector
+                return classify(self._rpc.call("setText", [selector, text]))
+            case Key(key=key):
+                return classify(self._rpc.call("pressKeyCode", [KEY_CODES[key]]))
+            case SetPower(power=power):
+                return classify(self._rpc.call("pressKeyCode", [224 if power is Power.ON else 223]))
+            case SetClipboard(text=text):
+                return classify(self._rpc.call("setClipboard", [None, text]))
+            case Launch() | Stop() | OpenUri() | Rotate() as action:
+                return self._shell.run(action)
 
-        Tap/LongPress  -> rpc click(x, y) / click(x, y, ms)
-        Activate       -> NotSent(NOT_SUPPORTED): u2.jar exposes no ACTION_CLICK on a node
-        Swipe          -> rpc swipe(fx, fy, tx, ty, steps)
-        SetText        -> address.pin, then rpc setText(selector, text)
-        Key            -> rpc pressKeyCode(code)    BACK 4, HOME 3, RECENTS 187, ENTER 66
-        SetPower       -> rpc pressKeyCode(224 wake / 223 sleep)
-        SetClipboard   -> rpc setClipboard(label, text)
-        Launch, Stop, OpenUri, Rotate -> shell.run
-        """
-        raise NotImplementedError
-
-    def clipboard(self) -> str:
-        raise NotImplementedError
+    def clipboard(self) -> str | None:
+        self._keepalive()
+        reply = self._rpc.call("getClipboard", [])
+        if reply.phase is not Phase.ANSWERED or reply.error_message is not None:
+            raise Refusal(ErrorCode.SERVER_UNAVAILABLE, "The server did not read the clipboard.")
+        return reply.result if isinstance(reply.result, str) else None
 
     def screenshot(self) -> bytes:
-        raise NotImplementedError
+        """A JPEG through UiAutomation, at full size."""
+        self._keepalive()
+        reply = self._rpc.call("takeScreenshot", [1.0, SCREENSHOT_QUALITY])
+        if reply.phase is not Phase.ANSWERED or not isinstance(reply.result, str):
+            raise Refusal(ErrorCode.SERVER_UNAVAILABLE, "The server did not take the screenshot.")
+        return base64.b64decode(reply.result)
 
     def close(self) -> None:
         self._forward.close()
@@ -167,7 +221,7 @@ class U2Hub:
             else:
                 info = shell.facts(also=touch)
                 server.ensure(rpc)
-            return U2Phone(info, rpc, forward, server, self._idle_limit_s, self._clock, first)
+            return U2Phone(info, rpc, forward, server, self._idle_limit_s, self._clock, shell, first)
         except BaseException:
             forward.close()
             raise

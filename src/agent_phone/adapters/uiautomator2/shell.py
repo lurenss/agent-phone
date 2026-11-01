@@ -9,12 +9,14 @@ default. `wm size` and `wm density` print an override line when one is set, and 
 from __future__ import annotations
 
 import re
+import shlex
 
 from agent_phone.adapters.uiautomator2.adb import Adb, first_line, shell
+from agent_phone.adapters.uiautomator2.delivery import classify_shell
 from agent_phone.core.device import BootId, DeviceIdentity, DeviceInfo, DeviceState, Package, Serial
 from agent_phone.core.geometry import Size
 from agent_phone.core.outcome import ErrorCode, Refusal
-from agent_phone.core.phone import Delivery, Launch, OpenUri, Rotate, Stop
+from agent_phone.core.phone import Delivery, Launch, OpenUri, Orientation, Rotate, Stop, intent_of
 
 PROPERTIES = (
     "ro.build.version.sdk",
@@ -108,10 +110,40 @@ class Shell:
         raise NotImplementedError
 
     def run(self, action: Launch | Stop | OpenUri | Rotate) -> Delivery:
-        # TODO:
-        #   Launch  -> monkey -p <pkg> -c android.intent.category.LAUNCHER 1
-        #   Stop    -> am force-stop <pkg>
-        #   OpenUri -> am start -a android.intent.action.VIEW -d <uri> [-p <pkg>]
-        #   Rotate  -> settings put system accelerometer_rotation / user_rotation
-        #   arguments are passed as an argv list, never through a shell string
-        raise NotImplementedError
+        """One `adb shell` call. Each argument is quoted for the phone's shell, so a package or a
+        link reaches its command as one word and never as shell syntax."""
+        script = " && ".join(shlex.join(argv) for argv in commands_for(action))
+        try:
+            result = shell(self._adb, self._serial, script, ACTION_TIMEOUT_S)
+        except Refusal:
+            return classify_shell(None, written=True)
+        return classify_shell(result.status, True, result.stdout + result.stderr)
+
+
+ACTION_TIMEOUT_S = 15.0
+ROTATION = {Orientation.PORTRAIT: "0", Orientation.LANDSCAPE: "1"}
+
+
+def commands_for(action: Launch | Stop | OpenUri | Rotate) -> tuple[tuple[str, ...], ...]:
+    match action:
+        case Launch(package=package):
+            return (("monkey", "-p", package, "-c", "android.intent.category.LAUNCHER", "1"),)
+        case Stop(package=package):
+            return (("am", "force-stop", package),)
+        case OpenUri() as link:
+            intent = intent_of(link)
+            package = intent[1] if intent else link.package
+            start = (
+                ("am", "start", "-a", intent[0]) if intent else ("am", "start", "-a", VIEW, "-d", link.uri)
+            )
+            return (start + (("-p", package) if package else ()),)
+        case Rotate(orientation=Orientation.AUTO):
+            return (("settings", "put", "system", "accelerometer_rotation", "1"),)
+        case Rotate(orientation=orientation):
+            return (
+                ("settings", "put", "system", "accelerometer_rotation", "0"),
+                ("settings", "put", "system", "user_rotation", ROTATION[orientation]),
+            )
+
+
+VIEW = "android.intent.action.VIEW"

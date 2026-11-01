@@ -98,7 +98,7 @@ class Server:
 
 def phone_with(first, clock):
     rpc = Rpc()
-    return U2Phone(INFO, rpc, Forward(), Server(), 900, clock, first), rpc
+    return U2Phone(INFO, rpc, Forward(), Server(), 900, clock, None, first), rpc
 
 
 def test_the_first_read_uses_the_dump_that_was_taken_early_and_every_later_read_asks_the_server():

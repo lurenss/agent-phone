@@ -29,8 +29,8 @@ from agent_phone.core.role import consumes_touch
 from agent_phone.core.screen import Flag, Node, NodeId, Screen, Window, WindowKind
 
 SWIPE_SPAN = 0.6
-SWIPE_STEPS = 55
-"""The steps uiautomator2 uses for a scroll, about 5 ms each, so the list scrolls and does not fling."""
+SWIPE_MS = 275
+"""As long as uiautomator2's own scroll (55 steps of about 5 ms), so the list scrolls and does not fling."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -211,4 +211,4 @@ def swipe_across(screen: Screen, node: Node, direction: Direction) -> Swipe:
                 f"Window {cover.id} {cover.package} ({cover.kind.value}) covers the swipe.",
                 {"point": [point.x, point.y]},
             )
-    return Swipe(start, end, SWIPE_STEPS)
+    return Swipe(start, end, SWIPE_MS)
