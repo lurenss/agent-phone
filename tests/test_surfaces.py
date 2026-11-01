@@ -162,3 +162,26 @@ def test_all_lists_windows_in_dump_order_so_a_window_id_is_its_place_in_the_tree
     assert ["focused" in line for line in heads] == [False, True]
     code, wire = snapshot(["--window", "1"], [starting], tmp_path)
     assert wire["data"]["app"] == "com.android.settings" and wire["data"]["others"][0]["id"] == 0
+
+
+J7_READS = {
+    "app-starting": ("com.android.settings", False, ["com.android.systemui"]),
+    "dialog-over-app": ("com.android.settings", True, ["com.android.systemui"]),
+    "ig-feed": ("com.instagram.android", False, ["com.android.systemui"]),
+    "mbs-home": ("com.facebook.pages.app", False, ["com.android.systemui"]),
+    "notification-shade": ("com.android.systemui", False, []),
+    "settings-home": ("com.android.settings", False, []),
+}
+
+
+@pytest.mark.parametrize("name", J7_READS)
+def test_each_j7_dump_has_its_active_window_dialog_flag_and_other_windows(name):
+    """The J7's dumps carry no `display-id` and none of their windows is inset by more than a bar,
+    so a change to how a dump becomes a screen must leave every row here as it is."""
+    surface = select_surface(fixture_screen(name))
+    package, dialog, others = J7_READS[name]
+    assert (surface.window.package, surface.dialog, [o.package for o in surface.others]) == (
+        package,
+        dialog,
+        others,
+    )
