@@ -20,6 +20,8 @@ uv run python -I probes/android/compare_backends.py <label>   # compare the old 
 
 Probes touch the real phone. Read the phone safety rules below before you run one.
 
+Before you call a change to device behavior done, prove it on a connected phone with `.claude/skills/verify-agent-phone/SKILL.md`. It drives this checkout's CLI the way an agent does and keeps the evidence under `~/.agent-phone/verify/`, outside git, because that evidence holds what the screen showed.
+
 ## Where the truth lives
 
 - **Shipped behavior** is the code and its tests. A doc that contradicts the code is a defect. Fix it in the same change.
@@ -35,6 +37,7 @@ src/agent_phone/adapters/   backends; each one translates one automation stack i
 src/agent_phone/cli/        argument parsing and the Driver; the only place an adapter is wired to core
 src/agent_phone/policy/     the built-in policy rules, shipped as package data
 src/agent_phone/skills/     the usage guides for agents, shipped as package data; `agent-phone skills get` prints them
+.claude/skills/             project skills; verify-agent-phone proves a change on a real phone
 examples/                   consumers built on the public API, with their own policy files
 probes/android/             phone measurements, their captures, and FINDINGS.md
 docs/                       the plan, the JSON contract, and lessons from past bugs
