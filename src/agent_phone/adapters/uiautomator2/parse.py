@@ -15,6 +15,16 @@ type, layer or focus attribute. What this module infers, and from what:
   AccessibilityWindowInfo replaces all of this with facts.
 - layer: None. The hit plan therefore treats every other window over a point as covering it
   (`core/act/hit.py`).
+
+The `Screen` is the default display. Android 13 puts `display-id` on every node, and a device with a
+second screen, such as the AYN Thor's bottom one (display 4), lists that screen's windows in the same
+dump. The server's click and swipe are motion events on display 0, and keys go to the top focused
+display, which is 0 on the Thor. A window of another display has coordinates of its own, so kept in the
+`Screen` it would cover taps that belong to display 0 (every tap left of x=1240 on the Thor) or, as the
+first window that could hold focus, become the active window with refs that no input can reach. The
+parser therefore keeps the windows whose root has `display-id="0"` or none, which covers API 28 dumps,
+and drops the rest: they are not active, not in `others`, not an occluder and not findable. Reading
+another display is not supported.
 """
 
 from __future__ import annotations
@@ -30,6 +40,10 @@ from agent_phone.core.screen import Attrs, Flag, NodeSpec, Screen, WindowKind, W
 STRIP_FRACTION = 0.08
 """The most a status or navigation bar takes of the display across its thin side. The J7's status
 bar takes 3.3%, and a three-button navigation bar is about 7.5%."""
+
+DEFAULT_DISPLAY = "0"
+"""The `display-id` of the display that input goes to. A dump without `display-id` (API 28) is all
+on it."""
 
 PLATFORM_UI: frozenset[str] = frozenset({"android", "com.android.systemui"})
 """Android's own window owners, not apps. The one place a package name appears in this
@@ -57,9 +71,10 @@ BOUNDS = re.compile(r"\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]")
 
 
 def parse_hierarchy(xml: str, natural_display: Size, ime_package: Package | None) -> Screen:
-    """Raise `Refusal(TRANSPORT)` on XML that does not parse, `Refusal(NO_SURFACE)` on an
-    empty hierarchy (screen off). `natural_display` is swapped for rotation 1 and 3, as the
-    landscape fixtures (`settings-home.xml`, `notification-shade.xml`) need."""
+    """Raise `Refusal(TRANSPORT)` on XML that does not parse, `Refusal(NO_SURFACE)` when no window of
+    display 0 is left (screen off, or a dump of other displays only). `natural_display` is swapped
+    for rotation 1 and 3, as the landscape fixtures (`settings-home.xml`, `notification-shade.xml`)
+    need."""
     try:
         hierarchy = ET.fromstring(xml)
     except ET.ParseError as error:
@@ -70,9 +85,16 @@ def parse_hierarchy(xml: str, natural_display: Size, ime_package: Package | None
         raise Refusal(
             ErrorCode.TRANSPORT, f"The screen dump has rotation {hierarchy.get('rotation')!r}."
         ) from error
-    roots = hierarchy.findall("node")
+    roots = [
+        root
+        for root in hierarchy.findall("node")
+        if root.get("display-id", DEFAULT_DISPLAY) == DEFAULT_DISPLAY
+    ]
     if not roots:
-        raise Refusal(ErrorCode.NO_SURFACE, "The screen dump has no window. The screen may be off.")
+        raise Refusal(
+            ErrorCode.NO_SURFACE,
+            "The screen dump has no window on the default display. The screen may be off.",
+        )
     display = natural_display
     if rotation in (Rotation.LEFT, Rotation.RIGHT):
         display = Size(natural_display.height, natural_display.width)

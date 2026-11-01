@@ -16,8 +16,6 @@ THOR_NATURAL = Size(1080, 1920)
 BOTTOM_SCREEN_WINDOW = "com.odin.dualscreen.assistant"
 THOR_DUMPS = ("thor-launcher", "thor-chess", "thor-netflix", "thor-youtube")
 
-IN_BUG_1 = pytest.mark.xfail(strict=True, reason="the parser keeps the windows of the Thor's bottom screen")
-
 
 def thor(name: str) -> Screen:
     return parse_hierarchy(fixture_xml(name), THOR_NATURAL, ime_package=None)
@@ -30,7 +28,6 @@ def clickable_at(screen: Screen, bounds: tuple[int, int, int, int]):
 
 
 @pytest.mark.parametrize("name", THOR_DUMPS)
-@IN_BUG_1
 def test_a_window_of_the_bottom_screen_is_not_in_the_screen(name):
     screen = thor(name)
     assert BOTTOM_SCREEN_WINDOW not in {w.package for w in screen.windows}
@@ -42,10 +39,7 @@ LEFT_ICONS = [(57, 524, 358, 751), (57, 751, 358, 978)]
 RIGHT_ICON = (1261, 524, 1562, 751)
 
 
-@pytest.mark.parametrize(
-    "icon",
-    [pytest.param(icon, marks=IN_BUG_1) for icon in LEFT_ICONS] + [RIGHT_ICON],
-)
+@pytest.mark.parametrize("icon", [*LEFT_ICONS, RIGHT_ICON])
 def test_a_launcher_icon_is_planned_to_its_center_on_either_side_of_the_bottom_screen_window(icon):
     screen = thor("thor-launcher")
     assert plan_point(screen, clickable_at(screen, icon)) == Rect(*icon).center()

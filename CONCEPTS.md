@@ -10,7 +10,7 @@ One read of every window on the device (`Screen`, `core/screen.py`). Its nodes s
 
 ### Window
 
-One window in the read (`Window`): an app, the status bar, the keyboard, a dialog or the notification shade. It has a kind (`WindowKind`), an `active` flag for the window with input focus, and a `layer` when the backend knows the stacking order. The uiautomator2 backend cannot read layers or focus. It reports as active the first window of its dump that is not a strip or the keyboard (`A2-7`, `A2-8`).
+One window in the read (`Window`): an app, the status bar, the keyboard, a dialog or the notification shade. It has a kind (`WindowKind`), an `active` flag for the window with input focus, and a `layer` when the backend knows the stacking order. The uiautomator2 backend cannot read layers or focus. It reports as active the first window of its dump that is not a strip or the keyboard (`A2-7`, `A2-8`). A `Screen` holds the windows of the default display only: a dump from a device with a second screen, such as the AYN Thor's, lists that screen's windows too, and the parser drops them, because input goes to display 0.
 
 ### Node
 

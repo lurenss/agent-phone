@@ -95,9 +95,6 @@ def test_settle_waits_out_a_dump_with_no_window_to_describe(tmp_path):
     assert wire["data"]["settled"] == "settled" and hub.phones[0].reads == 4
 
 
-IN_BUG_1 = pytest.mark.xfail(strict=True, reason="the parser keeps the windows of other displays")
-
-
 def second_display(label="", bounds="[0,0][540,1920]", display=4):
     child = node("android.widget.TextView", text=label, package="test.second_screen", bounds=bounds)
     return node(
@@ -105,13 +102,11 @@ def second_display(label="", bounds="[0,0][540,1920]", display=4):
     )
 
 
-@IN_BUG_1
 def test_a_window_of_another_display_is_never_active_even_when_it_comes_first():
     screen = screen_of(status_bar(), second_display(), app())
     assert actives(screen) == [("test.app", "application")]
 
 
-@IN_BUG_1
 def test_a_window_of_another_display_is_not_in_the_screen_at_all():
     screen = screen_of(app(), second_display("Elsewhere"))
     assert [w.package for w in screen.windows] == ["test.app"]
@@ -119,7 +114,6 @@ def test_a_window_of_another_display_is_not_in_the_screen_at_all():
     assert select_surface(screen).others == ()
 
 
-@IN_BUG_1
 def test_a_dump_of_windows_on_other_displays_only_is_no_surface():
     with pytest.raises(Refusal) as refused:
         screen_of(second_display(), second_display(display=2))
