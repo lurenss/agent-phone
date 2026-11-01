@@ -371,6 +371,48 @@ def test_a_button_with_commit_words_of_its_own_is_denied_under_a_question_that_a
     )
 
 
+J7_DENIES = merge((DEFAULT, PROFILE))
+QUESTIONS = [("Turn off mobile data?", "OK"), ("Turn off Wi-Fi?", "OK"), ("Disconnect the VPN?", "Yes")]
+WEAKENS_THE_AFFIRMATIVE = {
+    "exempt-ok": {"exempt": [{"id": "c.ok", "labels": ["OK", "Yes"], "reason": "r"}]},
+    "disable-the-affirmatives": {"disable": ["default.affirmative"]},
+}
+
+
+def test_a_button_that_says_a_word_a_denial_names_is_denied_and_a_cancel_beside_it_is_not():
+    screen = dialog("Are you sure?", "Cancel", "Turn off mobile data")
+    verdict = tap_on(screen, button(screen, "Turn off mobile data"), J7_DENIES)
+    assert isinstance(verdict, Denied) and verdict.rule == "j7.vpn-lockdown"
+    under = dialog("Turn off mobile data?", "Cancel", "OK")
+    assert tap_on(under, button(under, "Cancel"), J7_DENIES) == Clear(ClearReason.NO_COMMIT_WORDS), (
+        "Cancel does not do what its question says, and the way out of the dialog stays open"
+    )
+
+
+@pytest.mark.xfail(
+    strict=True, reason="R2-4: a deny rule's words do not follow a dialog button to its question"
+)
+@pytest.mark.parametrize(("title", "label"), QUESTIONS)
+def test_a_neutral_button_is_denied_by_the_words_of_its_question(title, label):
+    screen = dialog(title, "Cancel", label)
+    verdict = tap_on(screen, button(screen, label), J7_DENIES)
+    assert isinstance(verdict, Denied) and verdict.rule == "j7.vpn-lockdown", (
+        f"{label!r} does what {title!r} says, and the profile denies the network: got {verdict}"
+    )
+    assert {e.source for e in verdict.evidence} == {Source.CONTEXT}, "the denial names the question"
+
+
+@pytest.mark.xfail(
+    strict=True, reason="R2-4: a deny rule's words do not follow a dialog button to its question"
+)
+@pytest.mark.parametrize("case", sorted(WEAKENS_THE_AFFIRMATIVE))
+def test_a_consumer_file_cannot_stop_a_denial_reading_the_question_of_a_neutral_button(case):
+    screen = dialog("Turn off mobile data?", "Cancel", "OK")
+    weakening = parse_policy(WEAKENS_THE_AFFIRMATIVE[case], "consumer.toml")
+    verdict = tap_on(screen, button(screen, "OK"), merge((DEFAULT, PROFILE, weakening)))
+    assert isinstance(verdict, Denied), f"a consumer's file made the denied tap {verdict}"
+
+
 def test_on_the_j7_wi_fi_and_any_screen_that_shows_sockstun_are_denied():
     policy = merge((DEFAULT, PROFILE))
     wifi = screen_of(node("android.widget.Switch", content_desc="Wi-Fi", checkable=True, clickable=True))

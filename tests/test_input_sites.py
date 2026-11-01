@@ -296,3 +296,61 @@ def test_enter_with_no_active_window_keeps_the_key_rule_and_the_snapshots_site(t
     refused = act(ctx, Request(Key(KeyName.ENTER)))
     assert isinstance(refused, Refused) and refused.code is ErrorCode.COMMIT_REFUSED
     assert refused.details["effects"] == ["send"] and phone.permits == []
+
+
+SETTINGS = "com.android.settings"
+
+
+def question(title, positive):
+    """A Settings dialog that asks `title`, with Cancel and a positive button."""
+    return screen_of(
+        node(
+            "android.widget.FrameLayout",
+            node("android.widget.TextView", text=title, bounds="[60,1400][1020,1480]", package=SETTINGS),
+            node(
+                "android.widget.Button",
+                text="Cancel",
+                clickable=True,
+                bounds="[540,1700][780,1800]",
+                package=SETTINGS,
+            ),
+            node(
+                "android.widget.Button",
+                text=positive,
+                clickable=True,
+                bounds="[780,1700][1020,1800]",
+                package=SETTINGS,
+            ),
+            package=SETTINGS,
+            bounds="[0,1350][1080,1900]",
+        )
+    )
+
+
+def tap_positive(root, title, positive, grant=None):
+    ctx, phone, taken = start(root, question(title, positive), J7_POLICY, profile=J7.profile)
+    [line] = [line for line in taken.lines if line.name == positive]
+    return act(ctx, Request(Click(RefTarget(taken.ref(line.ref))), grant or Grant.none())), phone.permits
+
+
+def test_contrast_on_the_j7_a_button_that_itself_says_mobile_data_is_denied(tmp_path):
+    outcome, sent = tap_positive(tmp_path, "Are you sure?", "Turn off mobile data")
+    assert sent == [] and isinstance(outcome, Refused) and outcome.code is ErrorCode.DENIED
+    assert outcome.details["rule"] == "j7.vpn-lockdown"
+
+
+@pytest.mark.xfail(
+    strict=True, reason="R2-4: a deny rule's words do not follow a dialog button to its question"
+)
+@pytest.mark.parametrize(
+    ("title", "grant"),
+    [("Turn off mobile data?", Grant(frozenset({Effect.SYSTEM}))), ("Turn off Wi-Fi?", Grant.none())],
+)
+def test_on_the_j7_the_ok_of_a_question_about_the_network_is_never_sent(tmp_path, title, grant):
+    outcome, sent = tap_positive(tmp_path, title, "OK", grant)
+    got = outcome.code.value if isinstance(outcome, Refused) else outcome.report.verdict
+    assert sent == [] and isinstance(outcome, Refused) and outcome.code is ErrorCode.DENIED, (
+        f"the intent requires DENIED by j7.vpn-lockdown for 'OK' under {title!r} whatever the grant; "
+        f"got {got}, and the backend received {[permit.action for permit in sent]}"
+    )
+    assert outcome.details["rule"] == "j7.vpn-lockdown"
