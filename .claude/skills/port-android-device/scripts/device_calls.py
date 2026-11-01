@@ -24,7 +24,7 @@ EVIDENCE = [
     "-I",
     str(REPO / ".claude" / "skills" / "verify-agent-phone" / "scripts" / "evidence.py"),
 ]
-RAW_DUMP = "probes/android/raw_dump.py"
+RAW_DUMP = str(REPO / "probes" / "android" / "raw_dump.py")
 NAME = re.compile(r"[a-z][a-z0-9-]*")
 OBSERVING = {"snapshot", "wait", "find"}
 LOOKS = 3

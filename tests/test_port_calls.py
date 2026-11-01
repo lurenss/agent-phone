@@ -3,6 +3,7 @@ tests run the real evidence.py against a fake phone, so what it refuses here is 
 on a device."""
 
 import json
+from pathlib import Path
 
 import pytest
 from port_support import FakePhone, Screen, shared
@@ -97,6 +98,8 @@ def test_the_raw_dump_goes_through_evidence_as_a_read(tmp_path):
     rec = recorder(tmp_path, fake)
     call = rec.raw_dump("dump", "x-launcher")
     assert fake.dumps == ["x-launcher"] and "12 nodes" in call.text
+    assert json.loads((tmp_path / "dump.json").read_text())["argv"][1] == calls.RAW_DUMP
+    assert Path(calls.RAW_DUMP).is_absolute() and Path(calls.RAW_DUMP).is_file()
     assert json.loads((tmp_path / "dump.json").read_text())["input"] is False
 
 
