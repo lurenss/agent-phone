@@ -4,7 +4,8 @@ whose receiver is exactly the target, in the window that has focus, under no oth
 import pytest
 from support import checkbox_row, consumer_of, fixture_screen, labelled, node, screen_of
 
-from agent_phone.core.act.hit import Ambiguous, context_labels, plan_point, receiver_at
+from agent_phone.core.act.hit import Ambiguous, context_labels, plan_point, receiver_at, swipe_across
+from agent_phone.core.act.intent import Direction
 from agent_phone.core.geometry import Point
 from agent_phone.core.outcome import ErrorCode, Refusal
 
@@ -148,3 +149,89 @@ def test_a_view_that_is_invisible_to_the_user_still_takes_the_touch_at_its_point
         )
     )
     assert refused(lambda: plan_point(screen, labelled(screen, "Save"))).code is ErrorCode.OCCLUDED
+
+
+SCROLLER = "androidx.recyclerview.widget.RecyclerView"
+SCROLL_TAKES_THE_TOUCH = pytest.mark.xfail(
+    strict=True,
+    reason="only a clickable node takes a touch in the hit plan, and a scrolling view takes it too",
+)
+
+
+def sheet(order: int | None = None, **attrs: object) -> str:
+    """A list that covers the lower part of the screen, with a heading and nothing to tap. With no
+    `order` the dump says nothing about its drawing order."""
+    if order is not None:
+        attrs["drawing_order"] = order
+    return node(
+        SCROLLER,
+        node("android.widget.TextView", text="Sheet", bounds="[0,400][1080,450]"),
+        scrollable=True,
+        bounds="[0,400][1080,1920]",
+        **attrs,
+    )
+
+
+@SCROLL_TAKES_THE_TOUCH
+def test_a_scrollable_view_drawn_over_the_target_takes_the_touch_so_the_tap_is_occluded():
+    screen = screen_of(app(button("Save", "[0,500][1080,600]", drawing_order=1), sheet(2)))
+    blocked = refused(lambda: plan_point(screen, labelled(screen, "Save")))
+    assert blocked.code is ErrorCode.OCCLUDED, "the list drawn above would take the touch before Save does"
+    assert blocked.details["blocked_by"] == ["another element ('androidx.recyclerview.widget.RecyclerView')"]
+
+
+@SCROLL_TAKES_THE_TOUCH
+def test_a_scrollable_view_whose_order_is_unknown_over_the_target_is_not_guessed_at():
+    screen = screen_of(app(button("Save", "[0,500][1080,600]"), sheet()))
+    assert refused(lambda: plan_point(screen, labelled(screen, "Save"))).code is ErrorCode.OCCLUDED
+
+
+@SCROLL_TAKES_THE_TOUCH
+def test_a_scrolling_view_inside_the_target_that_fills_it_takes_the_touch():
+    card = node(
+        "android.widget.FrameLayout",
+        node("android.widget.HorizontalScrollView", scrollable=True, bounds="[0,500][1080,700]"),
+        clickable=True,
+        bounds="[0,500][1080,700]",
+    )
+    screen = screen_of(app(card))
+    assert refused(lambda: plan_point(screen, screen.nodes[1])).code is ErrorCode.OCCLUDED
+
+
+def test_a_row_inside_its_own_list_is_tapped_at_its_center():
+    rows = node(
+        SCROLLER,
+        button("First", "[0,500][1080,600]"),
+        button("Second", "[0,600][1080,700]"),
+        scrollable=True,
+        bounds="[0,400][1080,1920]",
+    )
+    screen = screen_of(app(rows))
+    for label in ("First", "Second"):
+        target = labelled(screen, label)
+        assert plan_point(screen, target) == target.attrs.bounds.center(), f"{label} sits in its own list"
+
+
+def test_a_row_inside_a_list_inside_a_scroll_view_is_tapped_at_its_center():
+    inner = node(SCROLLER, button("Row", "[0,500][1080,600]"), scrollable=True, bounds="[0,400][1080,1200]")
+    outer = node("android.widget.ScrollView", inner, scrollable=True, bounds="[0,300][1080,1900]")
+    screen = screen_of(app(outer))
+    target = labelled(screen, "Row")
+    assert plan_point(screen, target) == target.attrs.bounds.center()
+
+
+def test_a_scrollable_view_drawn_under_the_target_or_not_visible_does_not_take_its_touch():
+    under = screen_of(app(sheet(1), button("Save", "[0,500][1080,600]", drawing_order=2)))
+    assert plan_point(under, labelled(under, "Save")) == Point(540, 550)
+    hidden = screen_of(
+        app(button("Save", "[0,500][1080,600]", drawing_order=1), sheet(2, visible_to_user=False))
+    )
+    assert plan_point(hidden, labelled(hidden, "Save")) == Point(540, 550)
+
+
+@SCROLL_TAKES_THE_TOUCH
+def test_a_swipe_that_starts_on_another_scrolling_view_drawn_above_the_list_is_occluded():
+    below = node(SCROLLER, scrollable=True, drawing_order=1, bounds="[0,200][1080,1700]")
+    screen = screen_of(app(below, sheet(2)))
+    blocked = refused(lambda: swipe_across(screen, screen.nodes[1], Direction.DOWN))
+    assert blocked.code is ErrorCode.OCCLUDED
