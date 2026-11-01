@@ -161,7 +161,8 @@ def classify(policy: Policy, action: InputAction, site: Site | None, locale: str
             found, exempted = judge_receiver(
                 commits, rules(IgnoreRule), rules(ExemptRule), rules(InheritRule), receiver, context
             )
-            raw = phrases_in(commits, receiver, Source.RECEIVER)
+            withdrawn = [rule for rule in policy.withdrawn if in_scope(rule.scope, site, language)]
+            raw = phrases_in([*commits, *withdrawn], receiver, Source.RECEIVER)
     match action:
         case Key(key=key):
             found = [found_by(rule, Source.KEY, key.value) for rule in commits if key in rule.keys]

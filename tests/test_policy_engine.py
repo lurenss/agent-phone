@@ -200,9 +200,6 @@ def test_on_the_j7_the_connections_tile_is_denied_because_its_summary_names_airp
         assert tap_on(settings, button(settings, title), policy) == Clear(ClearReason.NO_COMMIT_WORDS)
 
 
-@pytest.mark.xfail(
-    strict=True, reason="disabling the default commit rules empties the effects the protection reads"
-)
 def test_disabling_the_default_commit_rules_does_not_unprotect_a_package():
     weakening = parse_policy({"disable": ["default.system", "default.delete"]}, "consumer.toml")
     policy = merge((DEFAULT, PROFILE, weakening))

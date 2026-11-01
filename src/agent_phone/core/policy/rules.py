@@ -138,10 +138,15 @@ Rule = CommitRule | ExemptRule | IgnoreRule | InheritRule | DenyRule
 @dataclass(frozen=True, slots=True)
 class Policy:
     """`languages` is the union the commit rules cover. A device whose locale language is not in
-    it gets LOCALE_UNSUPPORTED for every labeled input: the engine cannot read that screen."""
+    it gets LOCALE_UNSUPPORTED for every labeled input: the engine cannot read that screen.
+
+    `withdrawn` holds the commit rules a later layer disabled. They commit nothing, but deny
+    rules still read the effects they name, so disabling `default.system` cannot switch off a
+    profile's protection that denies system taps on a protected package's screen."""
 
     languages: frozenset[str]
     rules: tuple[Rule, ...]
+    withdrawn: tuple[CommitRule, ...] = ()
 
     def of_kind[R: Rule](self, kind: type[R]) -> tuple[R, ...]:
         return tuple(rule for rule in self.rules if isinstance(rule, kind))
@@ -309,6 +314,7 @@ def merge(layers: tuple[tuple[Policy, frozenset[RuleId]], ...]) -> Policy:
     still in force: a disable that matches nothing is a mistake in that file.
     """
     rules: list[Rule] = []
+    withdrawn: list[CommitRule] = []
     languages: set[str] = set()
     for policy, disabled in layers:
         defined = {rule.origin.rule: rule for rule in rules}
@@ -327,6 +333,9 @@ def merge(layers: tuple[tuple[Policy, frozenset[RuleId]], ...]) -> Policy:
                     f"{target.origin.source}. No policy file can unprotect a device.",
                     {"rule": rule_id, "source": target.origin.source},
                 )
+        withdrawn.extend(
+            rule for rule in rules if rule.origin.rule in disabled and isinstance(rule, CommitRule)
+        )
         rules = [rule for rule in rules if rule.origin.rule not in disabled]
         in_force = {rule.origin.rule: rule.origin.source for rule in rules}
         for rule in policy.rules:
@@ -339,7 +348,7 @@ def merge(layers: tuple[tuple[Policy, frozenset[RuleId]], ...]) -> Policy:
                 )
         rules.extend(policy.rules)
         languages |= policy.languages
-    return Policy(frozenset(languages), tuple(rules))
+    return Policy(frozenset(languages), tuple(rules), tuple(withdrawn))
 
 
 def protect_rules(profile: DeviceProfile, source: str) -> tuple[DenyRule, ...]:
