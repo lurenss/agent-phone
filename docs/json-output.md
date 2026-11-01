@@ -66,7 +66,7 @@ The exit code is 0 when `ok` is true, 1 for an error envelope, and 2 when the ar
 | `NO_SURFACE` | The window asked for is not on screen. No window has input focus (the screen is off), or `--surface` finds none, or `--window` is not an id of this read. The message lists the windows that are. |
 | `NOT_ACTIONABLE` | The element cannot take this input. `details.reason` is `hidden` or `disabled` when it stayed so until the deadline, and `no_tap`, `not_a_field`, `not_scrollable`, `no_area` or `wrong_axis` (a sideways scroll of a list that runs down, or an up or down scroll of a collection whose items all sit in one row) when it never can. |
 | `UNSTABLE` | The element moved between two reads. |
-| `OCCLUDED` | No point of the element would reach it: another window covers it, another element takes the touch there, two elements overlap in an unknown order, or its window has no input focus. |
+| `OCCLUDED` | No point of the element would reach it: another window covers it, another element takes the touch there, such as a list that scrolls and is drawn above it, two elements overlap in an unknown order, or its window has no input focus. |
 | `COMMIT_REFUSED` | The input would commit an effect that `--commit` did not grant. `details` lists the `effects`, the `granted` effects and the `evidence`. |
 | `DENIED` | A deny rule forbids the input whatever the caller grants. `details` names the `rule`, its `source` and the `evidence`. A device profile's protected package is denied this way. A deny rule reads a tap, a set-text, a scroll and Enter, and never back, home or recents. |
 | `LOCALE_UNSUPPORTED` | The device language has no policy rules, so input that commit rules read, a tap or Enter, cannot be judged. |

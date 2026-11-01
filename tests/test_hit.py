@@ -152,10 +152,6 @@ def test_a_view_that_is_invisible_to_the_user_still_takes_the_touch_at_its_point
 
 
 SCROLLER = "androidx.recyclerview.widget.RecyclerView"
-SCROLL_TAKES_THE_TOUCH = pytest.mark.xfail(
-    strict=True,
-    reason="only a clickable node takes a touch in the hit plan, and a scrolling view takes it too",
-)
 
 
 def sheet(order: int | None = None, **attrs: object) -> str:
@@ -172,7 +168,6 @@ def sheet(order: int | None = None, **attrs: object) -> str:
     )
 
 
-@SCROLL_TAKES_THE_TOUCH
 def test_a_scrollable_view_drawn_over_the_target_takes_the_touch_so_the_tap_is_occluded():
     screen = screen_of(app(button("Save", "[0,500][1080,600]", drawing_order=1), sheet(2)))
     blocked = refused(lambda: plan_point(screen, labelled(screen, "Save")))
@@ -180,13 +175,11 @@ def test_a_scrollable_view_drawn_over_the_target_takes_the_touch_so_the_tap_is_o
     assert blocked.details["blocked_by"] == ["another element ('androidx.recyclerview.widget.RecyclerView')"]
 
 
-@SCROLL_TAKES_THE_TOUCH
 def test_a_scrollable_view_whose_order_is_unknown_over_the_target_is_not_guessed_at():
     screen = screen_of(app(button("Save", "[0,500][1080,600]"), sheet()))
     assert refused(lambda: plan_point(screen, labelled(screen, "Save"))).code is ErrorCode.OCCLUDED
 
 
-@SCROLL_TAKES_THE_TOUCH
 def test_a_scrolling_view_inside_the_target_that_fills_it_takes_the_touch():
     card = node(
         "android.widget.FrameLayout",
@@ -229,7 +222,6 @@ def test_a_scrollable_view_drawn_under_the_target_or_not_visible_does_not_take_i
     assert plan_point(hidden, labelled(hidden, "Save")) == Point(540, 550)
 
 
-@SCROLL_TAKES_THE_TOUCH
 def test_a_swipe_that_starts_on_another_scrolling_view_drawn_above_the_list_is_occluded():
     below = node(SCROLLER, scrollable=True, drawing_order=1, bounds="[0,200][1080,1700]")
     screen = screen_of(app(below, sheet(2)))

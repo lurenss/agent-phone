@@ -9,9 +9,10 @@ point, not the node the caller meant. This module makes those the same node, or 
    block. A dialog over an app needs no rule of its own: the dump of a dialog leaves the app
    beneath it out (A2-7).
 2. Inside the window, dispatch follows Android's: children containing the point in reverse
-   drawing order, deepest node that takes a touch first (`role.takes_touch`). Equal or missing
-   drawing order between two branches that both hold one is ambiguous, and an ambiguous point
-   is never used.
+   drawing order, deepest node that takes a touch first (`role.takes_touch`). A visible scrolling
+   view takes it too, unless it is the target or holds it, because `ScrollView` and
+   `RecyclerView` keep ACTION_DOWN. Equal or missing drawing order between two branches that both
+   hold a taker is ambiguous, and an ambiguous point is never used.
 3. `plan_point` tries the visible center, then the four quadrant centers, and returns the
    first point whose receiver is exactly the target.
 """
@@ -26,7 +27,7 @@ from agent_phone.core.labels import Label, own_labels, owned
 from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.phone import Swipe
 from agent_phone.core.role import COLLECTIONS, Role, role_of, simple_name, takes_touch
-from agent_phone.core.screen import Node, NodeId, Screen, Window
+from agent_phone.core.screen import Flag, Node, NodeId, Screen, Window
 
 SWIPE_SPAN = 0.6
 SWIPE_MS = 275
@@ -54,18 +55,21 @@ def covering_window(screen: Screen, target: Window, point: Point) -> Window | No
     return None
 
 
-def receiver_at(screen: Screen, window: Window, point: Point) -> Receiver:
-    return receiver_in(screen, screen.node(window.root), point)
+def receiver_at(screen: Screen, window: Window, point: Point, target: Node | None = None) -> Receiver:
+    return receiver_in(screen, screen.node(window.root), point, target)
 
 
-def receiver_in(screen: Screen, node: Node, point: Point) -> Receiver:
+def receiver_in(screen: Screen, node: Node, point: Point, target: Node | None = None) -> Receiver:
     """A node the dump marks not visible to the user still takes a touch inside its bounds: a view
-    at alpha 0, such as a sheet that fades in, is not visible to the user and still takes touches."""
+    at alpha 0, such as a sheet that fades in, is not visible to the user and still takes touches.
+
+    A visible scrolling view takes the touch too, unless it is the `target` or holds it: a list
+    keeps ACTION_DOWN, but a row inside its own list is reached first, deepest node first."""
     if not node.attrs.bounds.contains(point):
         return None
     taking: list[tuple[Node, NodeId | Ambiguous]] = []
     for child in node.children:
-        found = receiver_in(screen, screen.node(child), point)
+        found = receiver_in(screen, screen.node(child), point, target)
         if found is not None:
             taking.append((screen.node(child), found))
     if len(taking) == 1:
@@ -75,7 +79,13 @@ def receiver_in(screen: Screen, node: Node, point: Point) -> Receiver:
         if None in orders or len(set(orders)) < len(orders):
             return Ambiguous(tuple(child.id for child, _ in taking))
         return max(taking, key=lambda pair: pair[0].attrs.drawing_order or 0)[1]
-    return node.id if takes_touch(node.attrs) else None
+    return node.id if takes_touch(node.attrs) or scrolls_over(node, target) else None
+
+
+def scrolls_over(node: Node, target: Node | None) -> bool:
+    """A visible scrolling view that is not the target and does not hold it."""
+    held = target is not None and node.id <= target.id < node.end
+    return node.has(Flag.SCROLLABLE) and node.has(Flag.VISIBLE) and not held
 
 
 def visible_area(screen: Screen, node: Node) -> Rect:
@@ -108,7 +118,7 @@ def plan_point(screen: Screen, node: Node) -> Point:
         if cover is not None:
             blocked.append(f"window {cover.id} {cover.package} ({cover.kind.value})")
             continue
-        found = receiver_at(screen, window, point)
+        found = receiver_at(screen, window, point, node)
         if found == node.id:
             return point
         blocked.append(describe(screen, found))
@@ -233,7 +243,7 @@ def swipe_across(screen: Screen, node: Node, direction: Direction) -> Swipe:
                 Point(area.left + int(width * near), middle.y),
                 Point(area.left + int(width * far), middle.y),
             )
-    taker = receiver_in(screen, screen.node(window.root), start)
+    taker = receiver_in(screen, screen.node(window.root), start, node)
     inside = taker is None or (isinstance(taker, int) and node.id <= taker < node.end)
     if not inside:
         raise Refusal(
