@@ -22,6 +22,7 @@ The outcome type decides which keys appear, and no command writes `delivery` or 
 - A read that succeeds (`Read`) has `ok: true` and `data`. It has no `delivery` and no `retry`.
 - A command refused before any input left the computer (`Refused`) has `ok: false`, `error`, `delivery: not_delivered` and `retry: safe`.
 - An input that was handed to the backend (`Acted`) has `data` with the action report and the observation after it, a `delivery` from its `SentState`, and `retry: unsafe`. If the input went out but the command still failed, `ok` is `false` and `error` is present as well.
+- A batch has its own rule for `delivery` and `retry`, written under [Batch payload](#batch-payload). Its `retry` is the one value that is not always derived from its `delivery`.
 - An exception that no command caught has `code: INTERNAL`. Its `delivery` is `delivery_uncertain` when this process spent an input permit that it did not refund, otherwise `not_delivered`.
 
 The exit code is 0 when `ok` is true, 1 for an error envelope, and 2 when the arguments do not parse. The envelope is printed in all three cases.
@@ -50,7 +51,7 @@ The exit code is 0 when `ok` is true, 1 for an error envelope, and 2 when the ar
 
 | Code | Meaning |
 | --- | --- |
-| `INVALID_ARGS` | The arguments do not parse. A ref without its snapshot id, such as `e12`, is one case. A link for `open-url` that holds a line break or any other control character, written out or percent-encoded, is another. |
+| `INVALID_ARGS` | The arguments do not parse. A target that is neither a ref nor a query, such as `e12` or `Display`, is one case. A step of a batch that does not parse, names its own device, or is not a command that uses the phone is another, and so is a batch file that is not a JSON array of non-empty arrays of strings, or a batch with no file on a terminal. A link for `open-url` that holds a line break or any other control character, written out or percent-encoded, is another. |
 | `POLICY_INVALID` | A policy file, or the order its layers merge in, is invalid. `details` names the `source`, the `table` and the `field`, or the `rule`. A file that disables a deny rule of the device profile, or of a file the profile names, is one case, and a file whose top-level `languages` names a language the built-in policy does not cover is another. |
 | `NO_DEVICE` | No device is connected and ready, or the requested one is not. |
 | `DEVICE_AMBIGUOUS` | Several devices are ready and neither `-d` nor a ref names one. |
@@ -285,6 +286,77 @@ A refused commit lists what the input would do, what was granted, and the labels
 | `system` | Changes device state that can cut off the device or the agent. |
 | `confirm` | Confirms an action whose effect the label does not say. |
 | `unlabeled` | Lands on an element with no words, so nothing says what it does. |
+
+## Batch payload
+
+`agent-phone batch [FILE]` runs the steps of a JSON array in one process, under one device lock. A step is an array of the arguments of one command without `agent-phone`, such as `["click", "name=Display", "--wait-for", "name*=Brightness"]`. The CLI's own parser reads each step. `-d` is given once, on the batch. A step may name no device, may not be `batch`, and must be a command that reads or drives the phone, so `server`, `devices` and `skills` are not steps. `--commit` and `--policy` go inside the step they serve, and a grant or a file in one step does not reach another. The steps run in order and stop at the first step whose result is not ok.
+
+An agent that must not send an input twice cannot rely on a ref after another input, because every input spends the refs taken before it. A later step finds its target by a query, after a `--wait-for` or a `wait` that gave it a current observation. A step with no observation to stand on is refused as `OBSERVE_FIRST`, as the example shows.
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `steps` | array of envelopes | One envelope for each step that ran, in order. Each is exactly what that command alone prints. |
+| `stopped_at` | int or null | The index, from 0, of the first step that is not ok, or null when every step is ok. Steps after it did not run. |
+| `trace` | string | The path of the [trace](#batch-trace) file. |
+
+The envelope's own keys follow the steps:
+
+- When every step is ok, `ok` is true. A batch that sent no input, such as one of reads, has no `delivery` and no `retry`, like a read. A batch that sent input has the weakest `delivery` among its inputs, in the order `delivery_uncertain`, `delivered_unverified`, `delivered_verified`, and `retry: unsafe`.
+- When a step fails, `ok` is false, `error` is that step's `error` object, and `delivery` is that step's `delivery`. `retry` is `unsafe` when any earlier step sent an input, because running the batch again would send that input again. Otherwise it is that step's `retry`. So `delivery` can be `not_delivered` with `retry` `unsafe`: the failed step sent nothing, and an earlier one did.
+- The exit code is the failed step's exit code, and 0 when every step is ok.
+- A failure before the first step runs, such as a step that does not parse, `NO_DEVICE`, `DEVICE_BUSY` or `POLICY_INVALID`, is an ordinary error envelope with `command` `batch`, `delivery` `not_delivered`, `retry` `safe` and no `data`. Nothing ran, and no trace was written.
+- A step that raises is the failed step. Its envelope is the `INTERNAL` envelope of an uncaught exception, with `delivery_uncertain` only when that step spent an input permit that it did not refund. The steps before it stay in `steps` and in the trace.
+
+```json
+{"v":1,"ok":false,"command":"batch","device":"0a1b2c3d4e5f6a7b","delivery":"not_delivered","retry":"unsafe",
+ "data":{"steps":[
+  {"v":1,"ok":true,"command":"launch","device":"0a1b2c3d4e5f6a7b","delivery":"delivered_unverified","retry":"unsafe",
+   "data":{"input":{"kind":"launch","package":"com.android.settings"},"target":null,
+    "gate":{"verdict":"clear","reason":"not_labeled_input"},"verified_by":null,"after":null}},
+  {"v":1,"ok":false,"command":"click","device":"0a1b2c3d4e5f6a7b","delivery":"not_delivered","retry":"safe",
+   "error":{"code":"OBSERVE_FIRST","message":"Input was sent since the latest snapshot, e8j9h. Take a new one and look first.",
+    "hint":"Input was sent since the last snapshot. Take one and look before acting.","details":{}}}],
+  "stopped_at":1,"trace":"/home/agent/.agent-phone/traces/0a1b2c3d4e5f6a7b/20261101T091500.123456Z-batch.jsonl"},
+ "error":{"code":"OBSERVE_FIRST","message":"Input was sent since the latest snapshot, e8j9h. Take a new one and look first.",
+  "hint":"Input was sent since the last snapshot. Take one and look before acting.","details":{}}}
+```
+
+The launch had no `--wait-for`, so it left no observation for the click. The click is refused with nothing sent, and the batch's `retry` is `unsafe` because the launch went out.
+
+### Batch trace
+
+Each batch writes one JSONL file, `<state root>/traces/<serial>/<UTC timestamp>-batch.jsonl`, in a folder of mode 0700, and the file has mode 0600. A line is written as its step ends, so a crash leaves the steps before it. There is one line for each step that ran, then a last line. A line is read from the step's envelope, so the two agree. It holds no `after` snapshot and no tree, which the step's envelope in the batch result has.
+
+#### Trace step line
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `line` | string | `step`. |
+| `i` | int | The step's index, from 0. |
+| `argv` | array of strings | The step's arguments. The text argument of `set-text` and `clipboard set`, wherever it stands, is replaced by `<N chars>`. |
+| `started_utc` | string | When the step started, in UTC with milliseconds. |
+| `ms` | int | How long the step took. |
+| `ok` | bool | The step's `ok`. |
+| `delivery` | string or null | The step's `delivery`, null for a read that succeeded. |
+| `retry` | string or null | The step's `retry`, null when it has no `delivery`. |
+| `error` | string or null | The step's error code. |
+| `input` | string or null | The kind of the input that went out, from the [input kinds](#input-kinds), or null. |
+| `target` | object or null | For `click`, `set-text` and `scroll` with a target: the `ref` and the `query` it was asked for, one of them null, and the `role` and `name` it resolved to, null when the input did not get that far. |
+| `gate` | object or null | The verdict the input was sent under, as in the [input payload](#input-payload), or null. |
+
+#### Trace end line
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `line` | string | `end`. |
+| `stopped_at` | int or null | The same as the batch's `data.stopped_at`. |
+| `ms` | int | The steps' total time, from the start of the first to the end of the last. |
+
+```jsonl
+{"line":"step","i":0,"argv":["launch","com.android.settings"],"started_utc":"2026-11-01T09:15:00.211Z","ms":412,"ok":true,"delivery":"delivered_unverified","retry":"unsafe","error":null,"input":"launch","target":null,"gate":{"verdict":"clear","reason":"not_labeled_input"}}
+{"line":"step","i":1,"argv":["click","name=Nowhere","--timeout-ms","100"],"started_utc":"2026-11-01T09:15:00.624Z","ms":3,"ok":false,"delivery":"not_delivered","retry":"safe","error":"OBSERVE_FIRST","input":null,"target":{"ref":null,"query":"name=\"Nowhere\"","role":null,"name":null},"gate":null}
+{"line":"end","stopped_at":1,"ms":416}
+```
 
 ## Device reads
 

@@ -196,3 +196,38 @@ def test_the_example_wait_timeout_is_what_the_code_prints_for_its_fixture(tmp_pa
     id = wire["error"]["details"]["after"]["id"]
     printed = json.dumps(wire, ensure_ascii=False).replace(id, example["error"]["details"]["after"]["id"])
     assert code == 1 and json.loads(printed) == example
+
+
+def run_batch(tmp_path, steps, serial="0a1b2c3d4e5f6a7b"):
+    """The envelope and the trace lines of a batch on the Settings fixture, after one snapshot."""
+    hub = FakeHub([Connected(Serial(serial), "SM_J730F", True)], screens=[fixture_screen("settings-home")])
+    _, taken = invoke(["snapshot"], hub, tmp_path)
+    file = tmp_path / "steps.json"
+    file.write_text(json.dumps(steps))
+    code, wire = invoke(["batch", str(file)], hub, tmp_path)
+    lines = [json.loads(line) for line in open(wire["data"]["trace"]).read().splitlines()]
+    return code, wire, lines, taken["data"]["id"]
+
+
+def test_the_example_batch_is_what_the_code_prints(tmp_path):
+    example = next(block for block in json_blocks() if block["command"] == "batch")
+    assert set(example["data"]) == set(first_column("## Batch payload"))
+    steps = [["launch", "com.android.settings"], ["click", "name=Nowhere", "--timeout-ms", "100"]]
+    code, wire, _, taken = run_batch(tmp_path, steps, example["device"])
+    printed = json.dumps(wire, ensure_ascii=False).replace(taken, "e8j9h")
+    printed = printed.replace(wire["data"]["trace"], example["data"]["trace"])
+    assert code == 1 and json.loads(printed) == example
+
+
+def test_the_trace_tables_list_exactly_the_keys_a_line_carries(tmp_path):
+    _, _, lines, _ = run_batch(tmp_path, [["launch", "com.android.settings"], ["press", "back"]])
+    step, end = lines[0], lines[-1]
+    assert list(step) == first_column("#### Trace step line")
+    assert list(end) == first_column("#### Trace end line")
+
+
+def test_the_example_trace_has_the_keys_of_the_tables():
+    [block] = re.findall(r"```jsonl\n(.*?)```", CONTRACT, re.S)
+    *steps, end = [json.loads(line) for line in block.splitlines()]
+    assert all(list(step) == first_column("#### Trace step line") for step in steps)
+    assert list(end) == first_column("#### Trace end line")
