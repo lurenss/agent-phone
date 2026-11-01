@@ -342,10 +342,43 @@ def merge(layers: tuple[tuple[Policy, frozenset[RuleId]], ...]) -> Policy:
     return Policy(frozenset(languages), tuple(rules))
 
 
-def protect_rules(profile: DeviceProfile) -> tuple[DenyRule, ...]:
-    # TODO: per ProtectedPackage p, two rules with from_profile=True:
-    #   stops={p.package}                                       -> refuses `stop p`
-    #   effects={DELETE, SYSTEM}, context_words=p.labels words  -> refuses "Force stop",
-    #                                                              "Uninstall", "Clear data"
-    #                                                              on p's App info screen
-    raise NotImplementedError
+def protect_rules(profile: DeviceProfile, source: str) -> tuple[DenyRule, ...]:
+    """Two deny rules per protected package, both marked as the profile's own:
+
+    - `profile.protect.<package>.stop` refuses `stop <package>`;
+    - `profile.protect.<package>.app-info` refuses a tap that would delete or change system
+      state (Force stop, Uninstall, Clear data, Disable) on a screen that names the package or
+      one of its labels, such as its App info page.
+    """
+    everywhere = Scope(frozenset(), frozenset(), frozenset())
+    rules = []
+    for protected in profile.protected:
+        names = tuple(
+            Phrase(tokens, anchored=False)
+            for name in (*protected.labels, protected.package)
+            if (tokens := words(name, LabelField.TEXT))
+        )
+        stem = f"profile.protect.{protected.package}"
+        rules.append(
+            DenyRule(
+                Origin(RuleId(f"{stem}.stop"), source, protected.reason),
+                everywhere,
+                (),
+                (),
+                frozenset(),
+                frozenset({protected.package}),
+                from_profile=True,
+            )
+        )
+        rules.append(
+            DenyRule(
+                Origin(RuleId(f"{stem}.app-info"), source, protected.reason),
+                everywhere,
+                (),
+                names,
+                frozenset({Effect.DELETE, Effect.SYSTEM}),
+                frozenset(),
+                from_profile=True,
+            )
+        )
+    return tuple(rules)

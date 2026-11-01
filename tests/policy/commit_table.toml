@@ -1,0 +1,320 @@
+# The commit table. tests/test_commit_table.py plants each label in a tapped element's text, its
+# content-desc, its hint, its resource-id, its class name and a child's text, and every
+# placement must give the effects listed here. Every phrase of the default policy has a row, and
+# the test fails when a phrase is added to the default policy without one.
+
+[[case]]
+label = "Share"
+effects = ["publish"]
+
+[[case]]
+label = "Post"
+effects = ["publish"]
+
+[[case]]
+label = "Publish"
+effects = ["publish"]
+
+[[case]]
+label = "Upload"
+effects = ["publish"]
+
+[[case]]
+label = "Go live"
+effects = ["publish"]
+
+[[case]]
+label = "Repost"
+effects = ["publish"]
+
+[[case]]
+label = "Condividi"
+effects = ["publish"]
+
+[[case]]
+label = "Pubblica"
+effects = ["publish"]
+
+[[case]]
+label = "Carica"
+effects = ["publish"]
+
+[[case]]
+label = "Share reel"
+effects = ["publish"]
+
+[[case]]
+label = "Schedule"
+effects = ["schedule"]
+
+[[case]]
+label = "Schedule reel"
+effects = ["schedule"]
+
+[[case]]
+label = "Programma"
+effects = ["schedule"]
+
+[[case]]
+label = "Pianifica"
+effects = ["schedule"]
+
+[[case]]
+label = "Send"
+effects = ["send"]
+
+[[case]]
+label = "Reply"
+effects = ["send"]
+
+[[case]]
+label = "Comment"
+effects = ["send"]
+
+[[case]]
+label = "Invia"
+effects = ["send"]
+
+[[case]]
+label = "Rispondi"
+effects = ["send"]
+
+[[case]]
+label = "Commenta"
+effects = ["send"]
+
+[[case]]
+label = "Delete"
+effects = ["delete"]
+
+[[case]]
+label = "Remove"
+effects = ["delete"]
+
+[[case]]
+label = "Discard"
+effects = ["delete"]
+
+[[case]]
+label = "Erase"
+effects = ["delete"]
+
+[[case]]
+label = "Clear all"
+effects = ["delete"]
+
+[[case]]
+label = "Clear data"
+effects = ["delete"]
+
+[[case]]
+label = "Clear storage"
+effects = ["delete"]
+
+[[case]]
+label = "Uninstall"
+effects = ["delete"]
+
+[[case]]
+label = "Elimina"
+effects = ["delete"]
+
+[[case]]
+label = "Rimuovi"
+effects = ["delete"]
+
+[[case]]
+label = "Scarta"
+effects = ["delete"]
+
+[[case]]
+label = "Cancella"
+effects = ["delete"]
+
+[[case]]
+label = "Disinstalla"
+effects = ["delete"]
+
+[[case]]
+label = "Buy"
+effects = ["purchase"]
+
+[[case]]
+label = "Pay"
+effects = ["purchase"]
+
+[[case]]
+label = "Purchase"
+effects = ["purchase"]
+
+[[case]]
+label = "Subscribe"
+effects = ["purchase"]
+
+[[case]]
+label = "Donate"
+effects = ["purchase"]
+
+[[case]]
+label = "Boost"
+effects = ["purchase"]
+
+[[case]]
+label = "Promote"
+effects = ["purchase"]
+
+[[case]]
+label = "Place order"
+effects = ["purchase"]
+
+[[case]]
+label = "Acquista"
+effects = ["purchase"]
+
+[[case]]
+label = "Paga"
+effects = ["purchase"]
+
+[[case]]
+label = "Abbonati"
+effects = ["purchase"]
+
+[[case]]
+label = "Sponsorizza"
+effects = ["purchase"]
+
+[[case]]
+label = "Follow"
+effects = ["social"]
+
+[[case]]
+label = "Unfollow"
+effects = ["social"]
+
+[[case]]
+label = "Block"
+effects = ["social"]
+
+[[case]]
+label = "Report"
+effects = ["social"]
+
+[[case]]
+label = "Segui"
+effects = ["social"]
+
+[[case]]
+label = "Blocca"
+effects = ["social"]
+
+[[case]]
+label = "Segnala"
+effects = ["social"]
+
+[[case]]
+label = "Airplane mode"
+effects = ["system"]
+
+[[case]]
+label = "Mobile data"
+effects = ["system"]
+
+[[case]]
+label = "VPN"
+effects = ["system"]
+
+[[case]]
+label = "Force stop"
+effects = ["system"]
+
+[[case]]
+label = "Disable"
+effects = ["system"]
+
+[[case]]
+label = "Factory data reset"
+effects = ["system"]
+
+[[case]]
+label = "Power off"
+effects = ["system"]
+
+[[case]]
+label = "Restart"
+effects = ["system"]
+
+[[case]]
+label = "USB debugging"
+effects = ["system"]
+
+[[case]]
+label = "Developer options"
+effects = ["system"]
+
+[[case]]
+label = "Modalità aereo"
+effects = ["system"]
+
+[[case]]
+label = "Dati mobili"
+effects = ["system"]
+
+[[case]]
+label = "Arresto forzato"
+effects = ["system"]
+
+[[case]]
+label = "Disattiva"
+effects = ["system"]
+
+[[case]]
+label = "Ripristina"
+effects = ["system"]
+
+[[case]]
+label = "Spegni"
+effects = ["system"]
+
+[[case]]
+label = "Riavvia"
+effects = ["system"]
+
+[[case]]
+label = "Confirm"
+effects = ["confirm"]
+
+[[case]]
+label = "Submit"
+effects = ["confirm"]
+
+[[case]]
+label = "Conferma"
+effects = ["confirm"]
+
+[[case]]
+label = "Delete and block"
+effects = ["delete", "social"]
+
+[[case]]
+label = "More actions for this post"
+effects = []
+
+[[case]]
+label = "Create new post"
+effects = []
+
+[[case]]
+label = "Notifications"
+effects = []
+
+[[case]]
+label = "Display"
+effects = []
+
+[[case]]
+label = "Sounds and vibration"
+effects = []
+
+[[case]]
+label = "Search"
+effects = []
