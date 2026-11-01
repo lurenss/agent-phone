@@ -16,3 +16,4 @@ The status of a device:
 | name | model | Android | language | status | card |
 | --- | --- | --- | --- | --- | --- |
 | emu-de-35 | Google sdk_gphone64_arm64 | 15 (API 35) | de-DE (not covered) | works with limits | [emu-de-35.md](emu-de-35.md) |
+| samsung-j7 | samsung SM-J730F | 9 (API 28) | en-US | works | [samsung-j7.md](samsung-j7.md) |
