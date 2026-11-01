@@ -1,13 +1,17 @@
 """The policy engine: what an input would do, judged from what it would land on.
 
 The engine never sees how the caller named the target. It is given the `Site` that act()
-derived from the live screen: the node that will receive the touch at the planned point
-(`act/hit.py`), that node's whole label surface (every label field of it and of the
-descendants it owns, `labels.surface_of`), and the context around it. A ref, a query by text,
-a query by resource-id and a raw point that land on the same node get the same verdict. That
-is the property the commit table tests: each commit phrase is planted in text, in
-content-desc, in hint, in a resource-id, in a class name and in a child's text, and every
-placement must give the same verdict.
+derived from the live screen: the node that will receive the input (`act/site.py`), that node's
+whole label surface (every label field of it and of the descendants it owns,
+`labels.surface_of`), and the context around it. A ref, a query by text, a query by
+resource-id and a raw point that land on the same node get the same verdict. That is the
+property the commit table tests: each commit phrase is planted in text, in content-desc, in
+hint, in a resource-id, in a class name and in a child's text, and every placement must give
+the same verdict.
+
+What an input lets the engine read is `reads_of`. A tap and Enter are read by commit rules and
+deny rules. A set-text and a scroll are read by deny rules only, because typing and scrolling
+commit nothing, and a composer whose hint says "Send a message" must not need `--commit send`.
 
 Commit rules read the labels that `ignore` and `exempt` rules leave. Deny rules read every
 label, because those two kinds can come from a consumer's file, and no consumer may weaken a
@@ -23,7 +27,18 @@ from enum import Enum
 from agent_phone.core.device import Package
 from agent_phone.core.labels import Label, LabelField, Surface, normalized, words
 from agent_phone.core.outcome import ErrorCode, Refusal
-from agent_phone.core.phone import Activate, InputAction, Key, LongPress, OpenUri, Stop, Tap
+from agent_phone.core.phone import (
+    Activate,
+    InputAction,
+    Key,
+    KeyName,
+    LongPress,
+    OpenUri,
+    SetText,
+    Stop,
+    Swipe,
+    Tap,
+)
 from agent_phone.core.policy.rules import (
     CommitRule,
     DenyRule,
@@ -41,17 +56,40 @@ from agent_phone.core.screen import WindowKind
 
 @dataclass(frozen=True, slots=True)
 class Site:
-    """`receiver` is None when no touch consumer is under the point (a blank area), and for an
-    input that lands on no node, such as a key, which goes to the window that has focus.
+    """`receiver` is None when no element of the screen receives the input: a launch, a stop, a
+    link, a rotation, the clipboard, back, home and recents, and Enter with nothing in focus.
 
-    `context` is the text the receiver sits in: the whole window when the surface is a
-    dialog, else the whole surface. The receiver's own labels are not repeated in it.
+    `context` is the rest of the receiver's window. The receiver's own labels are not repeated
+    in it. For Enter with nothing in focus it is every label of the active window.
     """
 
     package: Package
     window_kind: WindowKind
     receiver: Surface | None
     context: tuple[Label, ...]
+
+
+class Reads(Enum):
+    """How much of the screen the engine reads for an input."""
+
+    NOTHING = "nothing"
+    DENIALS = "denials"
+    EVERYTHING = "everything"
+
+
+def reads_of(action: InputAction) -> Reads:
+    """A tap and Enter act on an element, so commit rules read it. Enter is judged like a tap on
+    the view that has focus. A set-text and a scroll act on an element too, but they commit
+    nothing, so only deny rules read it. Back, home and recents read nothing, so that a deny rule
+    cannot trap the agent on a screen. Launch, stop, a link, a rotation and the clipboard act on no
+    element of the screen."""
+    match action:
+        case Tap() | LongPress() | Activate() | Key(key=KeyName.ENTER):
+            return Reads.EVERYTHING
+        case SetText() | Swipe():
+            return Reads.DENIALS
+        case _:
+            return Reads.NOTHING
 
 
 class Source(Enum):
@@ -130,11 +168,12 @@ def language_of(locale: str) -> str:
 
 
 def classify(policy: Policy, action: InputAction, site: Site | None, locale: str) -> Verdict:
-    """Pure. `site` is None only for an input that lands nowhere at all; act() passes the
-    window that has focus for keys, launches and the like, so app-scoped rules apply to them.
+    """Pure. act() passes a `Site` for every input. A `Site` with no receiver means no element
+    receives the input. `site` is None only for a caller with no screen to offer, and then only
+    the rules that name no app, window kind or element are read.
 
-    Raises `Refusal(LOCALE_UNSUPPORTED)` when a labeled input arrives and the device's language
-    is not in `policy.languages`.
+    Raises `Refusal(LOCALE_UNSUPPORTED)` when commit rules would read an input and the device's
+    language is not in `policy.languages`.
     """
     language = language_of(locale)
 
@@ -147,25 +186,27 @@ def classify(policy: Policy, action: InputAction, site: Site | None, locale: str
     exempted: list[RuleId] = []
     receiver: Sequence[Label] = ()
     context: Sequence[Label] = ()
-    labeled = isinstance(action, Tap | LongPress | Activate)
-    if labeled:
-        if language not in policy.languages:
-            raise Refusal(
-                ErrorCode.LOCALE_UNSUPPORTED,
-                f"The device language {locale!r} has no policy rules, so agent-phone cannot read "
-                f"what this input would do. The rules cover {', '.join(sorted(policy.languages))}.",
-                {"locale": locale, "languages": sorted(policy.languages)},
-            )
-        if site is not None and site.receiver is not None:
-            receiver, context = site.receiver.labels, site.context
-            found, exempted = judge_receiver(
-                commits, rules(IgnoreRule), rules(ExemptRule), rules(InheritRule), receiver, context
-            )
-            withdrawn = [rule for rule in policy.withdrawn if in_scope(rule.scope, site, language)]
-            raw = phrases_in([*commits, *withdrawn], receiver, Source.RECEIVER)
+    reads = reads_of(action)
+    if reads is Reads.EVERYTHING and language not in policy.languages:
+        raise Refusal(
+            ErrorCode.LOCALE_UNSUPPORTED,
+            f"The device language {locale!r} has no policy rules, so agent-phone cannot read "
+            f"what this input would do. The rules cover {', '.join(sorted(policy.languages))}.",
+            {"locale": locale, "languages": sorted(policy.languages)},
+        )
+    if reads is not Reads.NOTHING and site is not None:
+        context = site.context
+        if site.receiver is not None:
+            receiver = site.receiver.labels
+            if reads is Reads.EVERYTHING:
+                found, exempted = judge_receiver(
+                    commits, rules(IgnoreRule), rules(ExemptRule), rules(InheritRule), receiver, context
+                )
+                withdrawn = [rule for rule in policy.withdrawn if in_scope(rule.scope, site, language)]
+                raw = phrases_in([*commits, *withdrawn], receiver, Source.RECEIVER)
     match action:
         case Key(key=key):
-            found = [found_by(rule, Source.KEY, key.value) for rule in commits if key in rule.keys]
+            found = [*found, *(found_by(rule, Source.KEY, key.value) for rule in commits if key in rule.keys)]
         case OpenUri(uri=uri):
             scheme = uri.partition(":")[0].casefold()
             found = [found_by(rule, Source.URI, uri) for rule in commits if scheme in rule.uri_schemes]
@@ -176,7 +217,7 @@ def classify(policy: Policy, action: InputAction, site: Site | None, locale: str
             return Denied(rule.origin.rule, rule.origin.reason, rule.origin.source, evidence)
     if effects:
         return Commits(frozenset(effects), tuple(evidence for _, evidence in found))
-    if not labeled:
+    if reads is not Reads.EVERYTHING:
         return Clear(ClearReason.NOT_LABELED_INPUT)
     if site is None or site.receiver is None:
         return Clear(ClearReason.NO_RECEIVER)

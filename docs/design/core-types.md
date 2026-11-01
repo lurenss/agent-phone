@@ -205,7 +205,7 @@ agent_phone/core/
   snapshot/  surface.py view.py budget.py snapshot.py capture.py
   refs/      fingerprint.py resolve.py store.py   (store.py also holds the device lock)
   policy/    rules.py engine.py
-  act/       intent.py hit.py ledger.py act.py
+  act/       intent.py hit.py site.py ledger.py act.py
   wait/      clock.py predicate.py observe.py until.py
   commands/  snapshot.py click.py set_text.py press.py stop.py wait.py screenshot.py devices.py server.py
 agent_phone/adapters/uiautomator2/  phone.py parse.py rpc.py delivery.py address.py shell.py adb.py server.py
@@ -281,15 +281,15 @@ Rejected from Fable: binding `--commit` to a label. A grant names an effect from
 - What protects a phone whose profile is missing? Nothing beyond the default rules. A profile applies only from the state root a command uses and only to the serial it names, so another `AGENT_PHONE_HOME` or a mistyped serial leaves the J7's tunnel unprotected. `devices` prints the profile that applies, and an agent should check it before it drives a phone it knows.
 - Can a ref match a look-alike? A ref with no twin in its snapshot resolves to the one live element with its key. On a screen that moves on its own, such as Stories, that can be the same control of the next item. The row key staled nothing on static screens (A5-8). A feed is unmeasured.
 - Can a link commit? The engine judges a link by its scheme, so `tel:` and `sms:` need `--commit send`. A deep link into an app does whatever that app chooses, and its scheme says nothing about that. A consumer that opens deep links should name their schemes in a commit rule.
-- Can a scroll commit? A swipe starts on a row of the list. A vertical swipe scrolls, but a horizontal swipe on a list whose rows dismiss on a swipe, such as the notification shade, can delete a row. The engine does not judge swipes yet, and the live checks scroll Settings lists only.
+- Can a scroll commit? A swipe starts on a row of the list. A vertical swipe scrolls, but a horizontal swipe on a list whose rows dismiss on a swipe, such as the notification shade, can delete a row. The engine reads a swipe with deny rules only, and the axis rule below refuses the swipes that can dismiss a row. The live checks scroll Settings lists only.
 
 ## What unit 4 changed from this sketch
 
-- **Set-text sends no touch.** The jar's selector `setText` taps the field's center first unless the selector names an instance (A2-12). The adapter always names one, so `Fill` stays an input with no site and nothing for the engine to judge.
+- **Set-text sends no touch.** The jar's selector `setText` taps the field's center first unless the selector names an instance (A2-12). The adapter always names one, so a set-text commits nothing. The review of unit 4 still gives it a site, because a deny rule can name its screen (see the end of this document).
 - **Deny rules read every label.** Commit rules read what `ignore` and `exempt` leave, but deny rules read the receiver's whole surface and its whole context, so a consumer's file cannot weaken a profile's deny rule by ignoring or exempting its words. On the J7 this denies the Settings tile `Connections`, whose summary names airplane mode.
 - **A lost UiAutomation connection is not `NotSent`.** The sketch's delivery table guessed it was, and marked the guess for a device check. A click is a touch down and a touch up (A2-11), and nothing shows that losing the connection between the two sent neither, so it stays `Sent(UNACKNOWLEDGED)`. A shell that printed that nothing started, such as `am start` with no matching activity, is `NotSent`.
 - **An intent is an intent URI.** `OpenUri` keeps its shape. `intent:#Intent;action=<action>;end`, with an optional `package=`, opens an action, and an intent URI with data, a component, extras or flags is INVALID_ARGS, so `open-url` cannot start a call or pass arguments the engine never saw.
-- **Targetless inputs are judged at the focused window.** A key, a launch or a link gets a `Site` with the package and window kind of the newest snapshot and no receiver, so a rule scoped to an app applies to its keys too.
+- **Targetless inputs are judged at the focused window.** A key, a launch or a link gets a `Site` with the package and window kind of the newest snapshot and no receiver, so a rule scoped to an app applies to its keys too. Enter is the exception that the review of unit 4 added: it gets the focused view as its receiver.
 - **The process keeps its unrefunded spends.** `ledger.unrefunded()` reads a list the ledger keeps for the whole process, because an exception that escaped a command can no longer reach the `Ledger` that spent the permit.
 - **`protect_rules` takes the profile file's path**, so a denial names the file it came from.
 - **Only a clickable view takes a touch.** The hit plan uses `role.takes_touch`, clickable or long-clickable, as `View.onTouchEvent` does. A checkable switch that is not clickable passes the touch to its row, so a click on it is NOT_ACTIONABLE and the row is judged by its own words. `consumes_touch` still decides whose words a label is.
@@ -298,3 +298,11 @@ Rejected from Fable: binding `--commit` to a label. A grant names an effect from
 - **A sideways scroll needs a collection that runs across**: a pager, a horizontal scroll view, or rows side by side. On a list that runs down it is NOT_ACTIONABLE, because a sideways swipe on a row can call or dismiss.
 - **A disabled commit rule stays as withdrawn.** It commits nothing, but deny rules read its effects, so disabling `default.system` cannot switch off a profile's protection.
 - **A raise inside `inject` is `Acted` with `delivery_uncertain`**, and the process reports any refusal that escapes after an unrefunded spend the same way.
+
+## What the review of unit 4 changed
+
+Two reviewers, one on Opus and one on Fable, broke unit 4 in nine verified ways. Seven let an input past the commit gate or a deny rule. The fixes below each came with a failing test first, so the history reads as an argument.
+
+- **Every input that lands on something is judged by what it lands on.** `act/site.py` builds a `Site` for a tap, a set-text, a scroll and Enter. Before, only a tap had one, so a deny rule that read words or a screen never saw the others: on the J7, SocksTun's own screen denied a tap and sent a set-text, a scroll and Enter. A set-text and a scroll are read by deny rules only (`engine.reads_of`), because typing and scrolling commit nothing, and a composer whose hint says "Send a message" must not need `--commit send`. Neither gets the locale guard, which exists because commit words cannot be read in a language the policy does not cover.
+- **Enter is judged like a tap on the view that has focus.** Android hands Enter to the focused view, and a focused clickable view clicks on it. The receiver is the focused node of the active window, with its surface and its context, so `--commit send` no longer presses a focused "Delete". Commit rules read it together with `default.key.enter`, deny rules read it, and the locale guard applies. With nothing in focus the receiver is None and the context is every label of the window, so a rule that names the screen still sees it. With no active window nothing can hold focus, and the site stays the one the newest snapshot gives.
+- **Back, home and recents stay unjudged.** They have no receiver and no context. They are the agent's way off a screen, and a deny rule that traps the agent on the screen is worse than the screen. Launch, stop, a link, a rotation and the clipboard act on no element of the screen and stay as they were.

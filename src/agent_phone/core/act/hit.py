@@ -22,10 +22,10 @@ from dataclasses import dataclass
 
 from agent_phone.core.act.intent import Direction
 from agent_phone.core.geometry import Point, Rect
-from agent_phone.core.labels import Label, own_labels
+from agent_phone.core.labels import Label, own_labels, owned
 from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.phone import Swipe
-from agent_phone.core.role import COLLECTIONS, Role, consumes_touch, role_of, simple_name, takes_touch
+from agent_phone.core.role import COLLECTIONS, Role, role_of, simple_name, takes_touch
 from agent_phone.core.screen import Node, NodeId, Screen, Window
 
 SWIPE_SPAN = 0.6
@@ -167,16 +167,11 @@ def labels_outside(screen: Screen, row: Node, node: Node) -> tuple[Label, ...]:
 def context_labels(screen: Screen, node: Node) -> tuple[Label, ...]:
     """The engine's `Site.context`: the labels of the node's whole window minus the labels of its
     own surface, which are the node and its descendants outside nested touch consumers."""
-    own: set[NodeId] = set()
-    i = node.id
-    while i < node.end:
-        member = screen.nodes[i]
-        if member.id != node.id and consumes_touch(member.attrs):
-            i = member.end
-            continue
-        own.add(member.id)
-        i += 1
-    window = screen.window_of(node.id)
+    return outside_labels(screen, screen.window_of(node.id), {member.id for member in owned(screen, node)})
+
+
+def outside_labels(screen: Screen, window: Window, own: set[NodeId]) -> tuple[Label, ...]:
+    """Every label of `window` except those of the nodes in `own`."""
     return tuple(
         label
         for member in screen.subtree(window.root)

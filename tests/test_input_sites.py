@@ -29,9 +29,6 @@ DEFAULT = parse_policy(tomllib.loads(DEFAULT_POLICY.read_text(encoding="utf-8"))
 J7 = load_profile(ROOT / "examples" / "devices" / "j7.toml")
 J7_POLICY = load_policy((), J7)
 SEND = Grant(frozenset({Effect.SEND}))
-UNJUDGED = pytest.mark.xfail(
-    strict=True, reason="act() gives set-text, scroll and Enter no Site, or one with no screen in it"
-)
 
 
 def start(root, screen, policy, locale="en-US", profile=None):
@@ -85,12 +82,7 @@ def request_for(path, taken, grant):
             return Request(Key(KeyName.ENTER), grant)
 
 
-PATHS = [
-    "tap",
-    pytest.param("set-text", marks=UNJUDGED),
-    pytest.param("scroll", marks=UNJUDGED),
-    pytest.param("enter", marks=UNJUDGED),
-]
+PATHS = ["tap", "set-text", "scroll", "enter"]
 
 
 def denying(**rule):
@@ -219,7 +211,6 @@ def dialog(title, focused):
     )
 
 
-@UNJUDGED
 def test_enter_with_a_send_grant_does_not_press_a_focused_delete_button(tmp_path):
     ctx, phone, taken = start(
         tmp_path, dialog("Delete this post?", focused_button("Delete")), merge((DEFAULT,))
@@ -230,7 +221,6 @@ def test_enter_with_a_send_grant_does_not_press_a_focused_delete_button(tmp_path
     assert set(outcome.details["effects"]) == {"send", "delete"}
 
 
-@UNJUDGED
 def test_enter_on_a_focused_neutral_button_does_what_its_dialog_says(tmp_path):
     screen = dialog("Delete this post?", focused_button("OK"))
     ctx, phone, taken = start(tmp_path, screen, merge((DEFAULT,)))
@@ -248,7 +238,6 @@ def test_enter_on_a_focused_field_commits_send_by_the_key_alone(tmp_path):
     assert isinstance(act(ctx, Request(Key(KeyName.ENTER), SEND)), Acted)
 
 
-@UNJUDGED
 def test_enter_in_a_language_the_rules_do_not_cover_is_not_judged_and_so_not_sent(tmp_path):
     ctx, phone, taken = start(tmp_path, form(), merge((DEFAULT,)), locale="de-DE")
     outcome = act(ctx, Request(Key(KeyName.ENTER), SEND))
@@ -256,7 +245,6 @@ def test_enter_in_a_language_the_rules_do_not_cover_is_not_judged_and_so_not_sen
     assert isinstance(outcome, Refused) and outcome.code is ErrorCode.LOCALE_UNSUPPORTED
 
 
-@UNJUDGED
 def test_enter_with_nothing_in_focus_still_lets_a_rule_read_the_screen(tmp_path):
     ctx, phone, taken = start(tmp_path, form(title="plant", focused=False), denying(context_words=["plant"]))
     outcome = act(ctx, Request(Key(KeyName.ENTER), SEND))

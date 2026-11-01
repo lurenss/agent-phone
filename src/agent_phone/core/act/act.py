@@ -12,21 +12,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from agent_phone.core.act.hit import (
-    context_labels,
-    plan_point,
-    require_active,
-    row_labels,
-    runs_across,
-    swipe_across,
-)
+from agent_phone.core.act.hit import plan_point, require_active, runs_across, swipe_across
 from agent_phone.core.act.intent import ActionReport, Click, Direction, Fill, Request, Scroll, TargetReport
+from agent_phone.core.act.site import element_site, focus_site
 from agent_phone.core.context import Context
-from agent_phone.core.labels import Surface, display_name, surface_of, typed_text
+from agent_phone.core.labels import display_name, typed_text
 from agent_phone.core.outcome import Acted, ErrorCode, Outcome, Refusal, Refused, SentState
 from agent_phone.core.phone import (
     Ack,
     InputAction,
+    Key,
+    KeyName,
     LongPress,
     NodeAddress,
     NotSent,
@@ -37,7 +33,7 @@ from agent_phone.core.phone import (
 from agent_phone.core.policy.engine import Site, Verdict, classify, require
 from agent_phone.core.refs.fingerprint import path_of
 from agent_phone.core.refs.resolve import QueryTarget, RefTarget, Resolved, Target, locate, observed_snapshot
-from agent_phone.core.role import CHOICES, Role, role_of, takes_touch
+from agent_phone.core.role import Role, role_of, takes_touch
 from agent_phone.core.screen import Flag, Node, Screen
 from agent_phone.core.snapshot.capture import capture
 from agent_phone.core.snapshot.snapshot import SettleState, Snapshot
@@ -57,7 +53,8 @@ class NotYet(Refusal):
 
 @dataclass(frozen=True, slots=True)
 class Planned:
-    """The input act() will judge, where it lands, and the read it was planned on."""
+    """The input act() will judge, the site the engine reads for it, and the read it was planned
+    on. `site` holds the screen around the element the input lands on (`act/site.py`)."""
 
     action: InputAction
     site: Site | None
@@ -114,8 +111,12 @@ def _settle_target(ctx: Context, request: Request) -> Planned:
     observed = observed_snapshot(target, ctx.store, ctx.info.identity, ctx.ledger.epoch())
     intent = request.intent
     if not isinstance(intent, Click | Fill | Scroll):
-        before = ctx.phone.read() if any(is_effect(p) for p in request.wait_for) else None
-        return Planned(intent, Site(observed.package, observed.window_kind, None, ()), None, before, None)
+        site = Site(observed.package, observed.window_kind, None, ())
+        enter = isinstance(intent, Key) and intent.key is KeyName.ENTER
+        before = ctx.phone.read() if enter or any(is_effect(p) for p in request.wait_for) else None
+        if enter and before is not None:
+            site = focus_site(before, site)
+        return Planned(intent, site, None, before, None)
     last: list[NotYet] = []
     previous: list[Node] = []
 
@@ -185,7 +186,6 @@ def _plan(
     role = role_of(node.attrs)
     ref = str(intent.target.token) if isinstance(intent.target, RefTarget) else None
     point = None
-    site = None
     try:
         match intent:
             case Click(long=long):
@@ -194,10 +194,6 @@ def _plan(
                 action: InputAction = (
                     LongPress(point, address, LONG_PRESS_MS) if long else Tap(point, address)
                 )
-                surface = surface_of(screen, node)
-                if role in CHOICES:
-                    surface = Surface(node.id, surface.labels + row_labels(screen, node))
-                site = Site(window.package, window.kind, surface, context_labels(screen, node))
             case Fill(text=text):
                 require_active(window)
                 action = SetText(address_of(screen, node), text, secret=node.has(Flag.PASSWORD))
@@ -208,7 +204,7 @@ def _plan(
     except Refusal as refusal:
         raise NotYet(refusal.code, refusal.message, refusal.details) from refusal
     report = TargetReport(ref, role, display_name(screen, node, role), point)
-    return Planned(action, site, report, screen, resolved)
+    return Planned(action, element_site(screen, node), report, screen, resolved)
 
 
 def ready(intent: Click | Fill | Scroll, node: Node, screen: Screen) -> None:

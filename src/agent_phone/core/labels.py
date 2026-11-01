@@ -73,17 +73,22 @@ lower-case letter splits too: `ModalitàAereo` -> Modalità Aereo."""
 WORD = re.compile(r"[^\W_]+")
 
 
-def surface_of(screen: Screen, node: Node) -> Surface:
-    labels: list[Label] = []
+def owned(screen: Screen, node: Node) -> list[Node]:
+    """The node and every descendant that is not inside a nested touch consumer."""
+    members: list[Node] = []
     i = node.id
     while i < node.end:
         member = screen.nodes[i]
         if member.id != node.id and consumes_touch(member.attrs):
             i = member.end
             continue
-        labels.extend(own_labels(member))
+        members.append(member)
         i += 1
-    return Surface(node.id, tuple(labels))
+    return members
+
+
+def surface_of(screen: Screen, node: Node) -> Surface:
+    return Surface(node.id, tuple(label for member in owned(screen, node) for label in own_labels(member)))
 
 
 def own_labels(node: Node) -> tuple[Label, ...]:

@@ -68,7 +68,7 @@ The exit code is 0 when `ok` is true, 1 for an error envelope, and 2 when the ar
 | `UNSTABLE` | The element moved between two reads. |
 | `OCCLUDED` | No point of the element would reach it: another window covers it, another element takes the touch there, two elements overlap in an unknown order, or its window has no input focus. |
 | `COMMIT_REFUSED` | The input would commit an effect that `--commit` did not grant. `details` lists the `effects`, the `granted` effects and the `evidence`. |
-| `DENIED` | A deny rule forbids the input whatever the caller grants. `details` names the `rule`, its `source` and the `evidence`. A device profile's protected package is denied this way. |
+| `DENIED` | A deny rule forbids the input whatever the caller grants. `details` names the `rule`, its `source` and the `evidence`. A device profile's protected package is denied this way. A deny rule reads a tap, a set-text, a scroll and Enter, and never back, home or recents. |
 | `LOCALE_UNSUPPORTED` | The device language has no policy rules, so labeled input cannot be judged. |
 | `TIMEOUT` | A wait reached its deadline. |
 | `TRANSPORT` | adb or the server failed, or the device returned output that does not parse. |
@@ -239,10 +239,10 @@ A refused commit lists what the input would do, what was granted, and the labels
 
 | Reason | Meaning |
 | --- | --- |
-| `no_receiver` | Nothing that takes a touch is at the point. |
+| `no_receiver` | Nothing that takes a touch is at the point, or, for Enter, no view has focus. |
 | `no_commit_words` | No commit rule matched the words of the element or, for a neutral affirmative such as OK, its dialog. |
 | `exempt` | An exempt rule removed the only words that matched. |
-| `not_labeled_input` | The input lands on no element, and no rule for keys or links matched it. |
+| `not_labeled_input` | Commit rules do not read this input: a set-text, a scroll, back, home, recents, or an input that lands on no element, and no rule for keys or links matched it. |
 
 ### Effects
 
