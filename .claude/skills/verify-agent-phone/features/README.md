@@ -46,3 +46,6 @@ Keep implementation details out of the map. Name only entry points, commands, th
 - [Snapshot modes and surfaces](./snapshot-modes.md) covers compact, skeleton, drill-down, full, settle, and the window flags.
 - [Find, get and is](./find-get-is.md) covers queries, live property reads, and the ref refusals.
 - [Server lifetime and the device lock](./server-lifetime.md) covers start, status, stop, the idle stop, freeing the phone, and the lock.
+- [Taps, text, scrolls and keys](./ref-actions.md) covers `click`, `set-text`, `scroll`, `press`, spent refs and `OBSERVE_FIRST`.
+- [Device operations](./device-operations.md) covers `launch`, `stop`, `open-url`, `rotate`, `clipboard` and `screenshot`.
+- [The commit gate and device protections](./policy-gate.md) covers `COMMIT_REFUSED`, `DENIED`, grants and protected packages.

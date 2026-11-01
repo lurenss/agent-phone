@@ -29,7 +29,8 @@ from agent_phone.cli.settings import DEFAULT_STATE_ROOT
 
 VERIFY_ROOT = DEFAULT_STATE_ROOT / "verify"
 PROFILES = Path(__file__).resolve().parents[4] / "examples" / "devices"
-AGENT_PHONE_READS = {"devices", "snapshot", "find", "get", "is", "server", "skills"}
+AGENT_PHONE_READS = {"devices", "snapshot", "find", "get", "is", "server", "skills", "screenshot"}
+AGENT_PHONE_READ_PAIRS = {("clipboard", "get")}
 ADB_READS = {"devices", "get-state", "get-serialno", "version"}
 ADB_OPTIONS_WITH_VALUE = {"-s", "-t", "-H", "-P", "-L"}
 SHELL_READS = set(
@@ -67,7 +68,7 @@ def is_read(argv: list[str]) -> bool:
         words = argv[1:]
         while words and words[0] in ("-d", "--device"):
             words = words[2:]
-        return bool(words) and words[0] in AGENT_PHONE_READS
+        return bool(words) and (words[0] in AGENT_PHONE_READS or tuple(words[:2]) in AGENT_PHONE_READ_PAIRS)
     if argv[0] != "adb":
         return False
     at = 1

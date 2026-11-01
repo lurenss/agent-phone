@@ -23,9 +23,13 @@ READS = [
     ["adb", "shell", "uiautomator dump /dev/null 2>&1"],
     ["adb", "exec-out", "screencap", "-p"],
     ["adb", "devices", "-l"],
+    ["agent-phone", "screenshot"],
+    ["agent-phone", "clipboard", "get"],
 ]
 CHANGES = [
     ["agent-phone", "click", "@k3x9q:e1"],
+    ["agent-phone", "clipboard", "set", "x"],
+    ["agent-phone", "stop", "com.android.settings"],
     ["adb", "-s", "0a1b2c3d4e5f6a7b", "shell", "am start -a android.settings.SETTINGS"],
     ["adb", "shell", "input", "keyevent", "KEYCODE_HOME"],
     ["adb", "shell", "getprop ro.product.model; input tap 10 10"],
