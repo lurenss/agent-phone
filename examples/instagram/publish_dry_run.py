@@ -6,7 +6,7 @@ clip whose length matches the file, writes the caption, then backs out with Star
 the picker. It never taps Share, and the gate would refuse it without `--commit publish` anyway
 (`probes/android/gate_check.py` on the composer's dump says `commits publish`).
 
-    uv run python examples/instagram/publish_dry_run.py SERIAL FILE CAPTION [--accounts a,b] [--cold]
+    uv run python examples/instagram/publish_dry_run.py SERIAL FILE CAPTION --accounts FIRST,SECOND [--cold]
 
 `--cold` force-stops Instagram first and starts it again, as the old script does. Each account ends
 with no pending session, and `--clear-only` does only that. Every step
@@ -38,7 +38,6 @@ from agent_phone import (
 )
 
 INSTAGRAM = "com.instagram.android"
-ACCOUNTS = ("account-1", "account-2")
 PROFILE_TAB = Q(id="profile_tab")
 CREATE = Q(id="profile_header_create_button")
 CAPTION = Q(id="caption_input_text_view")
@@ -90,11 +89,11 @@ def to_profile(phone: Driver) -> None:
     phone.click(PROFILE_TAB, wait_for=Present(CREATE), timeout_ms=SCREEN_MS)
 
 
-def switch_to(phone: Driver, account: str) -> bool:
+def switch_to(phone: Driver, account: str, accounts: tuple[str, ...]) -> bool:
     """True when it switched. The handle on the profile is a button named after the account."""
     if phone.count(Q(account)) > 0:
         return False
-    current = next(name for name in ACCOUNTS if name != account)
+    current = next(name for name in accounts if name != account)
     phone.click(Q(current), wait_for=Present(Q(f"{account},", match=Match.PREFIX)), timeout_ms=SCREEN_MS)
     # The row's label sums up the account's unread notifications ("account-2, 41 comments and 136
     # more"). With exactly one comment it reads "1 comment and ...", and the default policy reads
@@ -140,9 +139,11 @@ def clear_pending(phone: Driver) -> None:
     phone.click(Q("Back to Home"), wait_for=Present(PROFILE_TAB), timeout_ms=SCREEN_MS)
 
 
-def compose_and_discard(phone: Driver, account: str, label: str, caption: str, steps: Steps) -> dict:
+def compose_and_discard(
+    phone: Driver, account: str, accounts: tuple[str, ...], label: str, caption: str, steps: Steps
+) -> dict:
     timed(steps, f"{account}: profile", lambda: to_profile(phone))
-    switched = timed(steps, f"{account}: switch account", lambda: switch_to(phone, account))
+    switched = timed(steps, f"{account}: switch account", lambda: switch_to(phone, account, accounts))
     timed(
         steps,
         f"{account}: create new",
@@ -196,12 +197,17 @@ def main(argv: list[str]) -> int:
     parser.add_argument("serial")
     parser.add_argument("file", type=Path)
     parser.add_argument("caption")
-    parser.add_argument("--accounts", default=",".join(ACCOUNTS))
+    parser.add_argument(
+        "--accounts",
+        required=True,
+        help="the handles of the accounts signed in on the phone, comma-separated",
+    )
     parser.add_argument("--cold", action="store_true")
     parser.add_argument(
         "--clear-only", action="store_true", help="only end a pending session on each account"
     )
     args = parser.parse_args(argv)
+    accounts = tuple(name.strip() for name in args.accounts.split(","))
     label = clip_label(args.file)
     steps: Steps = []
     results: list[dict] = []
@@ -216,14 +222,16 @@ def main(argv: list[str]) -> int:
                 "launch instagram",
                 lambda: phone.launch(INSTAGRAM, wait_for=Present(PROFILE_TAB), timeout_ms=COLD_START_MS),
             )
-            for account in (name.strip() for name in args.accounts.split(",")):
+            for account in accounts:
                 if args.clear_only:
                     timed(steps, f"{account}: profile", lambda: to_profile(phone))
-                    timed(steps, f"{account}: switch account", lambda a=account: switch_to(phone, a))
+                    timed(
+                        steps, f"{account}: switch account", lambda a=account: switch_to(phone, a, accounts)
+                    )
                     timed(steps, f"{account}: clear pending session", lambda: clear_pending(phone))
                     results.append({"account": account, "status": "cleared"})
                     continue
-                results.append(compose_and_discard(phone, account, label, args.caption, steps))
+                results.append(compose_and_discard(phone, account, accounts, label, args.caption, steps))
     except (PhoneError, LookupError, AssertionError) as error:
         outcome = getattr(error, "outcome", error)
         after = getattr(outcome, "details", {}).get("after") if hasattr(outcome, "details") else None
