@@ -209,6 +209,82 @@ def test_disabling_the_default_commit_rules_does_not_unprotect_a_package():
         assert isinstance(verdict, Denied) and verdict.rule == "profile.protect.hev.sockstun.app-info"
 
 
+TUNNEL = DeviceProfile(
+    Serial("0a1b2c3d4e5f6a7b"),
+    "phone",
+    (ProtectedPackage(Package("com.example.tunnel"), ("SafeTunnel",), "Always-on lockdown VPN."),),
+    (),
+)
+PROTECTS_TUNNEL = (Policy(frozenset(), protect_rules(TUNNEL, "phone.toml")), frozenset())
+EXEMPTS_OK = {"exempt": [{"id": "x.ok", "labels": ["OK"], "reason": "OK closes dialogs here."}]}
+EXEMPTS_DELETE = {"exempt": [{"id": "x.del", "labels": ["Delete"], "reason": "Delete is a heading here."}]}
+BROKEN_FOR_CONSUMERS = pytest.mark.xfail(
+    strict=True,
+    reason="a denial reads the effects of the rules still in force, which a consumer's file changes",
+)
+BROKEN_FOR_THE_DEVICE = pytest.mark.xfail(
+    strict=True, reason="a denial reads the effects of every withdrawn rule, whoever withdrew it"
+)
+OK_UNDER_A_DELETE = ("Delete SafeTunnel?", "OK")
+DELETE_ON_THE_APP = ("SafeTunnel", "Delete")
+"""The dialog a button sits in, and the button. The OK gets its effect from its dialog's words, and
+the Delete button from its own."""
+WEAKENINGS = {
+    "disable the delete words, read through the dialog": (
+        OK_UNDER_A_DELETE,
+        {"disable": ["default.delete"]},
+        BROKEN_FOR_CONSUMERS,
+    ),
+    "disable the affirmatives": (
+        OK_UNDER_A_DELETE,
+        {"disable": ["default.affirmative"]},
+        BROKEN_FOR_CONSUMERS,
+    ),
+    "exempt OK": (OK_UNDER_A_DELETE, EXEMPTS_OK, BROKEN_FOR_CONSUMERS),
+    "disable the delete words, read in the button": (
+        DELETE_ON_THE_APP,
+        {"disable": ["default.delete"]},
+        None,
+    ),
+    "exempt Delete": (DELETE_ON_THE_APP, EXEMPTS_DELETE, None),
+}
+
+
+def weakened_tap(case, *, by_the_device):
+    (title, label), doc, _ = WEAKENINGS[case]
+    screen = dialog(title, "Cancel", label)
+    layer_ = parse_policy(doc, "phone-policy.toml" if by_the_device else "consumer.toml", by_the_device)
+    policy = merge((DEFAULT, PROTECTS_TUNNEL, layer_))
+    assert tap_on(screen, button(screen, "Cancel"), policy) == Clear(ClearReason.NO_COMMIT_WORDS)
+    return tap_on(screen, button(screen, label), policy)
+
+
+def marked(case, by_the_device):
+    own = WEAKENINGS[case][2]
+    if by_the_device:
+        return pytest.param(case, id=case, marks=() if own else BROKEN_FOR_THE_DEVICE)
+    return pytest.param(case, id=case, marks=own or ())
+
+
+def test_a_dialog_that_deletes_a_protected_app_is_denied_at_its_button():
+    for title, label in (OK_UNDER_A_DELETE, DELETE_ON_THE_APP):
+        screen = dialog(title, "Cancel", label)
+        verdict = tap_on(screen, button(screen, label), merge((DEFAULT, PROTECTS_TUNNEL)))
+        assert isinstance(verdict, Denied) and verdict.rule == "profile.protect.com.example.tunnel.app-info"
+
+
+@pytest.mark.parametrize("case", [marked(case, False) for case in WEAKENINGS])
+def test_a_consumer_layer_may_weaken_a_commit_and_never_a_denial(case):
+    verdict = weakened_tap(case, by_the_device=False)
+    assert isinstance(verdict, Denied), f"a consumer's file made the denied tap {verdict}"
+
+
+@pytest.mark.parametrize("case", [marked(case, True) for case in WEAKENINGS])
+def test_a_layer_of_the_device_may_weaken_what_its_own_denials_read(case):
+    verdict = weakened_tap(case, by_the_device=True)
+    assert not isinstance(verdict, Denied), "the device's own layer chose this, and the denial ignored it"
+
+
 def test_on_the_j7_wi_fi_and_any_screen_that_shows_sockstun_are_denied():
     policy = merge((DEFAULT, PROFILE))
     wifi = screen_of(node("android.widget.Switch", content_desc="Wi-Fi", checkable=True, clickable=True))

@@ -7,7 +7,7 @@ import shutil
 
 import pytest
 from fakes import J7_SERIAL, FakeHub, invoke
-from support import ROOT, node, screen_of
+from support import ROOT, fixture_screen, node, screen_of
 
 from agent_phone.cli.policy import load_policy, load_profile, load_profiles, profile_for
 from agent_phone.core.device import Connected
@@ -90,3 +90,121 @@ def test_a_caller_file_may_still_disable_a_deny_rule_that_another_caller_file_de
     loaded = profile_for(load_profiles(tmp_path), J7_SERIAL)
     policy = load_policy([tmp_path / "deny.toml", tmp_path / "weaken.toml"], loaded)
     assert "c.deny" not in {rule.origin.rule for rule in policy.rules}
+
+
+CONSUMER_WEAKENS_A_DENIAL = pytest.mark.xfail(
+    strict=True,
+    reason="deny rules read the effects of the rules still in force, which a consumer's file changes",
+)
+INSTALLER = "com.google.android.packageinstaller"
+PROTECTS_A_TUNNEL = f"""
+[device]
+serial = "{J7_SERIAL}"
+name = "test-phone"
+
+[[protected]]
+package = "com.example.tunnel"
+labels = ["SafeTunnel"]
+reason = "Always-on lockdown VPN."
+"""
+UNINSTALL = screen_of(
+    node(
+        "android.widget.FrameLayout",
+        node("android.widget.TextView", text="SafeTunnel", bounds="[60,1400][1020,1480]", package=INSTALLER),
+        node(
+            "android.widget.TextView",
+            text="Do you want to uninstall this app?",
+            resource_id="android:id/message",
+            bounds="[60,1500][1020,1600]",
+            package=INSTALLER,
+        ),
+        node(
+            "android.widget.Button",
+            text="Cancel",
+            resource_id="android:id/button2",
+            clickable=True,
+            bounds="[540,1700][780,1800]",
+            package=INSTALLER,
+        ),
+        node(
+            "android.widget.Button",
+            text="OK",
+            resource_id="android:id/button1",
+            clickable=True,
+            bounds="[780,1700][1020,1800]",
+            package=INSTALLER,
+        ),
+        package=INSTALLER,
+        bounds="[0,1350][1080,1900]",
+    )
+)
+WEAKENINGS = {
+    "disable-default-delete": 'disable = ["default.delete"]\n',
+    "disable-default-affirmative": 'disable = ["default.affirmative"]\n',
+    "exempt-ok": '[[exempt]]\nid = "c.ok"\nlabels = ["OK"]\nreason = "OK only closes dialogs here."\n',
+    "ignore-button1": (
+        '[[ignore]]\nid = "c.b1"\nnode_ids = ["android:id/button1"]\nreason = "A neutral button."\n'
+    ),
+}
+
+
+def tap_ok_of_the_uninstall_dialog(root, *flags):
+    (root / "profiles").mkdir(exist_ok=True)
+    (root / "profiles" / "phone.toml").write_text(PROTECTS_A_TUNNEL)
+    code, wire = invoke(["snapshot"], FakeHub([J7], screens=[UNINSTALL]), root)
+    assert code == 0, wire
+    ref = next(
+        t for line in wire["data"]["tree"] if '"OK"' in line for t in line.split() if t.startswith("@")
+    )
+    hub = FakeHub([J7], screens=[UNINSTALL])
+    _, wire = invoke(["click", ref, *flags], hub, root)
+    return wire, [permit.action for phone in hub.phones for permit in phone.permits]
+
+
+def test_the_profile_alone_denies_the_ok_of_the_uninstall_dialog_of_a_protected_app(tmp_path):
+    wire, sent = tap_ok_of_the_uninstall_dialog(tmp_path)
+    assert wire["error"]["code"] == "DENIED"
+    assert wire["error"]["details"]["rule"] == "profile.protect.com.example.tunnel.app-info"
+    assert sent == []
+
+
+@CONSUMER_WEAKENS_A_DENIAL
+@pytest.mark.parametrize("weakening", sorted(WEAKENINGS))
+def test_no_consumer_file_turns_the_denial_of_that_ok_into_anything_else(tmp_path, weakening):
+    wire, sent = tap_ok_of_the_uninstall_dialog(
+        tmp_path, "--policy", str(caller_file(tmp_path, WEAKENINGS[weakening]))
+    )
+    assert sent == [], f"the OK of 'uninstall SafeTunnel?' was tapped: {wire.get('data', {}).get('gate')}"
+    assert wire["error"]["code"] == "DENIED", wire["error"]
+
+
+NEVER_SENDS = f"""
+[device]
+serial = "{J7_SERIAL}"
+name = "test-phone"
+
+[[deny]]
+id = "p.never-send"
+effects = ["send"]
+reason = "This phone never sends a message, with or without --commit."
+"""
+
+
+@CONSUMER_WEAKENS_A_DENIAL
+@pytest.mark.parametrize(
+    ("argv", "disabled"),
+    [(["press", "enter"], "default.key.enter"), (["open-url", "sms:5551234"], "default.uri.contact")],
+)
+def test_disabling_a_key_or_a_link_rule_does_not_switch_off_a_profile_denial(tmp_path, argv, disabled):
+    settings = fixture_screen("settings-home")
+    (tmp_path / "profiles").mkdir()
+    (tmp_path / "profiles" / "phone.toml").write_text(NEVER_SENDS)
+    assert invoke(["snapshot"], FakeHub([J7], screens=[settings]), tmp_path)[0] == 0
+    _, baseline = invoke(argv, FakeHub([J7], screens=[settings]), tmp_path)
+    assert baseline["error"]["code"] == "DENIED", baseline
+    hub = FakeHub([J7], screens=[settings])
+    consumer = caller_file(tmp_path, f'disable = ["{disabled}"]\n')
+    _, wire = invoke([*argv, "--policy", str(consumer)], hub, tmp_path)
+    sent = [permit.action for phone in hub.phones for permit in phone.permits]
+    assert sent == [], f"{' '.join(argv)} was sent under p.never-send: {wire.get('data', {}).get('gate')}"
+    assert wire["error"]["code"] == "DENIED", wire.get("error")
