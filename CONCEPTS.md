@@ -168,6 +168,12 @@ The claim on one device (`DeviceLock`, `core/refs/store.py`). It is an advisory 
 
 The server is the uiautomator2 process on the phone that answers screen reads (`Server`, `adapters/uiautomator2/server.py`). A command starts it detached when its health check fails. A watchdog shell on the phone kills it when the last-use file is older than the idle limit, 15 minutes by default (`AGENT_PHONE_IDLE_S`). `agent-phone server stop` ends both, which frees the device's one UiAutomation client for another tool.
 
+## Guides for agents
+
+### Skill
+
+A usage guide for agents that ships inside the package (`Skill`, `core/commands/skills.py`), as `agent_phone/skills/<name>/SKILL.md`. `skills list` names each one with its alias, and `skills get` prints one, so an agent reads the guide of the version it runs. `tests/test_skill_drift.py` keeps the guide's commands and flags equal to the parser's. *Avoid:* "skill" for `.claude/skills/verify-agent-phone/`, which is a project skill for agents that work on this repo, not a shipped guide.
+
 ## Relationships
 
 A backend turns one dump into a `Screen`. `select_surface` picks the window to describe. `build_view` walks it with the label surface and the role rules and produces lines, and `fit` keeps those lines within the budget. `fingerprints` keys every node so that each printed ref can be found again. The `Snapshot` holds the lines, the fingerprints and the device identity, and the store writes it to disk. A later command reads the snapshot back by the id in its ref, checks the device and the ledger epoch, and finds the element on a new `Screen` by its key. The policy engine reads the same label surface that named the element, so it judges the words the agent saw.
