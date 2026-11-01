@@ -108,7 +108,6 @@ def test_a_neutral_affirmative_does_what_its_dialog_says():
     assert tap_on(harmless, button(harmless, "Allow")) == Clear(ClearReason.NO_COMMIT_WORDS)
 
 
-@pytest.mark.xfail(strict=True, reason="is_affirmative compares the raw tokens, role suffix included")
 @pytest.mark.parametrize("description", ["OK, Button", "Allow,Button"])
 def test_an_affirmative_described_with_a_role_suffix_does_what_its_dialog_says(description):
     screen = screen_of(

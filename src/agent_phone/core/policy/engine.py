@@ -25,7 +25,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from agent_phone.core.device import Package
-from agent_phone.core.labels import Label, LabelField, Surface, normalized, words
+from agent_phone.core.labels import Label, LabelField, Surface, cleaned, normalized, words
 from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.phone import (
     Activate,
@@ -310,9 +310,10 @@ def judge_receiver(
 
 
 def is_affirmative(inherits: Sequence[InheritRule], labels: Sequence[Label]) -> bool:
-    """True when a naming label is, as a whole, one of the inherit rules' words."""
+    """True when a naming label is, as a whole, one of the inherit rules' words. It is compared as
+    the snapshot prints it, so a description "OK, Button" is the affirmative the agent reads."""
     affirmatives = {phrase.words for rule in inherits for phrase in rule.words}
-    return any(label.naming and words(label.value, label.field) in affirmatives for label in labels)
+    return any(label.naming and words(cleaned(label), label.field) in affirmatives for label in labels)
 
 
 def phrases_in(rules: Sequence[CommitRule], labels: Sequence[Label], source: Source) -> list[Found]:
