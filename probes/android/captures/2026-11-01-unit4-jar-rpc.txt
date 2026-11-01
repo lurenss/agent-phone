@@ -1,0 +1,604 @@
+== Landroidx/test/uiautomator/UiObject; click ()Z
+   0000 iget-object v0, v7, Landroidx/test/uiautomator/UiObject;->mConfig Landroidx/test/uiautomator/Configurator;
+   0004 invoke-virtual v0, Landroidx/test/uiautomator/Configurator;->getWaitForSelectorTimeout()J
+   000a move-result-wide v0
+   000c invoke-virtual v7, v0, v1, Landroidx/test/uiautomator/UiObject;->findAccessibilityNodeInfo(J)Landroid/view/accessibility/AccessibilityNodeInfo;
+   0012 move-result-object v0
+   0014 if-eqz v0, +041h
+   0018 invoke-virtual v7, v0, Landroidx/test/uiautomator/UiObject;->getVisibleBounds(Landroid/view/accessibility/AccessibilityNodeInfo;)Landroid/graphics/Rect;
+   001e move-result-object v1
+   0020 sget-object v2, Landroidx/test/uiautomator/UiObject;->TAG Ljava/lang/String;
+   0024 const/4 v3, 2
+   0026 new-array v3, v3, [Ljava/lang/Object;
+   002a const/4 v4, 0
+   002c invoke-virtual v1, Landroid/graphics/Rect;->centerX()I
+   0032 move-result v5
+   0034 invoke-static v5, Ljava/lang/Integer;->valueOf(I)Ljava/lang/Integer;
+   003a move-result-object v5
+   003c aput-object v5, v3, v4
+   0040 const/4 v4, 1
+   0042 invoke-virtual v1, Landroid/graphics/Rect;->centerY()I
+   0048 move-result v5
+   004a invoke-static v5, Ljava/lang/Integer;->valueOf(I)Ljava/lang/Integer;
+   0050 move-result-object v5
+   0052 aput-object v5, v3, v4
+   0056 const-string v4, "Clicking on (%d, %d)."
+   005a invoke-static v4, v3, Ljava/lang/String;->format(Ljava/lang/String; [Ljava/lang/Object;)Ljava/lang/String;
+   0060 move-result-object v3
+   0062 invoke-static v2, v3, Landroid/util/Log;->d(Ljava/lang/String; Ljava/lang/String;)I
+   0068 invoke-virtual v7, Landroidx/test/uiautomator/UiObject;->getInteractionController()Landroidx/test/uiautomator/InteractionController;
+   006e move-result-object v2
+   0070 invoke-virtual v1, Landroid/graphics/Rect;->centerX()I
+   0076 move-result v3
+   0078 invoke-virtual v1, Landroid/graphics/Rect;->centerY()I
+   007e move-result v4
+   0080 iget-object v5, v7, Landroidx/test/uiautomator/UiObject;->mConfig Landroidx/test/uiautomator/Configurator;
+   0084 invoke-virtual v5, Landroidx/test/uiautomator/Configurator;->getActionAcknowledgmentTimeout()J
+   008a move-result-wide v5
+   008c invoke-virtual v2, v3, v4, v5, v6, Landroidx/test/uiautomator/InteractionController;->clickAndSync(I I J)Z
+   0092 move-result v2
+   0094 return v2
+   0096 new-instance v1, Landroidx/test/uiautomator/UiObjectNotFoundException;
+   009a iget-object v2, v7, Landroidx/test/uiautomator/UiObject;->mUiSelector Landroidx/test/uiautomator/UiSelector;
+   009e invoke-virtual v2, Landroidx/test/uiautomator/UiSelector;->toString()Ljava/lang/String;
+   00a4 move-result-object v2
+   00a6 invoke-direct v1, v2, Landroidx/test/uiautomator/UiObjectNotFoundException;-><init>(Ljava/lang/String;)V
+   00ac throw v1
+== Landroidx/test/uiautomator/UiObject; setText (Ljava/lang/String;)Z
+   0000 if-nez v6, +004h
+   0004 const-string v6, ""
+   0008 sget v0, Landroid/os/Build$VERSION;->SDK_INT I
+   000c const/16 v1, 21
+   0010 const/4 v2, 0
+   0012 const/4 v3, 1
+   0014 const-string v4, "Setting text to '%s'."
+   0018 if-lt v0, v1, +03ah
+   001c iget-object v0, v5, Landroidx/test/uiautomator/UiObject;->mConfig Landroidx/test/uiautomator/Configurator;
+   0020 invoke-virtual v0, Landroidx/test/uiautomator/Configurator;->getWaitForSelectorTimeout()J
+   0026 move-result-wide v0
+   0028 invoke-virtual v5, v0, v1, Landroidx/test/uiautomator/UiObject;->findAccessibilityNodeInfo(J)Landroid/view/accessibility/AccessibilityNodeInfo;
+   002e move-result-object v0
+   0030 if-eqz v0, +020h
+   0034 sget-object v1, Landroidx/test/uiautomator/UiObject;->TAG Ljava/lang/String;
+   0038 new-array v3, v3, [Ljava/lang/Object;
+   003c aput-object v6, v3, v2
+   0040 invoke-static v4, v3, Ljava/lang/String;->format(Ljava/lang/String; [Ljava/lang/Object;)Ljava/lang/String;
+   0046 move-result-object v2
+   0048 invoke-static v1, v2, Landroid/util/Log;->d(Ljava/lang/String; Ljava/lang/String;)I
+   004e new-instance v1, Landroid/os/Bundle;
+   0052 invoke-direct v1, Landroid/os/Bundle;-><init>()V
+   0058 const-string v2, "ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE"
+   005c invoke-virtual v1, v2, v6, Landroid/os/Bundle;->putCharSequence(Ljava/lang/String; Ljava/lang/CharSequence;)V
+   0062 const/high16 v2, 2097152
+   0066 invoke-virtual v0, v2, v1, Landroid/view/accessibility/AccessibilityNodeInfo;->performAction(I Landroid/os/Bundle;)Z
+   006c move-result v2
+   006e return v2
+   0070 new-instance v1, Landroidx/test/uiautomator/UiObjectNotFoundException;
+   0074 invoke-virtual v5, Landroidx/test/uiautomator/UiObject;->getSelector()Landroidx/test/uiautomator/UiSelector;
+   007a move-result-object v2
+   007c invoke-virtual v2, Landroidx/test/uiautomator/UiSelector;->toString()Ljava/lang/String;
+   0082 move-result-object v2
+   0084 invoke-direct v1, v2, Landroidx/test/uiautomator/UiObjectNotFoundException;-><init>(Ljava/lang/String;)V
+   008a throw v1
+   008c invoke-virtual v5, Landroidx/test/uiautomator/UiObject;->clearTextField()V
+   0092 sget-object v0, Landroidx/test/uiautomator/UiObject;->TAG Ljava/lang/String;
+   0096 new-array v1, v3, [Ljava/lang/Object;
+   009a aput-object v6, v1, v2
+   009e invoke-static v4, v1, Ljava/lang/String;->format(Ljava/lang/String; [Ljava/lang/Object;)Ljava/lang/String;
+   00a4 move-result-object v1
+   00a6 invoke-static v0, v1, Landroid/util/Log;->d(Ljava/lang/String; Ljava/lang/String;)I
+   00ac invoke-virtual v5, Landroidx/test/uiautomator/UiObject;->getInteractionController()Landroidx/test/uiautomator/InteractionController;
+   00b2 move-result-object v0
+   00b4 invoke-virtual v0, v6, Landroidx/test/uiautomator/InteractionController;->sendText(Ljava/lang/String;)Z
+   00ba move-result v0
+   00bc return v0
+== Landroidx/test/uiautomator/UiObject2; click ()V
+   0000 invoke-direct v7, Landroidx/test/uiautomator/UiObject2;->getAccessibilityNodeInfo()Landroid/view/accessibility/AccessibilityNodeInfo;
+   0006 move-result-object v0
+   0008 invoke-direct v7, v0, Landroidx/test/uiautomator/UiObject2;->getVisibleCenter(Landroid/view/accessibility/AccessibilityNodeInfo;)Landroid/graphics/Point;
+   000e move-result-object v1
+   0010 sget-object v2, Landroidx/test/uiautomator/UiObject2;->TAG Ljava/lang/String;
+   0014 const/4 v3, 2
+   0016 new-array v3, v3, [Ljava/lang/Object;
+   001a iget v4, v1, Landroid/graphics/Point;->x I
+   001e invoke-static v4, Ljava/lang/Integer;->valueOf(I)Ljava/lang/Integer;
+   0024 move-result-object v4
+   0026 const/4 v5, 0
+   0028 aput-object v4, v3, v5
+   002c iget v4, v1, Landroid/graphics/Point;->y I
+   0030 invoke-static v4, Ljava/lang/Integer;->valueOf(I)Ljava/lang/Integer;
+   0036 move-result-object v4
+   0038 const/4 v6, 1
+   003a aput-object v4, v3, v6
+   003e const-string v4, "Clicking on (%d, %d)."
+   0042 invoke-static v4, v3, Ljava/lang/String;->format(Ljava/lang/String; [Ljava/lang/Object;)Ljava/lang/String;
+   0048 move-result-object v3
+   004a invoke-static v2, v3, Landroid/util/Log;->d(Ljava/lang/String; Ljava/lang/String;)I
+   0050 invoke-virtual v0, Landroid/view/accessibility/AccessibilityNodeInfo;->isClickable()Z
+   0056 move-result v3
+   0058 if-nez v3, +00fh
+   005c new-array v3, v6, [Ljava/lang/Object;
+   0060 aput-object v0, v3, v5
+   0064 const-string v4, "Clicking on non-clickable object: %s"
+   0068 invoke-static v4, v3, Ljava/lang/String;->format(Ljava/lang/String; [Ljava/lang/Object;)Ljava/lang/String;
+   006e move-result-object v3
+   0070 invoke-static v2, v3, Landroid/util/Log;->w(Ljava/lang/String; Ljava/lang/String;)I
+   0076 iget-object v2, v7, Landroidx/test/uiautomator/UiObject2;->mGestureController Landroidx/test/uiautomator/GestureController;
+   007a new-array v3, v6, [Landroidx/test/uiautomator/PointerGesture;
+   007e invoke-virtual v7, Landroidx/test/uiautomator/UiObject2;->getDisplayId()I
+   0084 move-result v4
+   0086 invoke-static v1, v4, Landroidx/test/uiautomator/Gestures;->click(Landroid/graphics/Point; I)Landroidx/test/uiautomator/PointerGesture;
+   008c move-result-object v4
+   008e aput-object v4, v3, v5
+   0092 invoke-virtual v2, v3, Landroidx/test/uiautomator/GestureController;->performGesture([Landroidx/test/uiautomator/PointerGesture;)V
+   0098 return-void 
+== Landroidx/test/uiautomator/UiObject2; click (J)V
+   0000 invoke-direct v8, Landroidx/test/uiautomator/UiObject2;->getAccessibilityNodeInfo()Landroid/view/accessibility/AccessibilityNodeInfo;
+   0006 move-result-object v0
+   0008 invoke-direct v8, v0, Landroidx/test/uiautomator/UiObject2;->getVisibleCenter(Landroid/view/accessibility/AccessibilityNodeInfo;)Landroid/graphics/Point;
+   000e move-result-object v1
+   0010 sget-object v2, Landroidx/test/uiautomator/UiObject2;->TAG Ljava/lang/String;
+   0014 const/4 v3, 3
+   0016 new-array v3, v3, [Ljava/lang/Object;
+   001a iget v4, v1, Landroid/graphics/Point;->x I
+   001e invoke-static v4, Ljava/lang/Integer;->valueOf(I)Ljava/lang/Integer;
+   0024 move-result-object v4
+   0026 const/4 v5, 0
+   0028 aput-object v4, v3, v5
+   002c iget v4, v1, Landroid/graphics/Point;->y I
+   0030 invoke-static v4, Ljava/lang/Integer;->valueOf(I)Ljava/lang/Integer;
+   0036 move-result-object v4
+   0038 const/4 v6, 1
+   003a aput-object v4, v3, v6
+   003e invoke-static v9, v10, Ljava/lang/Long;->valueOf(J)Ljava/lang/Long;
+   0044 move-result-object v4
+   0046 const/4 v7, 2
+   0048 aput-object v4, v3, v7
+   004c const-string v4, "Clicking on (%d, %d) for %dms."
+   0050 invoke-static v4, v3, Ljava/lang/String;->format(Ljava/lang/String; [Ljava/lang/Object;)Ljava/lang/String;
+   0056 move-result-object v3
+   0058 invoke-static v2, v3, Landroid/util/Log;->d(Ljava/lang/String; Ljava/lang/String;)I
+   005e invoke-virtual v0, Landroid/view/accessibility/AccessibilityNodeInfo;->isClickable()Z
+   0064 move-result v3
+   0066 if-nez v3, +00fh
+   006a new-array v3, v6, [Ljava/lang/Object;
+   006e aput-object v0, v3, v5
+   0072 const-string v4, "Clicking on non-clickable object: %s"
+   0076 invoke-static v4, v3, Ljava/lang/String;->format(Ljava/lang/String; [Ljava/lang/Object;)Ljava/lang/String;
+   007c move-result-object v3
+   007e invoke-static v2, v3, Landroid/util/Log;->w(Ljava/lang/String; Ljava/lang/String;)I
+   0084 iget-object v2, v8, Landroidx/test/uiautomator/UiObject2;->mGestureController Landroidx/test/uiautomator/GestureController;
+   0088 new-array v3, v6, [Landroidx/test/uiautomator/PointerGesture;
+   008c invoke-virtual v8, Landroidx/test/uiautomator/UiObject2;->getDisplayId()I
+   0092 move-result v4
+   0094 invoke-static v1, v9, v10, v4, Landroidx/test/uiautomator/Gestures;->click(Landroid/graphics/Point; J I)Landroidx/test/uiautomator/PointerGesture;
+   009a move-result-object v4
+   009c aput-object v4, v3, v5
+   00a0 invoke-virtual v2, v3, Landroidx/test/uiautomator/GestureController;->performGesture([Landroidx/test/uiautomator/PointerGesture;)V
+   00a6 return-void 
+== Landroidx/test/uiautomator/UiObject2; click (Landroid/graphics/Point;)V
+   0000 invoke-direct v6, Landroidx/test/uiautomator/UiObject2;->getAccessibilityNodeInfo()Landroid/view/accessibility/AccessibilityNodeInfo;
+   0006 move-result-object v0
+   0008 invoke-direct v6, v7, v0, Landroidx/test/uiautomator/UiObject2;->clipToGestureBounds(Landroid/graphics/Point; Landroid/view/accessibility/AccessibilityNodeInfo;)Z
+   000e sget-object v1, Landroidx/test/uiautomator/UiObject2;->TAG Ljava/lang/String;
+   0012 const/4 v2, 2
+   0014 new-array v2, v2, [Ljava/lang/Object;
+   0018 iget v3, v7, Landroid/graphics/Point;->x I
+   001c invoke-static v3, Ljava/lang/Integer;->valueOf(I)Ljava/lang/Integer;
+   0022 move-result-object v3
+   0024 const/4 v4, 0
+   0026 aput-object v3, v2, v4
+   002a iget v3, v7, Landroid/graphics/Point;->y I
+   002e invoke-static v3, Ljava/lang/Integer;->valueOf(I)Ljava/lang/Integer;
+   0034 move-result-object v3
+   0036 const/4 v5, 1
+   0038 aput-object v3, v2, v5
+   003c const-string v3, "Clicking on (%d, %d)."
+   0040 invoke-static v3, v2, Ljava/lang/String;->format(Ljava/lang/String; [Ljava/lang/Object;)Ljava/lang/String;
+   0046 move-result-object v2
+   0048 invoke-static v1, v2, Landroid/util/Log;->d(Ljava/lang/String; Ljava/lang/String;)I
+   004e invoke-virtual v0, Landroid/view/accessibility/AccessibilityNodeInfo;->isClickable()Z
+   0054 move-result v2
+   0056 if-nez v2, +00fh
+   005a new-array v2, v5, [Ljava/lang/Object;
+   005e aput-object v0, v2, v4
+   0062 const-string v3, "Clicking on non-clickable object: %s"
+   0066 invoke-static v3, v2, Ljava/lang/String;->format(Ljava/lang/String; [Ljava/lang/Object;)Ljava/lang/String;
+   006c move-result-object v2
+   006e invoke-static v1, v2, Landroid/util/Log;->w(Ljava/lang/String; Ljava/lang/String;)I
+   0074 iget-object v1, v6, Landroidx/test/uiautomator/UiObject2;->mGestureController Landroidx/test/uiautomator/GestureController;
+   0078 new-array v2, v5, [Landroidx/test/uiautomator/PointerGesture;
+   007c invoke-virtual v6, Landroidx/test/uiautomator/UiObject2;->getDisplayId()I
+   0082 move-result v3
+   0084 invoke-static v7, v3, Landroidx/test/uiautomator/Gestures;->click(Landroid/graphics/Point; I)Landroidx/test/uiautomator/PointerGesture;
+   008a move-result-object v3
+   008c aput-object v3, v2, v4
+   0090 invoke-virtual v1, v2, Landroidx/test/uiautomator/GestureController;->performGesture([Landroidx/test/uiautomator/PointerGesture;)V
+   0096 return-void 
+== Landroidx/test/uiautomator/UiObject2; click (Landroid/graphics/Point; J)V
+   0000 invoke-direct v7, Landroidx/test/uiautomator/UiObject2;->getAccessibilityNodeInfo()Landroid/view/accessibility/AccessibilityNodeInfo;
+   0006 move-result-object v0
+   0008 invoke-direct v7, v8, v0, Landroidx/test/uiautomator/UiObject2;->clipToGestureBounds(Landroid/graphics/Point; Landroid/view/accessibility/AccessibilityNodeInfo;)Z
+   000e sget-object v1, Landroidx/test/uiautomator/UiObject2;->TAG Ljava/lang/String;
+   0012 const/4 v2, 3
+   0014 new-array v2, v2, [Ljava/lang/Object;
+   0018 iget v3, v8, Landroid/graphics/Point;->x I
+   001c invoke-static v3, Ljava/lang/Integer;->valueOf(I)Ljava/lang/Integer;
+   0022 move-result-object v3
+   0024 const/4 v4, 0
+   0026 aput-object v3, v2, v4
+   002a iget v3, v8, Landroid/graphics/Point;->y I
+   002e invoke-static v3, Ljava/lang/Integer;->valueOf(I)Ljava/lang/Integer;
+   0034 move-result-object v3
+   0036 const/4 v5, 1
+   0038 aput-object v3, v2, v5
+   003c invoke-static v9, v10, Ljava/lang/Long;->valueOf(J)Ljava/lang/Long;
+   0042 move-result-object v3
+   0044 const/4 v6, 2
+   0046 aput-object v3, v2, v6
+   004a const-string v3, "Clicking on (%d, %d) for %dms."
+   004e invoke-static v3, v2, Ljava/lang/String;->format(Ljava/lang/String; [Ljava/lang/Object;)Ljava/lang/String;
+   0054 move-result-object v2
+   0056 invoke-static v1, v2, Landroid/util/Log;->d(Ljava/lang/String; Ljava/lang/String;)I
+   005c invoke-virtual v0, Landroid/view/accessibility/AccessibilityNodeInfo;->isClickable()Z
+   0062 move-result v2
+   0064 if-nez v2, +00fh
+   0068 new-array v2, v5, [Ljava/lang/Object;
+   006c aput-object v0, v2, v4
+   0070 const-string v3, "Clicking on non-clickable object: %s"
+   0074 invoke-static v3, v2, Ljava/lang/String;->format(Ljava/lang/String; [Ljava/lang/Object;)Ljava/lang/String;
+   007a move-result-object v2
+   007c invoke-static v1, v2, Landroid/util/Log;->w(Ljava/lang/String; Ljava/lang/String;)I
+   0082 iget-object v1, v7, Landroidx/test/uiautomator/UiObject2;->mGestureController Landroidx/test/uiautomator/GestureController;
+   0086 new-array v2, v5, [Landroidx/test/uiautomator/PointerGesture;
+   008a invoke-virtual v7, Landroidx/test/uiautomator/UiObject2;->getDisplayId()I
+   0090 move-result v3
+   0092 invoke-static v8, v9, v10, v3, Landroidx/test/uiautomator/Gestures;->click(Landroid/graphics/Point; J I)Landroidx/test/uiautomator/PointerGesture;
+   0098 move-result-object v3
+   009a aput-object v3, v2, v4
+   009e invoke-virtual v1, v2, Landroidx/test/uiautomator/GestureController;->performGesture([Landroidx/test/uiautomator/PointerGesture;)V
+   00a4 return-void 
+== Lcom/wetest/uia2/stub/Selector; checkBySelectorNull (Lcom/wetest/uia2/stub/Selector;)Z
+   0000 invoke-virtual v8, Lcom/wetest/uia2/stub/Selector;->getMask()J
+   0006 move-result-wide v0
+   0008 const-wide/32 v2, 8388608
+   000e and-long/2addr v0, v2
+   0010 const/4 v2, 1
+   0012 const-wide/16 v3, 0
+   0016 cmp-long v5, v0, v3
+   001a if-gtz v5, +018h
+   001e invoke-virtual v8, Lcom/wetest/uia2/stub/Selector;->getMask()J
+   0024 move-result-wide v0
+   0026 const-wide/32 v5, 16777216
+   002c and-long/2addr v0, v5
+   002e cmp-long v5, v0, v3
+   0032 if-lez v5, +003h
+   0036 goto +ah
+   0038 invoke-virtual v8, Lcom/wetest/uia2/stub/Selector;->toBySelector()Landroidx/test/uiautomator/BySelector;
+   003e move-result-object v0
+   0040 if-nez v0, +003h
+   0044 return v2
+   0046 const/4 v0, 0
+   0048 return v0
+   004a return v2
+== Lcom/wetest/uia2/stub/Selector; toUiObject2 ()Landroidx/test/uiautomator/UiObject2;
+   0000 invoke-virtual v3, v3, Lcom/wetest/uia2/stub/Selector;->checkBySelectorNull(Lcom/wetest/uia2/stub/Selector;)Z
+   0006 move-result v0
+   0008 const/4 v1, 0
+   000a if-eqz v0, +003h
+   000e return-object v1
+   0010 iget-object v0, v3, Lcom/wetest/uia2/stub/Selector;->device Landroidx/test/uiautomator/UiDevice;
+   0014 invoke-virtual v3, Lcom/wetest/uia2/stub/Selector;->toBySelector()Landroidx/test/uiautomator/BySelector;
+   001a move-result-object v2
+   001c invoke-virtual v0, v2, Landroidx/test/uiautomator/UiDevice;->findObject(Landroidx/test/uiautomator/BySelector;)Landroidx/test/uiautomator/UiObject2;
+   0022 move-result-object v0
+   0024 invoke-virtual v3, Lcom/wetest/uia2/stub/Selector;->getChildOrSibling()[Ljava/lang/String;
+   002a move-result-object v2
+   002c array-length v2, v2
+   002e if-lez v2, +003h
+   0032 return-object v1
+   0034 return-object v0
+== Lcom/wetest/uia2/stub/AutomatorServiceImpl; click (Landroidx/test/uiautomator/UiObject; Ljava/lang/String;)Z
+   0000 if-nez v3, +004h
+   0004 const-string v3, "center"
+   0008 invoke-virtual v3, Ljava/lang/String;->toLowerCase()Ljava/lang/String;
+   000e move-result-object v3
+   0010 const-string v0, "br"
+   0014 invoke-virtual v0, v3, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+   001a move-result v0
+   001c if-nez v0, +039h
+   0020 const-string v0, "bottomright"
+   0024 invoke-virtual v0, v3, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+   002a move-result v0
+   002c if-eqz v0, +003h
+   0030 goto +2fh
+   0032 const-string v0, "tl"
+   0036 invoke-virtual v0, v3, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+   003c move-result v0
+   003e if-nez v0, +023h
+   0042 const-string v0, "topleft"
+   0046 invoke-virtual v0, v3, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+   004c move-result v0
+   004e if-eqz v0, +003h
+   0052 goto +19h
+   0054 const-string v0, "c"
+   0058 invoke-virtual v0, v3, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+   005e move-result v0
+   0060 if-nez v0, +00dh
+   0064 const-string v0, "center"
+   0068 invoke-virtual v0, v3, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+   006e move-result v0
+   0070 if-eqz v0, +003h
+   0074 goto +3h
+   0076 const/4 v0, 0
+   0078 return v0
+   007a invoke-virtual v2, Landroidx/test/uiautomator/UiObject;->click()Z
+   0080 move-result v0
+   0082 return v0
+   0084 invoke-virtual v2, Landroidx/test/uiautomator/UiObject;->clickTopLeft()Z
+   008a move-result v0
+   008c return v0
+   008e invoke-virtual v2, Landroidx/test/uiautomator/UiObject;->clickBottomRight()Z
+   0094 move-result v0
+   0096 return v0
+== Lcom/wetest/uia2/stub/AutomatorServiceImpl; swipe (Landroidx/test/uiautomator/UiObject2; Ljava/lang/String; F I)Z
+   0000 invoke-virtual v3, Ljava/lang/String;->toLowerCase()Ljava/lang/String;
+   0006 move-result-object v3
+   0008 const-string v0, "u"
+   000c invoke-virtual v0, v3, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+   0012 move-result v0
+   0014 if-nez v0, +04fh
+   0018 const-string v0, "up"
+   001c invoke-virtual v0, v3, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+   0022 move-result v0
+   0024 if-eqz v0, +003h
+   0028 goto +45h
+   002a const-string v0, "d"
+   002e invoke-virtual v0, v3, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+   0034 move-result v0
+   0036 if-nez v0, +038h
+   003a const-string v0, "down"
+   003e invoke-virtual v0, v3, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+   0044 move-result v0
+   0046 if-eqz v0, +003h
+   004a goto +2eh
+   004c const-string v0, "l"
+   0050 invoke-virtual v0, v3, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+   0056 move-result v0
+   0058 if-nez v0, +021h
+   005c const-string v0, "left"
+   0060 invoke-virtual v0, v3, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+   0066 move-result v0
+   0068 if-eqz v0, +003h
+   006c goto +17h
+   006e const-string v0, "r"
+   0072 invoke-virtual v0, v3, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+   0078 move-result v0
+   007a if-nez v0, +00ah
+   007e const-string v0, "right"
+   0082 invoke-virtual v0, v3, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+   0088 move-result v0
+   008a if-eqz v0, +019h
+   008e sget-object v0, Landroidx/test/uiautomator/Direction;->RIGHT Landroidx/test/uiautomator/Direction;
+   0092 invoke-virtual v2, v0, v4, v5, Landroidx/test/uiautomator/UiObject2;->swipe(Landroidx/test/uiautomator/Direction; F I)V
+   0098 goto +12h
+   009a sget-object v0, Landroidx/test/uiautomator/Direction;->LEFT Landroidx/test/uiautomator/Direction;
+   009e invoke-virtual v2, v0, v4, v5, Landroidx/test/uiautomator/UiObject2;->swipe(Landroidx/test/uiautomator/Direction; F I)V
+   00a4 goto +ch
+   00a6 sget-object v0, Landroidx/test/uiautomator/Direction;->DOWN Landroidx/test/uiautomator/Direction;
+   00aa invoke-virtual v2, v0, v4, v5, Landroidx/test/uiautomator/UiObject2;->swipe(Landroidx/test/uiautomator/Direction; F I)V
+   00b0 goto +6h
+   00b2 sget-object v0, Landroidx/test/uiautomator/Direction;->UP Landroidx/test/uiautomator/Direction;
+   00b6 invoke-virtual v2, v0, v4, v5, Landroidx/test/uiautomator/UiObject2;->swipe(Landroidx/test/uiautomator/Direction; F I)V
+   00bc const/4 v0, 1
+   00be return v0
+== Lcom/wetest/uia2/stub/AutomatorServiceImpl; swipe (Landroidx/test/uiautomator/UiObject; Ljava/lang/String; I)Z
+   0000 invoke-virtual v4, Ljava/lang/String;->toLowerCase()Ljava/lang/String;
+   0006 move-result-object v4
+   0008 const/4 v0, 0
+   000a const-string v1, "u"
+   000e invoke-virtual v1, v4, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+   0014 move-result v1
+   0016 if-nez v1, +04ch
+   001a const-string v1, "up"
+   001e invoke-virtual v1, v4, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+   0024 move-result v1
+   0026 if-eqz v1, +003h
+   002a goto +42h
+   002c const-string v1, "d"
+   0030 invoke-virtual v1, v4, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+   0036 move-result v1
+   0038 if-nez v1, +036h
+   003c const-string v1, "down"
+   0040 invoke-virtual v1, v4, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+   0046 move-result v1
+   0048 if-eqz v1, +003h
+   004c goto +2ch
+   004e const-string v1, "l"
+   0052 invoke-virtual v1, v4, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+   0058 move-result v1
+   005a if-nez v1, +020h
+   005e const-string v1, "left"
+   0062 invoke-virtual v1, v4, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+   0068 move-result v1
+   006a if-eqz v1, +003h
+   006e goto +16h
+   0070 const-string v1, "r"
+   0074 invoke-virtual v1, v4, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+   007a move-result v1
+   007c if-nez v1, +00ah
+   0080 const-string v1, "right"
+   0084 invoke-virtual v1, v4, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+   008a move-result v1
+   008c if-eqz v1, +015h
+   0090 invoke-virtual v3, v5, Landroidx/test/uiautomator/UiObject;->swipeRight(I)Z
+   0096 move-result v0
+   0098 goto +fh
+   009a invoke-virtual v3, v5, Landroidx/test/uiautomator/UiObject;->swipeLeft(I)Z
+   00a0 move-result v0
+   00a2 goto +ah
+   00a4 invoke-virtual v3, v5, Landroidx/test/uiautomator/UiObject;->swipeDown(I)Z
+   00aa move-result v0
+   00ac goto +5h
+   00ae invoke-virtual v3, v5, Landroidx/test/uiautomator/UiObject;->swipeUp(I)Z
+   00b4 move-result v0
+   00b6 return v0
+== Lcom/wetest/uia2/stub/AutomatorServiceImpl; click (I I)Z
+   0000 if-ltz v4, +01ah
+   0004 if-gez v5, +003h
+   0008 goto +16h
+   000a iget-object v0, v3, Lcom/wetest/uia2/stub/AutomatorServiceImpl;->touchController Lcom/wetest/uia2/stub/TouchController;
+   000e int-to-float v1, v4
+   0010 int-to-float v2, v5
+   0012 invoke-virtual v0, v1, v2, Lcom/wetest/uia2/stub/TouchController;->touchDown(F F)Z
+   0018 const-wide/16 v0, 100
+   001c invoke-static v0, v1, Landroid/os/SystemClock;->sleep(J)V
+   0022 iget-object v0, v3, Lcom/wetest/uia2/stub/AutomatorServiceImpl;->touchController Lcom/wetest/uia2/stub/TouchController;
+   0026 int-to-float v1, v4
+   0028 int-to-float v2, v5
+   002a invoke-virtual v0, v1, v2, Lcom/wetest/uia2/stub/TouchController;->touchUp(F F)Z
+   0030 move-result v0
+   0032 return v0
+   0034 const/4 v0, 0
+   0036 return v0
+== Lcom/wetest/uia2/stub/AutomatorServiceImpl; click (I I J)Z
+   0000 if-ltz v4, +018h
+   0004 if-gez v5, +003h
+   0008 goto +14h
+   000a iget-object v0, v3, Lcom/wetest/uia2/stub/AutomatorServiceImpl;->touchController Lcom/wetest/uia2/stub/TouchController;
+   000e int-to-float v1, v4
+   0010 int-to-float v2, v5
+   0012 invoke-virtual v0, v1, v2, Lcom/wetest/uia2/stub/TouchController;->touchDown(F F)Z
+   0018 invoke-static v6, v7, Landroid/os/SystemClock;->sleep(J)V
+   001e iget-object v0, v3, Lcom/wetest/uia2/stub/AutomatorServiceImpl;->touchController Lcom/wetest/uia2/stub/TouchController;
+   0022 int-to-float v1, v4
+   0024 int-to-float v2, v5
+   0026 invoke-virtual v0, v1, v2, Lcom/wetest/uia2/stub/TouchController;->touchUp(F F)Z
+   002c move-result v0
+   002e return v0
+   0030 const/4 v0, 0
+   0032 return v0
+== Lcom/wetest/uia2/stub/AutomatorServiceImpl; click (Lcom/wetest/uia2/stub/Selector;)Z
+   0000 invoke-virtual v3, Lcom/wetest/uia2/stub/Selector;->toUiObject2()Landroidx/test/uiautomator/UiObject2;
+   0006 move-result-object v0
+   0008 if-nez v0, +011h
+   000c iget-object v0, v2, Lcom/wetest/uia2/stub/AutomatorServiceImpl;->device Landroidx/test/uiautomator/UiDevice;
+   0010 invoke-virtual v3, Lcom/wetest/uia2/stub/Selector;->toUiSelector()Landroidx/test/uiautomator/UiSelector;
+   0016 move-result-object v1
+   0018 invoke-virtual v0, v1, Landroidx/test/uiautomator/UiDevice;->findObject(Landroidx/test/uiautomator/UiSelector;)Landroidx/test/uiautomator/UiObject;
+   001e move-result-object v0
+   0020 invoke-virtual v0, Landroidx/test/uiautomator/UiObject;->click()Z
+   0026 move-result v0
+   0028 return v0
+   002a invoke-virtual v3, Lcom/wetest/uia2/stub/Selector;->toUiObject2()Landroidx/test/uiautomator/UiObject2;
+   0030 move-result-object v0
+   0032 invoke-virtual v0, Landroidx/test/uiautomator/UiObject2;->click()V
+   0038 const/4 v0, 1
+   003a return v0
+== Lcom/wetest/uia2/stub/AutomatorServiceImpl; click (Lcom/wetest/uia2/stub/Selector; Ljava/lang/String;)Z
+   0000 iget-object v0, v2, Lcom/wetest/uia2/stub/AutomatorServiceImpl;->device Landroidx/test/uiautomator/UiDevice;
+   0004 invoke-virtual v3, Lcom/wetest/uia2/stub/Selector;->toUiSelector()Landroidx/test/uiautomator/UiSelector;
+   000a move-result-object v1
+   000c invoke-virtual v0, v1, Landroidx/test/uiautomator/UiDevice;->findObject(Landroidx/test/uiautomator/UiSelector;)Landroidx/test/uiautomator/UiObject;
+   0012 move-result-object v0
+   0014 invoke-direct v2, v0, v4, Lcom/wetest/uia2/stub/AutomatorServiceImpl;->click(Landroidx/test/uiautomator/UiObject; Ljava/lang/String;)Z
+   001a move-result v0
+   001c return v0
+== Lcom/wetest/uia2/stub/AutomatorServiceImpl; click (Ljava/lang/String;)Z
+   0000 invoke-direct v1, v2, Lcom/wetest/uia2/stub/AutomatorServiceImpl;->getUiObject(Ljava/lang/String;)Landroidx/test/uiautomator/UiObject;
+   0006 move-result-object v0
+   0008 invoke-virtual v0, Landroidx/test/uiautomator/UiObject;->click()Z
+   000e move-result v0
+   0010 return v0
+== Lcom/wetest/uia2/stub/AutomatorServiceImpl; click (Ljava/lang/String; Ljava/lang/String;)Z
+   0000 invoke-direct v1, v2, Lcom/wetest/uia2/stub/AutomatorServiceImpl;->getUiObject(Ljava/lang/String;)Landroidx/test/uiautomator/UiObject;
+   0006 move-result-object v0
+   0008 invoke-direct v1, v0, v3, Lcom/wetest/uia2/stub/AutomatorServiceImpl;->click(Landroidx/test/uiautomator/UiObject; Ljava/lang/String;)Z
+   000e move-result v0
+   0010 return v0
+== Lcom/wetest/uia2/stub/AutomatorServiceImpl; pressKeyCode (I)Z
+   0000 iget-object v0, v1, Lcom/wetest/uia2/stub/AutomatorServiceImpl;->device Landroidx/test/uiautomator/UiDevice;
+   0004 invoke-virtual v0, v2, Landroidx/test/uiautomator/UiDevice;->pressKeyCode(I)Z
+   000a move-result v0
+   000c return v0
+== Lcom/wetest/uia2/stub/AutomatorServiceImpl; pressKeyCode (I I)Z
+   0000 iget-object v0, v1, Lcom/wetest/uia2/stub/AutomatorServiceImpl;->device Landroidx/test/uiautomator/UiDevice;
+   0004 invoke-virtual v0, v2, v3, Landroidx/test/uiautomator/UiDevice;->pressKeyCode(I I)Z
+   000a move-result v0
+   000c return v0
+== Lcom/wetest/uia2/stub/AutomatorServiceImpl; setClipboard (Ljava/lang/String; Ljava/lang/String;)V
+   0000 iget-object v0, v2, Lcom/wetest/uia2/stub/AutomatorServiceImpl;->clipboardManager Landroid/content/ClipboardManager;
+   0004 invoke-static v3, v4, Landroid/content/ClipData;->newPlainText(Ljava/lang/CharSequence; Ljava/lang/CharSequence;)Landroid/content/ClipData;
+   000a move-result-object v1
+   000c invoke-virtual v0, v1, Landroid/content/ClipboardManager;->setPrimaryClip(Landroid/content/ClipData;)V
+   0012 return-void 
+== Lcom/wetest/uia2/stub/AutomatorServiceImpl; setText (Lcom/wetest/uia2/stub/Selector; Ljava/lang/String;)Z
+   0000 invoke-virtual v4, Lcom/wetest/uia2/stub/Selector;->toUiObject2()Landroidx/test/uiautomator/UiObject2;
+   0006 move-result-object v0
+   0008 invoke-virtual v0, Landroidx/test/uiautomator/UiObject2;->click()V
+   000e invoke-virtual v4, Lcom/wetest/uia2/stub/Selector;->toUiObject2()Landroidx/test/uiautomator/UiObject2;
+   0014 move-result-object v0
+   0016 invoke-virtual v0, v5, Landroidx/test/uiautomator/UiObject2;->setText(Ljava/lang/String;)V
+   001c const/4 v0, 1
+   001e return v0
+   0020 move-exception v0
+   0022 goto +2h
+   0024 move-exception v0
+   0026 iget-object v1, v3, Lcom/wetest/uia2/stub/AutomatorServiceImpl;->device Landroidx/test/uiautomator/UiDevice;
+   002a invoke-virtual v4, Lcom/wetest/uia2/stub/Selector;->toUiSelector()Landroidx/test/uiautomator/UiSelector;
+   0030 move-result-object v2
+   0032 invoke-virtual v1, v2, Landroidx/test/uiautomator/UiDevice;->findObject(Landroidx/test/uiautomator/UiSelector;)Landroidx/test/uiautomator/UiObject;
+   0038 move-result-object v1
+   003a invoke-virtual v1, v5, Landroidx/test/uiautomator/UiObject;->setText(Ljava/lang/String;)Z
+   0040 move-result v1
+   0042 return v1
+   catch Ljava/lang/NullPointerException; -> 0024
+   catch Landroidx/test/uiautomator/StaleObjectException; -> 0020
+== Lcom/wetest/uia2/stub/AutomatorServiceImpl; setText (Ljava/lang/String; Ljava/lang/String;)Z
+   0000 invoke-direct v1, v2, Lcom/wetest/uia2/stub/AutomatorServiceImpl;->getUiObject(Ljava/lang/String;)Landroidx/test/uiautomator/UiObject;
+   0006 move-result-object v0
+   0008 invoke-virtual v0, v3, Landroidx/test/uiautomator/UiObject;->setText(Ljava/lang/String;)Z
+   000e move-result v0
+   0010 return v0
+== Lcom/wetest/uia2/stub/AutomatorServiceImpl; swipe (I I I I I)Z
+   0000 iget-object v0, v6, Lcom/wetest/uia2/stub/AutomatorServiceImpl;->device Landroidx/test/uiautomator/UiDevice;
+   0004 move v1, v7
+   0006 move v2, v8
+   0008 move v3, v9
+   000a move v4, v10
+   000c move v5, v11
+   000e invoke-virtual/range v0 ... v5, Landroidx/test/uiautomator/UiDevice;->swipe(I I I I I)Z
+   0014 move-result v0
+   0016 return v0
+== Lcom/wetest/uia2/stub/AutomatorServiceImpl; swipe (Lcom/wetest/uia2/stub/Selector; Ljava/lang/String; F I)Z
+   0000 invoke-virtual v3, Lcom/wetest/uia2/stub/Selector;->toUiObject2()Landroidx/test/uiautomator/UiObject2;
+   0006 move-result-object v0
+   0008 if-nez v0, +011h
+   000c iget-object v0, v2, Lcom/wetest/uia2/stub/AutomatorServiceImpl;->device Landroidx/test/uiautomator/UiDevice;
+   0010 invoke-virtual v3, Lcom/wetest/uia2/stub/Selector;->toUiSelector()Landroidx/test/uiautomator/UiSelector;
+   0016 move-result-object v1
+   0018 invoke-virtual v0, v1, Landroidx/test/uiautomator/UiDevice;->findObject(Landroidx/test/uiautomator/UiSelector;)Landroidx/test/uiautomator/UiObject;
+   001e move-result-object v0
+   0020 invoke-direct v2, v0, v4, v6, Lcom/wetest/uia2/stub/AutomatorServiceImpl;->swipe(Landroidx/test/uiautomator/UiObject; Ljava/lang/String; I)Z
+   0026 move-result v0
+   0028 return v0
+   002a invoke-virtual v3, Lcom/wetest/uia2/stub/Selector;->toUiObject2()Landroidx/test/uiautomator/UiObject2;
+   0030 move-result-object v0
+   0032 invoke-direct v2, v0, v4, v5, v6, Lcom/wetest/uia2/stub/AutomatorServiceImpl;->swipe(Landroidx/test/uiautomator/UiObject2; Ljava/lang/String; F I)Z
+   0038 move-result v0
+   003a return v0
+== Lcom/wetest/uia2/stub/AutomatorServiceImpl; swipe (Lcom/wetest/uia2/stub/Selector; Ljava/lang/String; I)Z
+   0000 iget-object v0, v2, Lcom/wetest/uia2/stub/AutomatorServiceImpl;->device Landroidx/test/uiautomator/UiDevice;
+   0004 invoke-virtual v3, Lcom/wetest/uia2/stub/Selector;->toUiSelector()Landroidx/test/uiautomator/UiSelector;
+   000a move-result-object v1
+   000c invoke-virtual v0, v1, Landroidx/test/uiautomator/UiDevice;->findObject(Landroidx/test/uiautomator/UiSelector;)Landroidx/test/uiautomator/UiObject;
+   0012 move-result-object v0
+   0014 invoke-direct v2, v0, v4, v5, Lcom/wetest/uia2/stub/AutomatorServiceImpl;->swipe(Landroidx/test/uiautomator/UiObject; Ljava/lang/String; I)Z
+   001a move-result v0
+   001c return v0
+== Lcom/wetest/uia2/stub/AutomatorServiceImpl; swipe (Ljava/lang/String; Ljava/lang/String; I)Z
+   0000 invoke-direct v1, v2, Lcom/wetest/uia2/stub/AutomatorServiceImpl;->getUiObject(Ljava/lang/String;)Landroidx/test/uiautomator/UiObject;
+   0006 move-result-object v0
+   0008 invoke-direct v1, v0, v3, v4, Lcom/wetest/uia2/stub/AutomatorServiceImpl;->swipe(Landroidx/test/uiautomator/UiObject; Ljava/lang/String; I)Z
+   000e move-result v0
+   0010 return v0
