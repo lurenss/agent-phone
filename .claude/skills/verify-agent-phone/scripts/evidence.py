@@ -82,6 +82,27 @@ def is_read(argv: list[str]) -> bool:
     return rest[0] in ADB_READS
 
 
+def batch_files(argv: list[str]) -> list[Path]:
+    """The files that an `agent-phone batch` names, or [] for any other command. A batch keeps
+    its steps in a file, so the argv alone does not say what it sends."""
+    if argv[0] != "agent-phone":
+        return []
+    words = argv[1:]
+    while words and words[0] in ("-d", "--device"):
+        words = words[2:]
+    if not words or words[0] != "batch":
+        return []
+    return [Path(word) for word in words[1:] if word != "-" and Path(word).is_file()]
+
+
+def scanned(argv: list[str]) -> str:
+    """The words an input is judged by for a protected package: its argv and the steps of a
+    batch file, without the brackets and backslashes that hide a package name in JSON or a
+    quoted script."""
+    steps = [path.read_text(encoding="utf-8", errors="replace") for path in batch_files(argv)]
+    return re.sub(r"[\[\]\\]", "", " ".join([*argv, *steps]))
+
+
 def resolved(argv: list[str]) -> list[str]:
     here = Path(sys.executable).parent
     programs = {"agent-phone": str(here / "agent-phone"), "python": sys.executable}
@@ -106,7 +127,9 @@ def record(args: argparse.Namespace) -> int:
         sys.exit("evidence: give the command after --")
     if not args.input and not is_read(argv):
         sys.exit(f"evidence: {shlex.join(argv)} may change the phone. Pass --input if your task allows it.")
-    plain = re.sub(r"[\[\]\\]", "", " ".join(argv))
+    if args.input and argv[0] == "agent-phone" and "batch" in argv[1:] and not batch_files(argv):
+        sys.exit("evidence: a batch input must name its steps file, so the record can show what it sends")
+    plain = scanned(argv)
     named = sorted(package for package in protected_packages() if package in plain)
     if args.input and named:
         sys.exit(f"evidence: refused, the input names the protected package {named}")

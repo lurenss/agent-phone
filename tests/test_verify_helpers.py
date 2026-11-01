@@ -95,9 +95,6 @@ def test_flags_before_the_double_dash_are_ours_and_the_rest_is_the_command(tmp_p
     assert entry["exit"] == 0 and entry["stdout"] == "hi\n"
 
 
-@pytest.mark.xfail(
-    strict=True, reason="evidence.py judges only the argv, which a batch keeps its steps out of"
-)
 def test_the_words_judged_for_a_protected_package_include_the_steps_in_a_batch_file(tmp_path):
     steps = tmp_path / "steps.json"
     steps.write_text('[["launch", "com.android.settings"], ["stop", "hev.sockstun"]]')
@@ -109,3 +106,21 @@ def test_the_words_judged_for_a_protected_package_include_the_steps_in_a_batch_f
         assert "hev.sockstun" in evidence.scanned(argv)
     assert "hev.sockstun" not in evidence.scanned(["agent-phone", "batch", str(tmp_path / "nowhere.json")])
     assert "hev.sockstun" not in evidence.scanned(["agent-phone", "snapshot"])
+
+
+def test_a_batch_that_names_a_protected_package_in_its_steps_is_refused_before_it_runs(tmp_path, monkeypatch):
+    def never(*args, **kwargs):
+        raise AssertionError("the batch reached the phone")
+
+    monkeypatch.setattr(evidence.subprocess, "run", never)
+    steps = tmp_path / "steps.json"
+    steps.write_text('[["stop", "hev.sockstun"]]')
+    run = tmp_path / "run"
+    run.mkdir()
+    with pytest.raises(SystemExit, match="protected package"):
+        evidence.record(request(run, ["agent-phone", "batch", str(steps)], True))
+    with pytest.raises(SystemExit, match="steps file"):
+        evidence.record(request(run, ["agent-phone", "batch"], True))
+    with pytest.raises(SystemExit, match="may change the phone"):
+        evidence.record(request(run, ["agent-phone", "batch", str(steps)], False))
+    assert list(run.iterdir()) == []
