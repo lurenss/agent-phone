@@ -1,0 +1,6 @@
+# The emu-de-35 profile. Copy it to ~/.agent-phone/profiles/, where agent-phone reads every profile.
+# It names no policy file.
+
+[device]
+serial = "emulator-5554"
+name = "emu-de-35"
