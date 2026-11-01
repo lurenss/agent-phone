@@ -359,9 +359,11 @@ def open_phone(
 
     The device lock is held until the block ends, and the phone is closed then. `hub`, `settings`
     and `clock` are for tests and for consumers that bring their own; the defaults read the
-    environment and use adb. A `ref` names its device through its snapshot, so no `serial` is
-    needed when the ref is given. `first_read` is for a caller that reads once, straight after
-    it opens, as the CLI does (`PhoneHub.open`).
+    environment and use adb. The permission mode is `settings.permission_mode`, which the
+    environment variable `AGENT_PHONE_PERMISSION_MODE` sets, and no argument here can change it.
+    A `ref` names its device through its snapshot, so no `serial` is needed when the ref is given.
+    `first_read` is for a caller that reads once, straight after it opens, as the CLI does
+    (`PhoneHub.open`).
     """
     try:
         settings = settings or Settings.from_environment()
