@@ -22,7 +22,7 @@ What an element is for, from a closed list (`Role`, `core/role.py`). `role_of` r
 
 ### Strip
 
-A system window along one edge of the display: as wide as the display along its top or bottom, or as tall as it down a side, and no more than 8% thick the other way (`is_strip`, `adapters/uiautomator2/parse.py`). The status bar and the navigation bar are strips. A strip is never the active window. A server that has seen no screen change since it started lists the status bar before the app, and skipping strips finds the app anyway (`A2-8`).
+A system window along one edge of the display: as wide as the display along its top or bottom, or as tall as it down a side, and no more than 8% thick the other way (`is_strip`, `adapters/uiautomator2/parse.py`). "Along an edge" and "as wide as the display" each allow 2 pixels (`EDGE_SLACK`), because the Thor reports bounds a pixel inside the display. The status bar and the navigation bar are strips. A strip is never the active window. A server that has seen no screen change since it started lists the status bar before the app, and skipping strips finds the app anyway (`A2-8`).
 
 ### Touch consumer
 

@@ -95,9 +95,6 @@ def test_settle_waits_out_a_dump_with_no_window_to_describe(tmp_path):
     assert wire["data"]["settled"] == "settled" and hub.phones[0].reads == 4
 
 
-IN_BUG_2 = pytest.mark.xfail(strict=True, reason="a bar one pixel inside the display is not a strip")
-
-
 def second_display(label="", bounds="[0,0][540,1920]", display=4):
     child = node("android.widget.TextView", text=label, package="test.second_screen", bounds=bounds)
     return node(
@@ -146,7 +143,6 @@ def system_window(bounds):
         )
     ],
 )
-@IN_BUG_2
 def test_a_bar_up_to_two_pixels_inside_the_display_edge_is_still_a_strip(bounds):
     assert actives(screen_of(system_window(bounds), app())) == [("test.app", "application")]
 
@@ -159,7 +155,6 @@ def test_a_system_window_three_pixels_short_of_a_side_or_off_an_edge_is_not_a_st
 
 
 @pytest.mark.parametrize("bounds", ["[1801,1][1920,1079]", "[1800,0][1919,1080]"])
-@IN_BUG_2
 def test_a_navigation_bar_down_a_side_that_is_a_pixel_inside_the_display_is_a_strip(bounds):
     screen = screen_of(system_window(bounds), app(bounds="[0,0][1800,1080]"), rotation=1)
     assert actives(screen) == [("test.app", "application")]

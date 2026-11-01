@@ -41,6 +41,11 @@ STRIP_FRACTION = 0.08
 """The most a status or navigation bar takes of the display across its thin side. The J7's status
 bar takes 3.3%, and a three-button navigation bar is about 7.5%."""
 
+EDGE_SLACK = 2
+"""Pixels by which a window may stop short of a display edge and still be along it. The Thor reports
+root bounds a pixel inside the display, and not always the same way: its status bar is `[1,0][1920,55]`
+on one read and `[0,0][1920,55]` on another."""
+
 DEFAULT_DISPLAY = "0"
 """The `display-id` of the display that input goes to. A dump without `display-id` (API 28) is all
 on it."""
@@ -170,11 +175,15 @@ def could_hold_focus(root: NodeSpec, kind: WindowKind, display: Size) -> bool:
 
 
 def is_strip(bounds: Rect, display: Size) -> bool:
-    """A bar along one edge: as wide as the display along its top or bottom edge, or as tall as
-    it down a side edge, and thin across the other way."""
+    """A bar along one edge: as wide as the display along its top or bottom edge, or as tall as it
+    down a side edge, and thin across the other way. "Along an edge" and "as wide as the display"
+    both allow `EDGE_SLACK` pixels, so a bar that stops short of a side by more than that is not a strip."""
+    near_left, near_top = bounds.left <= EDGE_SLACK, bounds.top <= EDGE_SLACK
+    near_right = bounds.right >= display.width - EDGE_SLACK
+    near_bottom = bounds.bottom >= display.height - EDGE_SLACK
     width, height = bounds.right - bounds.left, bounds.bottom - bounds.top
-    along_top_or_bottom = width >= display.width and (bounds.top <= 0 or bounds.bottom >= display.height)
-    along_a_side = height >= display.height and (bounds.left <= 0 or bounds.right >= display.width)
+    along_top_or_bottom = near_left and near_right and (near_top or near_bottom)
+    along_a_side = near_top and near_bottom and (near_left or near_right)
     return (along_top_or_bottom and height <= STRIP_FRACTION * display.height) or (
         along_a_side and width <= STRIP_FRACTION * display.width
     )

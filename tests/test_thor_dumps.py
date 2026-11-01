@@ -48,23 +48,19 @@ def test_a_launcher_icon_is_planned_to_its_center_on_either_side_of_the_bottom_s
     assert plan_point(screen, clickable_at(screen, icon)) == Rect(*icon).center()
 
 
-IN_BUG_2 = pytest.mark.xfail(strict=True, reason="a status bar one pixel inside the display is not a strip")
-
-
 @pytest.mark.parametrize(
     ("name", "app"),
     [
         ("thor-launcher", "com.android.launcher3"),
         ("thor-youtube", "com.google.android.youtube"),
-        pytest.param("thor-chess", "com.chess", marks=IN_BUG_2),
-        pytest.param("thor-netflix", "com.netflix.mediaclient", marks=IN_BUG_2),
+        ("thor-chess", "com.chess"),
+        ("thor-netflix", "com.netflix.mediaclient"),
     ],
 )
 def test_the_active_window_is_the_app_whichever_way_the_status_bar_is_inset(name, app):
     assert select_surface(thor(name)).window.package == app
 
 
-@IN_BUG_2
 def test_wait_for_an_app_holds_with_that_app_on_the_thor_screen(tmp_path):
     hub = FakeHub([PHONE], screens=[thor("thor-netflix")])
     code, wire = invoke(["wait", "--app", "com.netflix.mediaclient", "--timeout-ms", "200"], hub, tmp_path)
