@@ -8,20 +8,19 @@ from agent_phone import (
     Foreground,
     Gone,
     KeyName,
+    Package,
     PhoneError,
     Present,
     Q,
     Settled,
+    Snapshot,
     open_phone,
 )
 from agent_phone.cli.settings import Settings
 from agent_phone.core.commands.wait import WAIT_TIMEOUT_MS
-from agent_phone.core.device import Connected, Package
+from agent_phone.core.device import Connected
 from agent_phone.core.outcome import Disposition, ErrorCode, Refused, disposition_of
 from agent_phone.core.refs.store import SnapshotStore
-from agent_phone.core.snapshot.snapshot import Snapshot
-
-pytestmark = pytest.mark.xfail(strict=True, reason="Driver.wait is not built yet")
 
 J7 = Connected(J7_SERIAL, "SM_J730F", ready=True)
 SETTINGS = fixture_screen("settings-home")
@@ -97,10 +96,3 @@ def test_a_wait_after_an_input_gives_the_next_input_its_observation(tmp_path):
         seen = phone.wait(Present(Q("Brightness")))
         phone.press(KeyName.BACK)
     assert seen.epoch == 1 and len(hub.phones[0].permits) == 2
-
-
-def test_the_package_exports_what_a_consumer_of_wait_needs():
-    from agent_phone import Package as exported_package
-    from agent_phone import Snapshot as exported_snapshot
-
-    assert exported_package is Package and exported_snapshot is Snapshot

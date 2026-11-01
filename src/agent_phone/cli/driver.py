@@ -63,7 +63,7 @@ from agent_phone.core.commands.scroll import ScrollCommand
 from agent_phone.core.commands.set_text import SetTextCommand
 from agent_phone.core.commands.snapshot import SnapshotCommand
 from agent_phone.core.commands.stop import StopCommand
-from agent_phone.core.commands.wait import WaitCommand
+from agent_phone.core.commands.wait import WAIT_TIMEOUT_MS, WaitCommand
 from agent_phone.core.context import Context
 from agent_phone.core.device import Package, Serial, select_device
 from agent_phone.core.outcome import Acted, Outcome, Read, Refusal, Refused, Value
@@ -196,6 +196,17 @@ class Driver:
         outcome = self.run(FindCommand(query, DEFAULT_LIMIT, True, Scope(pick, window, root)))
         if isinstance(outcome, Read) and isinstance(outcome.payload, Found):
             return outcome.payload.count
+        raise PhoneError(outcome)
+
+    def wait(
+        self, conditions: Predicate | Sequence[Predicate], *, timeout_ms: int = WAIT_TIMEOUT_MS
+    ) -> Snapshot:
+        """Read until every condition holds on one read, and return that read as a new snapshot
+        whose refs serve the next call. It sends nothing. A timeout raises `PhoneError` with the last
+        read in `error.outcome.details["after"]`, and no condition raises it with INVALID_ARGS."""
+        outcome = self.run(WaitCommand(predicates(conditions), timeout_ms))
+        if isinstance(outcome, Read) and isinstance(outcome.payload, Snapshot):
+            return outcome.payload
         raise PhoneError(outcome)
 
     def get(
