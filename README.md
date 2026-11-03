@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/media/logo-dark.svg">
+    <img src="docs/media/logo-light.svg" alt="agent-phone logo: a phone drawn as two brackets around one tap target" width="96">
+  </picture>
+</p>
+
 # agent-phone
 
 https://github.com/user-attachments/assets/53370492-cd75-47dc-a98f-ae2e49a225b4

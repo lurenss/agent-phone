@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 540" width="320" height="540">
+  <title>agent-phone</title>
+  <g transform="translate(10 10)">
+    <g fill="none" stroke="#E9EDF3" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 100 14 H 70 A 48 48 0 0 0 22 62 V 458 A 48 48 0 0 0 70 506 H 100"/>
+      <path d="M 200 14 H 230 A 48 48 0 0 1 278 62 V 458 A 48 48 0 0 1 230 506 H 200"/>
+    </g>
+    <rect x="126" y="46" width="48" height="14" rx="7" fill="#E9EDF3"/>
+    <circle cx="150" cy="262" r="46" fill="#4DD4FF"/>
+  </g>
+</svg>
