@@ -60,8 +60,8 @@ rendered under the same one."""
 def holds(predicate: Predicate, previous: Screen | None, current: Screen) -> bool:
     """Present and Gone match the lines of a compact view of the active window, as `find` does.
     A read with no active window, or with no line, decides neither, so Gone does not hold on a
-    frame between two screens. `observe` asks about a read only when it produced a screen, so no
-    predicate, Gone included, holds on an empty dump.
+    frame between two screens, nor on a dialog that may cover the target. `observe` asks about a
+    read only when it produced a screen, so no predicate, Gone included, holds on an empty dump.
     Gone by ref would need the ref's stored fingerprint, and no command asks for it: `wait` and the
     `--wait-for-gone` flags take queries, so it stays NOT_SUPPORTED."""
     match predicate:
@@ -85,14 +85,18 @@ def holds(predicate: Predicate, previous: Screen | None, current: Screen) -> boo
 
 def shown(query: Query, screen: Screen) -> bool | None:
     """Whether a line of the active window matches, or None when the read cannot say: no window
-    has focus, or the window prints no line, as the blank frame between two screens does."""
+    has focus, the window prints no line, as the blank frame between two screens does, or the
+    window is a dialog and no line matches, because a dialog hides what lies under it (A2-7)."""
     try:
-        view = build_view(select_surface(screen), Mode.COMPACT)
+        surface = select_surface(screen)
+        view = build_view(surface, Mode.COMPACT)
     except Refusal:
         return None
     if not view.lines:
         return None
-    return any(matches(query, screen, screen.node(node)) for node in view.nodes)
+    if any(matches(query, screen, screen.node(node)) for node in view.nodes):
+        return True
+    return None if surface.dialog else False
 
 
 def printed_lines(screen: Screen, settled: Settled) -> tuple[str, ...] | None:

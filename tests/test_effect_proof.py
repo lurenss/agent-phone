@@ -84,7 +84,6 @@ PAGE_WITH_DISPLAY = node(
 )
 
 
-@pytest.mark.xfail(strict=True, reason="#4: a dialog over the target satisfies --wait-for-gone")
 @pytest.mark.parametrize(
     "dialog",
     [screen_of(LOADING), screen_of(LOADING, PAGE_WITH_DISPLAY)],
