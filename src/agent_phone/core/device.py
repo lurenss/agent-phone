@@ -28,8 +28,11 @@ class DeviceIdentity:
 
 
 class Capability(Enum):
-    """What a backend can do beyond `read` and coordinate input. Core plans around these."""
+    """What a backend can do beyond `read`. Core plans around these, and refuses an input whose
+    capability is missing with NOT_SUPPORTED before it spends a permit. POINT_INPUT is a touch at
+    a point on the screen: a tap, a long press or a swipe."""
 
+    POINT_INPUT = "point_input"
     SEMANTIC_CLICK = "semantic_click"
     WINDOW_LAYERS = "window_layers"
     NODE_IDS = "node_ids"

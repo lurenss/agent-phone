@@ -240,7 +240,7 @@ def test_the_clipboard_and_a_screenshot_are_reads_of_the_server():
 
 def test_the_phone_reports_what_this_backend_can_do():
     phone = U2Phone(INFO, Rpc(), Forward(), Server(), 900, FakeClock(), Shell())
-    assert {c.value for c in phone.info().capabilities} == {"clipboard", "screenshot"}
+    assert {c.value for c in phone.info().capabilities} == {"point_input", "clipboard", "screenshot"}
 
 
 class AmStartAdb:

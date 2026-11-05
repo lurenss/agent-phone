@@ -47,7 +47,7 @@ SCREENSHOT_QUALITY = 90
 STEP_MS = 5
 """UiDevice.swipe moves one step about every 5 ms."""
 KEY_CODES = {KeyName.BACK: 4, KeyName.HOME: 3, KeyName.RECENTS: 187, KeyName.ENTER: 66}
-CAPABILITIES = frozenset({Capability.CLIPBOARD, Capability.SCREENSHOT})
+CAPABILITIES = frozenset({Capability.POINT_INPUT, Capability.CLIPBOARD, Capability.SCREENSHOT})
 DUMP_METHOD = "dumpWindowHierarchy"
 MAX_DEPTH = 50
 ALREADY_REGISTERED = "already registered"

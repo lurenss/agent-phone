@@ -32,7 +32,9 @@ def info_for(
     model: str = "SM-J730F",
     boot: BootId = J7_BOOT,
     locale: str = "en-US",
-    capabilities: frozenset[Capability] = frozenset({Capability.CLIPBOARD, Capability.SCREENSHOT}),
+    capabilities: frozenset[Capability] = frozenset(
+        {Capability.POINT_INPUT, Capability.CLIPBOARD, Capability.SCREENSHOT}
+    ),
 ) -> DeviceInfo:
     return DeviceInfo(
         DeviceIdentity(serial, boot),
