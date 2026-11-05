@@ -172,6 +172,13 @@ def typed_text(node: Node) -> str | None:
     return None
 
 
+def holds_text(node: Node, text: str) -> bool:
+    """True when the field shows `text`. A LOSSY read shows each character above U+FFFF as `..`
+    (A9-1), so `text` is compared in that form."""
+    shown = "".join(".." if ord(char) > 0xFFFF else char for char in text) if node.has(Flag.LOSSY) else text
+    return typed_text(node) == shown
+
+
 def is_value(screen: Screen, label: Label) -> bool:
     """True for text the user changes or must not see: a field's or slider's own text, and
     any text of a password node."""

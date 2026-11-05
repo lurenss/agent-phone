@@ -60,7 +60,7 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
 | `not_delivered` | safe | No input left the computer, or the backend proved that nothing reached the device. Running the same command again is safe. |
 | `delivery_uncertain` | unsafe | Input may have reached the device. Look at the screen before you act again. |
 | `delivered_unverified` | unsafe | Input reached the device and nothing checked its effect. |
-| `delivered_verified` | unsafe | Input reached the device, and every `--wait-for` and `--wait-for-gone` of the input did not hold before it and held after it. A `set-text` with no wait is also `delivered_verified` when the field reads back the text it sent, and that read-back does not check what the field held before. |
+| `delivered_verified` | unsafe | Input reached the device, and every `--wait-for` and `--wait-for-gone` of the input did not hold before it and held after it. A `set-text` with no wait is also `delivered_verified` when the field reads back the text it sent, or, on a field that reads `lossy`, that text with each character above U+FFFF as `..`. That read-back does not check what the field held before. |
 
 `not_delivered` is the only value after which the same command can succeed again, because every input spends the refs taken before it.
 
