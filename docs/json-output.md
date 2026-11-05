@@ -209,7 +209,7 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
 
 ## Wait payload
 
-`agent-phone wait [--for QUERY]... [--gone QUERY]... [--app PACKAGE] [--settled] [--timeout-ms N]` reads the screen until every condition holds on one read. `--for` and `--gone` take the query that `--wait-for` and `--wait-for-gone` take, `--app` holds when the window that has focus belongs to that package, and `--settled` holds when two reads in a row print the same lines, and an empty read between them starts that count again. At least one condition is required, or the command is `INVALID_ARGS` and reads nothing. The default timeout is 10,000 ms.
+`agent-phone wait [--for QUERY]... [--gone QUERY]... [--app PACKAGE] [--settled] [--timeout-ms N]` reads the screen until every condition holds on one read. `--for` and `--gone` take the query that `--wait-for` and `--wait-for-gone` take, `--app` holds when the window that has focus belongs to that package, and `--settled` holds when every read for 800 ms has printed the same lines, and a read that prints other lines, or an empty read, starts that window again. At least one condition is required, or the command is `INVALID_ARGS` and reads nothing. The default timeout is 10,000 ms.
 
 `wait` sends no input, so it is a read: it never has a permit, and running it again is safe.
 
@@ -494,6 +494,6 @@ The tree of `--surface all` also has a line at depth 0 that opens each window: `
 
 | State | Meaning |
 | --- | --- |
-| `settled` | Two reads in a row gave the same lines. |
-| `unsettled` | The settle deadline passed first, and this is the last screen read. |
+| `settled` | Every read for 800 ms gave the same lines. |
+| `unsettled` | The settle deadline passed first, and this is the last screen read. A deadline under 800 ms always ends here. |
 | `unchecked` | One read, with no settle asked (`A2-5`). |

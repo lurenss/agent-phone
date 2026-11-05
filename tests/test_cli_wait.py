@@ -2,7 +2,7 @@
 
 import pytest
 from fakes import J7_SERIAL, FakeHub, invoke
-from support import fixture_screen, node, screen_of
+from support import FakeClock, fixture_screen, node, screen_of, settled_from
 
 from agent_phone.cli.args import parse_args
 from agent_phone.core.commands.wait import WAIT_TIMEOUT_MS
@@ -94,9 +94,9 @@ def test_a_condition_that_holds_prints_the_snapshot_it_held_on_after_one_read(tm
 
 
 def test_a_settled_screen_in_the_foreground_says_settled(tmp_path):
-    hub = FakeHub([J7], screens=[SETTINGS])
-    code, wire = invoke(["wait", "--settled", "--app", "com.android.settings"], hub, tmp_path)
-    assert code == 0 and wire["data"]["settled"] == "settled" and hub.phones[0].reads == 2
+    hub, clock = FakeHub([J7], screens=[SETTINGS]), FakeClock()
+    code, wire = invoke(["wait", "--settled", "--app", "com.android.settings"], hub, tmp_path, clock=clock)
+    assert code == 0 and wire["data"]["settled"] == "settled" and settled_from(clock, 0)
 
 
 def test_a_timeout_prints_what_the_screen_showed_and_is_safe_to_retry(tmp_path):

@@ -1,6 +1,6 @@
 import pytest
 from fakes import J7_SERIAL, FakeHub, invoke
-from support import fixture_screen, node, screen_of
+from support import FakeClock, fixture_screen, node, screen_of, settled_from
 
 from agent_phone.core.device import Connected
 from agent_phone.core.outcome import ErrorCode, Refusal
@@ -142,9 +142,9 @@ def test_select_surface_on_a_screen_with_no_active_window_says_the_screen_may_be
 
 def test_settling_on_a_dialog_waits_for_the_dialog_to_appear(tmp_path):
     ig, dialog = fixture_screen("ig-feed"), fixture_screen("dialog-over-app")
-    hub = FakeHub([J7], screens=[ig, ig, dialog, dialog])
-    code, wire = invoke(["snapshot", "--surface", "dialog", "--settle"], hub, tmp_path)
-    assert code == 0 and wire["data"]["settled"] == "settled" and hub.phones[0].reads == 4
+    hub, clock = FakeHub([J7], screens=[ig, ig, dialog, dialog]), FakeClock()
+    code, wire = invoke(["snapshot", "--surface", "dialog", "--settle"], hub, tmp_path, clock=clock)
+    assert code == 0 and wire["data"]["settled"] == "settled" and settled_from(clock, 2)
     assert wire["data"]["app"] == "com.android.settings"
 
 

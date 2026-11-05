@@ -4,7 +4,7 @@ knows none, and then it lists the windows by layer, so the status bar comes firs
 
 import pytest
 from fakes import J7_SERIAL, FakeHub, invoke
-from support import fixture_screen, node, screen_of
+from support import FakeClock, fixture_screen, node, screen_of, settled_from
 
 from agent_phone.core.device import Connected
 from agent_phone.core.outcome import ErrorCode, Refusal
@@ -89,10 +89,10 @@ def test_a_dump_of_only_the_status_bar_is_no_surface_and_says_an_app_may_be_star
 
 def test_settle_waits_out_a_dump_with_no_window_to_describe(tmp_path):
     bare, ready = screen_of(status_bar()), fixture_screen("app-starting")
-    hub = FakeHub([J7], screens=[bare, bare, ready, ready])
-    code, wire = invoke(["snapshot", "--settle"], hub, tmp_path)
+    hub, clock = FakeHub([J7], screens=[bare, bare, ready, ready]), FakeClock()
+    code, wire = invoke(["snapshot", "--settle"], hub, tmp_path, clock=clock)
     assert code == 0 and wire["data"]["app"] == "com.android.settings"
-    assert wire["data"]["settled"] == "settled" and hub.phones[0].reads == 4
+    assert wire["data"]["settled"] == "settled" and settled_from(clock, 2)
 
 
 def second_display(label="", bounds="[0,0][540,1920]", display=4):

@@ -12,7 +12,7 @@ measured on the clock and costs no real time.
 
 import pytest
 from fakes import J7_SERIAL, FakeHub, invoke
-from support import FakeClock, fixture_screen, node, screen_of
+from support import FakeClock, fixture_screen, node, screen_of, settled_from
 
 from agent_phone.core.device import Connected
 from agent_phone.core.outcome import ErrorCode, Refusal
@@ -166,16 +166,15 @@ def test_any_other_refusal_between_empty_reads_still_ends_the_wait_at_once(tmp_p
 
 
 def test_an_empty_read_between_two_equal_screens_starts_settling_again(tmp_path):
-    hub = FakeHub([J7], screens=[page("Wi-Fi"), EMPTY, page("Wi-Fi"), page("Wi-Fi")])
-    code, wire = invoke(["snapshot", "--settle"], hub, tmp_path, clock=FakeClock())
-    assert code == 0 and wire["data"]["settled"] == "settled"
-    assert hub.phones[0].reads == 4
+    hub, clock = FakeHub([J7], screens=[page("Wi-Fi"), EMPTY, page("Wi-Fi"), page("Wi-Fi")]), FakeClock()
+    code, wire = invoke(["snapshot", "--settle"], hub, tmp_path, clock=clock)
+    assert code == 0 and wire["data"]["settled"] == "settled" and settled_from(clock, 2)
 
 
 def test_settling_that_begins_on_an_empty_read_settles_on_the_screen_that_follows(tmp_path):
-    hub = FakeHub([J7], screens=[EMPTY, page("Wi-Fi"), page("Wi-Fi")])
-    code, wire = invoke(["snapshot", "--settle"], hub, tmp_path, clock=FakeClock())
-    assert code == 0 and wire["data"]["settled"] == "settled" and hub.phones[0].reads == 3
+    hub, clock = FakeHub([J7], screens=[EMPTY, page("Wi-Fi"), page("Wi-Fi")]), FakeClock()
+    code, wire = invoke(["snapshot", "--settle"], hub, tmp_path, clock=clock)
+    assert code == 0 and wire["data"]["settled"] == "settled" and settled_from(clock, 1)
 
 
 def test_settling_on_a_screen_that_stays_empty_ends_no_surface_at_the_settle_deadline(tmp_path):

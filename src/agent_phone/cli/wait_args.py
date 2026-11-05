@@ -46,7 +46,7 @@ def add_wait(commands: argparse._SubParsersAction, after: argparse.ArgumentParse
     wait.add_argument(
         "--settled",
         action="store_true",
-        help="two reads in a row print the same lines",
+        help="every read for 800 ms prints the same lines",
     )
     wait.add_argument(
         "--timeout-ms",
