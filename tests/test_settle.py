@@ -1,5 +1,5 @@
 import pytest
-from fakes import J7_SERIAL, FakeHub, invoke
+from fakes import J7_SERIAL, FakeHub, FakePhone, invoke
 from support import FakeClock, fixture_screen, node, screen_of
 
 from agent_phone.cli.driver import open_phone
@@ -30,6 +30,43 @@ def settle(screens, tmp_path, timeout_ms=3000):
     with open_phone(hub=hub, settings=settings, clock=clock) as phone:
         taken = phone.snapshot(settle=True, timeout_ms=timeout_ms)
     return taken, hub.phones[0].reads, clock
+
+
+class Timed(FakePhone):
+    """Shows each screen of `script`, a run of (seconds, screen), from its time on `clock`."""
+
+    def __init__(self, info, clock, script):
+        super().__init__(info, script[0][1])
+        self._clock, self._script = clock, script
+
+    def read(self):
+        self.reads += 1
+        return next(screen for at, screen in reversed(self._script) if at <= self._clock.now())
+
+
+class TimedHub(FakeHub):
+    def __init__(self, clock, *script):
+        super().__init__([J7])
+        self._clock, self._script = clock, script
+
+    def open(self, serial, first_read=False):
+        return Timed(self._infos[serial], self._clock, self._script)
+
+
+def settle_timed(tmp_path, timeout_ms, *script):
+    clock = FakeClock()
+    settings = Settings(state_root=tmp_path, lock_wait_s=0.0)
+    with open_phone(hub=TimedHub(clock, *script), settings=settings, clock=clock) as phone:
+        return phone.snapshot(settle=True, timeout_ms=timeout_ms)
+
+
+@pytest.mark.xfail(strict=True, reason="#4: two equal reads 50 ms apart settle before a change at 500 ms")
+def test_a_screen_change_scripted_at_500_ms_reads_as_unsettled(tmp_path):
+    loading, loaded = screen_saying("Photos"), screen_saying("Photo 1")
+    early = settle_timed(tmp_path, 1000, (0.0, loading), (0.5, loaded))
+    assert early.settled is SettleState.UNSETTLED
+    late = settle_timed(tmp_path, 3000, (0.0, loading), (0.5, loaded))
+    assert late.settled is SettleState.SETTLED and [line.name for line in late.lines] == ["Photo 1"]
 
 
 def test_a_screen_that_does_not_change_is_settled_after_two_reads(tmp_path):
