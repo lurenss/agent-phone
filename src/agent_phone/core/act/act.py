@@ -17,7 +17,7 @@ from agent_phone.core.act.hit import plan_point, require_active, swipe_across, v
 from agent_phone.core.act.intent import ActionReport, Click, Fill, Request, Scroll, TargetReport
 from agent_phone.core.act.site import element_site, focus_site
 from agent_phone.core.context import Context
-from agent_phone.core.labels import display_name, typed_text
+from agent_phone.core.labels import display_name, holds_text, typed_text
 from agent_phone.core.outcome import Acted, ErrorCode, Outcome, Refusal, Refused, SentState
 from agent_phone.core.phone import (
     Ack,
@@ -46,6 +46,7 @@ from agent_phone.core.wait.until import until
 LONG_PRESS_MS = 800
 """Above Android's 500 ms long-press timeout, with room for a loaded phone."""
 READ_BACK_S = 1.0
+LOSSY_PROOF = "the field holds the text as a lossy read shows it, each character above U+FFFF as .."
 
 
 class NotYet(Refusal):
@@ -320,31 +321,33 @@ def _read_back(
 ) -> Acted:
     """Read the field back, on `screen` or by reading until it holds the text or READ_BACK_S
     passes. A secret field is never read, so it stays as it was. A field that left the screen
-    proves nothing either way."""
+    proves nothing either way. A lossy read is compared in the form it shows, and the proof says so."""
     resolved = planned.resolved
     if resolved is None or (isinstance(planned.action, SetText) and planned.action.secret):
         return Acted(state, report, after)
 
-    def value_on(current: Screen) -> str | None:
+    def field_on(current: Screen) -> Node | None:
         try:
-            return typed_text(current.node(locate(intent.target, resolved.observed, current).node))
+            return current.node(locate(intent.target, resolved.observed, current).node)
         except Refusal:
             return None
 
     reads = [] if screen is None else [screen]
 
-    def holds_text() -> bool | None:
+    def holds() -> bool | None:
         reads.append(ctx.phone.read())
-        return value_on(reads[-1]) == intent.text or None
+        field = field_on(reads[-1])
+        return (field is not None and holds_text(field, intent.text)) or None
 
     if screen is None:
-        until(ctx.clock, holds_text, READ_BACK_S)
-    value = value_on(reads[-1])
+        until(ctx.clock, holds, READ_BACK_S)
+    field = field_on(reads[-1])
     after = after or record(ctx, reads[-1], SettleState.UNCHECKED)
-    if value == intent.text:
+    if field is not None and holds_text(field, intent.text):
         verified = state if state is SentState.UNCERTAIN else SentState.VERIFIED
-        return Acted(verified, _by(report, report.verified_by or "the field holds the text"), after)
-    if value is None:
+        proof = LOSSY_PROOF if field.has(Flag.LOSSY) else "the field holds the text"
+        return Acted(verified, _by(report, report.verified_by or proof), after)
+    if field is None or typed_text(field) is None:
         return Acted(state, report, after)
     unverified = state if state is SentState.UNCERTAIN else SentState.UNVERIFIED
     return Acted(

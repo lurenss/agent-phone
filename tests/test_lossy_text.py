@@ -27,7 +27,6 @@ def set_text(root, text: str, shows: str) -> dict:
     return invoke(["set-text", f"@{taken}:e1", text], hub, root)[1]
 
 
-@pytest.mark.xfail(strict=True, raises=AssertionError, reason="#3: set-text compares the lossy dump exactly")
 def test_set_text_of_an_emoji_is_verified_on_the_dump_that_writes_it_as_two_dots(tmp_path):
     wire = set_text(tmp_path, "hi 😴", shows="hi ..")
     assert wire["ok"] and wire["delivery"] == "delivered_verified"
