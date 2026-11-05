@@ -17,7 +17,8 @@ type, layer or focus attribute. What this module infers, and from what:
   (`core/act/hit.py`).
 - lossy: the dumper writes `.` for each UTF-16 surrogate, so a character above U+FFFF reads as
   `..` (A9-1). A node whose text, content-desc or hint holds `..` is LOSSY, a literal `..` too,
-  because the dump cannot tell the two apart.
+  because the dump cannot tell the two apart. A password's text is not read for it, because
+  nothing reads a secret's text.
 
 The `Screen` is the default display. Android 13 puts `display-id` on every node, and a device with a
 second screen, such as the AYN Thor's bottom one (display 4), lists that screen's windows in the same
@@ -140,7 +141,8 @@ def parse_attrs(attrib: dict[str, str]) -> Attrs:
     flags = {flag for name, flag in BOOL_FLAGS.items() if attrib.get(name) == "true"}
     if class_name.rpartition(".")[2] in EDITABLE_CLASSES:
         flags.add(Flag.EDITABLE)
-    if any(LOSSY_MARK in attrib.get(name, "") for name in ("text", "content-desc", "hint")):
+    read = ("content-desc", "hint") if Flag.PASSWORD in flags else ("text", "content-desc", "hint")
+    if any(LOSSY_MARK in attrib.get(name, "") for name in read):
         flags.add(Flag.LOSSY)
     drawing_order = attrib.get("drawing-order")
     if drawing_order is not None and not drawing_order.lstrip("-").isdigit():
