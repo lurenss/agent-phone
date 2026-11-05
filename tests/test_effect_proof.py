@@ -68,3 +68,33 @@ def test_an_effect_wait_that_already_holds_is_refused_and_sends_nothing(tmp_path
     assert isinstance(outcome, Refused) and outcome.code is ErrorCode.INVALID_ARGS, outcome
     assert disposition_of(outcome) is Disposition.NOT_DELIVERED
     assert phone.permits == [] and ctx.ledger.epoch() == 0
+
+
+LOADING = node(
+    "android.widget.FrameLayout",
+    node("android.widget.TextView", text="Loading data", bounds="[140,900][940,1000]"),
+    package="com.android.settings",
+    bounds="[90,800][990,1100]",
+)
+PAGE_WITH_DISPLAY = node(
+    "android.widget.FrameLayout",
+    node("android.widget.TextView", text="Display", bounds="[0,900][1080,1000]"),
+    package="com.android.settings",
+    bounds="[0,0][1080,1920]",
+)
+
+
+@pytest.mark.xfail(strict=True, reason="#4: a dialog over the target satisfies --wait-for-gone")
+@pytest.mark.parametrize(
+    "dialog",
+    [screen_of(LOADING), screen_of(LOADING, PAGE_WITH_DISPLAY)],
+    ids=["the dump hides the page", "the dump lists the page"],
+)
+def test_a_dialog_over_the_target_does_not_prove_it_gone(tmp_path, dialog):
+    ctx, _ = context(tmp_path, SETTINGS, after_input=[dialog])
+    covered = act(ctx, tap_display(ctx, Gone(Q("Display"))))
+    assert covered.error is ErrorCode.TIMEOUT and covered.disposition is Disposition.DELIVERED_UNVERIFIED
+    ctx, _ = context(tmp_path, SETTINGS, after_input=[dialog, DISPLAY_PAGE])
+    gone = act(ctx, tap_display(ctx, Gone(Q("Display"))))
+    assert gone.disposition is Disposition.DELIVERED_VERIFIED
+    assert [line.name for line in gone.after.lines] == ["Brightness"], "the wait stopped on the dialog"
