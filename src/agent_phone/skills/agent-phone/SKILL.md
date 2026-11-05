@@ -92,7 +92,7 @@ agent-phone wait --for 'role=field name=Search' --timeout-ms 20000
 
 Choose between `wait` and `--wait-for`:
 
-- Put `--wait-for` or `--wait-for-gone` on the input when the wait is the proof that the input worked. It is one call, and `delivery` becomes `delivered_verified` when the effect appeared after the input.
+- Put `--wait-for` or `--wait-for-gone` on the input when the wait is the proof that the input worked. It is one call, and `delivery` becomes `delivered_verified` when the effect appeared after the input. Every condition you list must be false before the input. One that already holds proves nothing, so the input is refused with `INVALID_ARGS` and nothing is sent. Wait for something the input changes.
 - Use `wait` when no input is involved or `--wait-for` cannot say it. That covers a page that loads by itself, a dialog that closes on its own, `--app` and `--settled`, several conditions on one read, an input you sent without `--wait-for`, and a longer wait after a `--wait-for` timed out. `--wait-for` does not take `--app` or `--settled`.
 
 ## Pick the window
@@ -205,7 +205,7 @@ cat steps.json | agent-phone batch
 [
   ["launch", "com.android.settings", "--wait-for", "name=Display"],
   ["click", "name=Display", "--wait-for", "name*=Brightness"],
-  ["press", "back", "--wait-for", "name=Display"]
+  ["press", "back", "--wait-for-gone", "name*=Brightness"]
 ]
 ```
 

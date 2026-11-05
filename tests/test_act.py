@@ -163,11 +163,7 @@ def test_a_wait_that_saw_its_effect_appear_verifies_the_input_and_returns_fresh_
     assert isinstance(back, Acted) and len(phone.permits) == 2
 
 
-def test_a_wait_that_already_held_proves_nothing_and_one_that_never_holds_times_out(tmp_path):
-    ctx, _ = context(tmp_path, SETTINGS)
-    held = act(ctx, click(look(ctx), DISPLAY_TILE, wait_for=(Present(Q("Notifications")),)))
-    assert isinstance(held, Acted) and held.disposition is Disposition.DELIVERED_UNVERIFIED
-    assert held.report.verified_by == 'present name="Notifications", which already held before the input'
+def test_a_wait_that_never_holds_times_out_and_the_input_stays_unverified(tmp_path):
     ctx, _ = context(tmp_path, SETTINGS)
     late = act(ctx, click(look(ctx), DISPLAY_TILE, wait_for=(Gone(Q("Display")),), timeout_ms=300))
     assert isinstance(late, Acted) and late.error is ErrorCode.TIMEOUT

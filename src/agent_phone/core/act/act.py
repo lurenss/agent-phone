@@ -10,7 +10,7 @@ from that point on "nothing happened" can no longer be claimed. A backend that r
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from agent_phone.core.act.axis import refuse_wrong_axis
 from agent_phone.core.act.hit import plan_point, require_active, swipe_across, visible_area
@@ -63,15 +63,12 @@ class Planned:
     target: TargetReport | None
     before: Screen | None
     resolved: Resolved | None
-    held_before: tuple[bool, ...] = ()
 
 
 def act(ctx: Context, request: Request) -> Outcome:
     try:
         planned = _settle_target(ctx, request)
-        if planned.before is not None:
-            held = tuple(holds(p, None, planned.before) for p in request.wait_for if is_effect(p))
-            planned = replace(planned, held_before=held)
+        refuse_held_effects(request, planned.before)
         verdict = classify(ctx.policy, planned.action, planned.site, ctx.info.locale)
         admit(verdict, request.grant, ctx.mode)
     except Refusal as refusal:
@@ -92,6 +89,21 @@ def act(ctx: Context, request: Request) -> Outcome:
         ctx.ledger.refund(permit)
         return Refused(delivery.code, delivery.detail)
     return _after_send(ctx, request, delivery, planned, verdict)
+
+
+def refuse_held_effects(request: Request, before: Screen | None) -> None:
+    """An effect that already holds on the read the input is planned on would hold whether or not
+    the input worked, so the wait could not prove anything. `before` is None only when no effect
+    is asked for."""
+    if before is None:
+        return
+    held = [p for p in request.wait_for if is_effect(p) and holds(p, None, before)]
+    if held:
+        raise Refusal(
+            ErrorCode.INVALID_ARGS,
+            f"{' and '.join(describe(p) for p in held)} already holds before the input, so it cannot "
+            "prove that the input worked. Nothing was sent. Wait for something the input changes.",
+        )
 
 
 def target_of(request: Request) -> Target | None:
@@ -247,9 +259,8 @@ def address_of(screen: Screen, node: Node) -> NodeAddress:
 def _after_send(ctx: Context, request: Request, delivery: Sent, planned: Planned, verdict: Verdict) -> Acted:
     """Never raises. Any exception here becomes `Acted(error=INTERNAL)` with the sent state.
 
-    Verification: an effect predicate in `wait_for` that was false on the read the input was
-    planned on and holds after makes the action VERIFIED. One that already held before proves
-    nothing, and the action stays UNVERIFIED with that said in `verified_by`. Fill reads the
+    Verification: an effect predicate in `wait_for` that holds after the input makes the action
+    VERIFIED. It was false on the read the input was planned on, or act() refused. Fill reads the
     field back on its own (not for secrets). A contradicted read-back is ACTION_FAILED, still
     delivered. The observation the wait ends on is recorded as a snapshot at the new epoch and
     returned in `after`, so the caller has fresh refs without another call.
@@ -273,17 +284,10 @@ def _after_send(ctx: Context, request: Request, delivery: Sent, planned: Planned
                 f"{wanted} did not hold within {request.timeout_ms} ms.",
             )
         effects = [p for p in request.wait_for if is_effect(p)]
-        proofs = [p for p, held in zip(effects, planned.held_before, strict=False) if not held]
-        if proofs:
+        state = sent
+        if effects:
             state = sent if sent is SentState.UNCERTAIN else SentState.VERIFIED
-            report = _by(report, " and ".join(describe(p) for p in proofs))
-        elif effects:
-            state = sent
-            report = _by(
-                report, f"{' and '.join(describe(p) for p in effects)}, which already held before the input"
-            )
-        else:
-            state = sent
+            report = _by(report, " and ".join(describe(p) for p in effects))
         if isinstance(request.intent, Fill):
             return _read_back(ctx, request.intent, planned, state, report, seen.screen, after)
         return Acted(state, report, after)

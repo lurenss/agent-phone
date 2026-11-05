@@ -53,7 +53,6 @@ def press_back(ctx, *wait_for):
     return Request(Key(KeyName.BACK), wait_for=wait_for, timeout_ms=300)
 
 
-@pytest.mark.xfail(strict=True, reason="#4: an effect wait that already holds lets the input go out")
 @pytest.mark.parametrize(
     "request_for",
     [
