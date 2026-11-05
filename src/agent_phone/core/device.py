@@ -28,9 +28,9 @@ class DeviceIdentity:
 
 
 class Capability(Enum):
-    """What a backend can do beyond `read`. Core plans around these, and refuses an input whose
-    capability is missing with NOT_SUPPORTED before it spends a permit. POINT_INPUT is a touch at
-    a point on the screen: a tap, a long press or a swipe."""
+    """What a backend can do beyond `read`. Core plans around these. Without POINT_INPUT, a touch
+    at a point (a tap, a long press or a swipe) is refused with NOT_SUPPORTED before a permit is
+    spent, and so are the clipboard and screenshot commands without theirs."""
 
     POINT_INPUT = "point_input"
     SEMANTIC_CLICK = "semantic_click"
