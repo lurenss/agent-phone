@@ -341,13 +341,13 @@ def _read_back(
 
     reads = [] if screen is None else [screen]
 
-    def holds() -> bool | None:
+    def shows_text() -> bool | None:
         reads.append(ctx.phone.read())
         field = field_on(reads[-1])
         return (field is not None and holds_text(field, intent.text)) or None
 
     if screen is None:
-        until(ctx.clock, holds, READ_BACK_S)
+        until(ctx.clock, shows_text, READ_BACK_S)
     field = field_on(reads[-1])
     after = after or record(ctx, reads[-1], SettleState.UNCHECKED)
     if field is not None and holds_text(field, intent.text):
