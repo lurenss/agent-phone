@@ -17,6 +17,7 @@ from agent_phone.core.act.hit import plan_point, require_active, swipe_across, v
 from agent_phone.core.act.intent import ActionReport, Click, Fill, Request, Scroll, TargetReport
 from agent_phone.core.act.site import element_site, focus_site
 from agent_phone.core.context import Context
+from agent_phone.core.device import Capability
 from agent_phone.core.labels import display_name, holds_text, typed_text
 from agent_phone.core.outcome import Acted, ErrorCode, Outcome, Refusal, Refused, SentState
 from agent_phone.core.phone import (
@@ -29,6 +30,7 @@ from agent_phone.core.phone import (
     NotSent,
     Sent,
     SetText,
+    Swipe,
     Tap,
 )
 from agent_phone.core.policy.engine import Site, Verdict, classify
@@ -69,6 +71,11 @@ class Planned:
 def act(ctx: Context, request: Request) -> Outcome:
     try:
         planned = _settle_target(ctx, request)
+        if (
+            isinstance(planned.action, Tap | LongPress | Swipe)
+            and Capability.POINT_INPUT not in ctx.info.capabilities
+        ):
+            raise Refusal(ErrorCode.NOT_SUPPORTED, "This backend cannot touch a point on the screen.")
         refuse_held_effects(request, planned.before)
         verdict = classify(ctx.policy, planned.action, planned.site, ctx.info.locale)
         admit(verdict, request.grant, ctx.mode)
