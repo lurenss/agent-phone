@@ -40,9 +40,6 @@ def test_a_lossy_read_back_that_differs_from_the_text_still_fails(tmp_path, show
     assert wire["error"]["code"] == "ACTION_FAILED" and wire["delivery"] == "delivered_unverified"
 
 
-@pytest.mark.xfail(
-    strict=True, raises=AssertionError, reason="#3: a line does not say the dump damaged its text"
-)
 def test_a_line_that_shows_text_the_dump_damaged_is_marked_lossy():
     screen = screen_of(
         node(

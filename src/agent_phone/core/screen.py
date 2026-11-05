@@ -22,6 +22,10 @@ WindowId = NewType("WindowId", int)
 
 
 class Flag(Enum):
+    """Booleans the backend reports for a node. LOSSY says that the backend wrote a character of
+    the node's text, content-desc or hint that it could not carry as `.`, so a character above
+    U+FFFF reads as `..` (A9-1)."""
+
     CLICKABLE = "clickable"
     LONG_CLICKABLE = "long_clickable"
     SCROLLABLE = "scrollable"
@@ -34,6 +38,7 @@ class Flag(Enum):
     PASSWORD = "password"
     VISIBLE = "visible"
     EDITABLE = "editable"
+    LOSSY = "lossy"
 
 
 @dataclass(frozen=True, slots=True)

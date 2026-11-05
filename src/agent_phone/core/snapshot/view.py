@@ -26,7 +26,7 @@ from dataclasses import dataclass, replace
 from enum import Enum
 
 from agent_phone.core.geometry import Rect
-from agent_phone.core.labels import shown_values
+from agent_phone.core.labels import shown_nodes, shown_values
 from agent_phone.core.role import (
     COLLECTIONS,
     VALUE_ROLES,
@@ -36,7 +36,7 @@ from agent_phone.core.role import (
     role_of,
     shows_surface,
 )
-from agent_phone.core.screen import Attrs, Flag, Node, NodeId, Screen, Window
+from agent_phone.core.screen import Flag, Node, NodeId, Screen, Window
 from agent_phone.core.snapshot.surface import Pick, Surface
 
 
@@ -53,6 +53,7 @@ class State(Enum):
     FOCUSED = "focused"
     SECRET = "secret"
     OFFSCREEN = "offscreen"
+    LOSSY = "lossy"
 
 
 @dataclass(frozen=True, slots=True)
@@ -201,12 +202,17 @@ def window_line(window: Window) -> Line:
     )
 
 
-def states_of(attrs: Attrs) -> frozenset[State]:
+def states_of(screen: Screen, node: Node, role: Role) -> frozenset[State]:
+    """LOSSY when any node whose labels the line shows is LOSSY, such as the child that names a
+    button."""
+    attrs = node.attrs
     states = {state for flag, state in STATE_FLAGS.items() if flag in attrs.flags}
     if Flag.ENABLED not in attrs.flags:
         states.add(State.DISABLED)
     if Flag.VISIBLE not in attrs.flags:
         states.add(State.OFFSCREEN)
+    if any(member.has(Flag.LOSSY) for member in shown_nodes(screen, node, role)):
+        states.add(State.LOSSY)
     return frozenset(states)
 
 
@@ -226,7 +232,7 @@ def line_of(screen: Screen, node: Node, role: Role, depth: int, ref: int | None)
         detail=detail,
         value=attrs.text if role in VALUE_ROLES and not secret else "",
         id_hint="" if name else attrs.resource_id.rpartition("/")[2],
-        states=states_of(attrs),
+        states=states_of(screen, node, role),
         bounds=attrs.bounds,
         rows=None,
         folded=0,

@@ -142,13 +142,13 @@ def stable_name(screen: Screen, node: Node, role: Role) -> str | None:
 def shown_values(screen: Screen, node: Node, role: Role) -> tuple[str, ...]:
     """The naming values a snapshot line shows for the node, in name order, cleaned and
     without repeats. The first is the name, the rest are the detail."""
-    if shows_surface(node.attrs, role):
-        labels = tuple(
-            label for member in owned(screen, node, consumes_touch) for label in own_labels(member)
-        )
-    else:
-        labels = own_labels(node)
+    labels = tuple(label for member in shown_nodes(screen, node, role) for label in own_labels(member))
     return naming_values(screen, labels)
+
+
+def shown_nodes(screen: Screen, node: Node, role: Role) -> list[Node]:
+    """The nodes whose labels `shown_values` reads: the node's surface when it shows one."""
+    return owned(screen, node, consumes_touch) if shows_surface(node.attrs, role) else [node]
 
 
 def naming_values(screen: Screen, labels: Sequence[Label]) -> tuple[str, ...]:
