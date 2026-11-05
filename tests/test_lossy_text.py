@@ -85,9 +85,6 @@ def test_a_line_that_shows_text_the_dump_damaged_is_marked_lossy():
     )
 
 
-@pytest.mark.xfail(
-    strict=True, raises=AssertionError, reason="#3 review: the lossy mark reads a secret's text"
-)
 def test_a_secret_field_is_never_marked_lossy_by_its_hidden_text():
     secret = node(
         "android.widget.EditText", text="ab..cd", password=True, clickable=True, bounds="[0,100][1080,200]"
