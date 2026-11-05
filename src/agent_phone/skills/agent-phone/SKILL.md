@@ -41,6 +41,7 @@ agent-phone reads the screen and sends input. Every input names what it acts on 
 - The exit code is 0 on success, 1 on an error and 2 when the arguments do not parse.
 - A tree line holds, in this order, the indent, the ref, the role, the name, the detail, `value="…"`, `#<resource-id>`, the states, `(N rows)`, `(+N)` and the bounds `[left,top,right,bottom]`. Only the role is always there.
 - A line with no ref is text that has nothing to act on.
+- A line marked `lossy` holds text the phone could not read whole: an emoji shows as `..`. To find it, query the text as the line shows it, such as `name="Send .."`.
 - `keyboard` and `dialog` say that an overlay is up. `others` lists every other window with its `id`.
 
 ## Use refs

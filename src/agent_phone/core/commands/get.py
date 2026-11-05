@@ -53,5 +53,5 @@ def property_of(
             b = attrs.bounds
             return (b.left, b.top, b.right, b.bottom)
         case GetProperty.STATES:
-            states = states_of(attrs)
+            states = states_of(screen, node, role_of(attrs))
             return tuple(state.value for state in State if state in states)

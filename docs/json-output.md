@@ -479,6 +479,7 @@ The tree of `--surface all` also has a line at depth 0 that opens each window: `
 | `focused` | The element has input focus. |
 | `secret` | A password field. Its value is never printed. |
 | `offscreen` | The element is not visible to the user. Only `full` mode prints such lines. |
+| `lossy` | The backend could not read every character of the line's text and wrote `.` for each one it lost. An emoji, or any other character above U+FFFF, shows as `..`. A literal `..` is marked too, because the read cannot tell the two apart. A query matches the text as the line shows it. |
 
 ### Window kinds
 

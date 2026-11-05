@@ -15,6 +15,9 @@ type, layer or focus attribute. What this module infers, and from what:
   AccessibilityWindowInfo replaces all of this with facts.
 - layer: None. The hit plan therefore treats every other window over a point as covering it
   (`core/act/hit.py`).
+- lossy: the dumper writes `.` for each UTF-16 surrogate, so a character above U+FFFF reads as
+  `..` (A9-1). A node whose text, content-desc or hint holds `..` is LOSSY, a literal `..` too,
+  because the dump cannot tell the two apart.
 
 The `Screen` is the default display. Android 13 puts `display-id` on every node, and a device with a
 second screen, such as the AYN Thor's bottom one (display 4), lists that screen's windows in the same
@@ -65,6 +68,7 @@ BOOL_FLAGS: dict[str, Flag] = {
 }
 
 
+LOSSY_MARK = ".."
 EDITABLE_CLASSES = frozenset({"EditText", "AutoCompleteTextView"})
 """The dump has no `editable` attribute, so these class simple names stand in for it."""
 
@@ -136,6 +140,8 @@ def parse_attrs(attrib: dict[str, str]) -> Attrs:
     flags = {flag for name, flag in BOOL_FLAGS.items() if attrib.get(name) == "true"}
     if class_name.rpartition(".")[2] in EDITABLE_CLASSES:
         flags.add(Flag.EDITABLE)
+    if any(LOSSY_MARK in attrib.get(name, "") for name in ("text", "content-desc", "hint")):
+        flags.add(Flag.LOSSY)
     drawing_order = attrib.get("drawing-order")
     if drawing_order is not None and not drawing_order.lstrip("-").isdigit():
         raise Refusal(ErrorCode.TRANSPORT, f"The screen dump has drawing-order {drawing_order!r}.")
