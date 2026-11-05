@@ -33,8 +33,14 @@ def test_set_text_of_an_emoji_is_verified_on_the_dump_that_writes_it_as_two_dots
     assert "lossy" in wire["data"]["verified_by"]
 
 
+def test_an_exact_read_back_is_compared_exactly(tmp_path):
+    wire = set_text(tmp_path, "hi 😴", shows="hi 😴")
+    assert wire["ok"] and wire["delivery"] == "delivered_verified"
+    assert "lossy" not in wire["data"]["verified_by"]
+
+
 @pytest.mark.parametrize("shows", ["hi ....", "hi", "hi ."])
-def test_a_lossy_read_back_that_differs_from_the_text_still_fails(tmp_path, shows):
+def test_a_read_back_that_differs_from_the_text_still_fails(tmp_path, shows):
     wire = set_text(tmp_path, "hi 😴", shows)
     assert wire["error"]["code"] == "ACTION_FAILED" and wire["delivery"] == "delivered_unverified"
 
@@ -58,6 +64,13 @@ def test_a_line_that_shows_text_the_dump_damaged_is_marked_lossy():
                 bounds="[0,500][1080,600]",
             ),
             node("android.widget.TextView", text="good night.", bounds="[0,700][1080,800]"),
+            node(
+                "android.widget.ImageButton",
+                content_desc="Like ..",
+                clickable=True,
+                bounds="[0,900][200,1000]",
+            ),
+            node("android.widget.EditText", hint="Say hi ..", clickable=True, bounds="[0,1100][1080,1200]"),
             package="test.app",
             bounds="[0,0][1080,1920]",
         )
@@ -67,4 +80,19 @@ def test_a_line_that_shows_text_the_dump_damaged_is_marked_lossy():
         '@k3x9q:e1 button "Send .." lossy [0,300,1080,400]',
         '@k3x9q:e2 field "Message" value="hi .." lossy [0,500,1080,600]',
         'text "good night." [0,700,1080,800]',
+        '@k3x9q:e3 button "Like .." lossy [0,900,200,1000]',
+        '@k3x9q:e4 field "Say hi .." lossy [0,1100,1080,1200]',
     )
+
+
+@pytest.mark.xfail(
+    strict=True, raises=AssertionError, reason="#3 review: the lossy mark reads a secret's text"
+)
+def test_a_secret_field_is_never_marked_lossy_by_its_hidden_text():
+    secret = node(
+        "android.widget.EditText", text="ab..cd", password=True, clickable=True, bounds="[0,100][1080,200]"
+    )
+    screen = screen_of(
+        node("android.widget.FrameLayout", secret, package="test.app", bounds="[0,0][1080,1920]")
+    )
+    assert render(compact(screen), SnapshotId("k3x9q")) == ("@k3x9q:e1 field secret [0,100,1080,200]",)
