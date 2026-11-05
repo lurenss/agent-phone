@@ -165,7 +165,7 @@ def add_snapshot(commands: argparse._SubParsersAction, after: Parser) -> None:
     snapshot.add_argument(
         "--settle",
         action="store_true",
-        help="read until two reads in a row print the same lines, and say whether they did",
+        help="read until every read for 800 ms prints the same lines, and say whether they did",
     )
     snapshot.add_argument(
         "--timeout-ms",

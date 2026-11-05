@@ -1,6 +1,6 @@
 import pytest
 from fakes import J7_SERIAL, FakeHub, FakePhone, invoke
-from support import FakeClock, fixture_screen, node, screen_of
+from support import FakeClock, fixture_screen, node, screen_of, settled_from
 
 from agent_phone.cli.driver import open_phone
 from agent_phone.cli.settings import Settings
@@ -60,7 +60,6 @@ def settle_timed(tmp_path, timeout_ms, *script):
         return phone.snapshot(settle=True, timeout_ms=timeout_ms)
 
 
-@pytest.mark.xfail(strict=True, reason="#4: two equal reads 50 ms apart settle before a change at 500 ms")
 def test_a_screen_change_scripted_at_500_ms_reads_as_unsettled(tmp_path):
     loading, loaded = screen_saying("Photos"), screen_saying("Photo 1")
     early = settle_timed(tmp_path, 1000, (0.0, loading), (0.5, loaded))
@@ -69,16 +68,15 @@ def test_a_screen_change_scripted_at_500_ms_reads_as_unsettled(tmp_path):
     assert late.settled is SettleState.SETTLED and [line.name for line in late.lines] == ["Photo 1"]
 
 
-def test_a_screen_that_does_not_change_is_settled_after_two_reads(tmp_path):
-    taken, reads, clock = settle([screen_saying("Wi-Fi")], tmp_path)
-    assert taken.settled is SettleState.SETTLED and reads == 2
-    assert clock.pauses == [POLL_GAP_S]
+def test_a_screen_that_does_not_change_is_settled_after_a_quiet_window(tmp_path):
+    taken, _, clock = settle([screen_saying("Wi-Fi")], tmp_path)
+    assert taken.settled is SettleState.SETTLED and settled_from(clock, 0)
 
 
 def test_a_screen_that_changes_once_settles_on_the_new_content(tmp_path):
     old, new = screen_saying("Settings"), screen_saying("Wi-Fi")
-    taken, reads, _ = settle([old, new], tmp_path)
-    assert taken.settled is SettleState.SETTLED and reads == 3
+    taken, _, clock = settle([old, new], tmp_path)
+    assert taken.settled is SettleState.SETTLED and settled_from(clock, 1)
     assert [line.name for line in taken.lines] == ["Wi-Fi"]
 
 
@@ -92,8 +90,8 @@ def test_a_screen_that_never_stops_changing_is_unsettled_and_the_last_read_is_de
 
 
 def test_a_change_the_agent_cannot_see_does_not_unsettle_a_screen(tmp_path):
-    taken, reads, _ = settle([screen_saying("Wi-Fi"), screen_saying("Wi-Fi", "[0,0][20,20]")], tmp_path)
-    assert taken.settled is SettleState.SETTLED and reads == 2
+    taken, _, clock = settle([screen_saying("Wi-Fi"), screen_saying("Wi-Fi", "[0,0][20,20]")], tmp_path)
+    assert taken.settled is SettleState.SETTLED and settled_from(clock, 0)
 
 
 def test_a_deadline_already_past_returns_the_one_read_it_made(tmp_path):
@@ -115,10 +113,10 @@ def test_a_snapshot_without_settle_reads_once_and_says_unchecked(tmp_path):
     assert code == 0 and wire["data"]["settled"] == "unchecked" and hub.phones[0].reads == 1
 
 
-def test_settle_on_the_command_line_says_settled_and_reads_twice(tmp_path):
-    hub = FakeHub([J7], screens=[fixture_screen("settings-home")])
-    code, wire = invoke(["snapshot", "--settle"], hub, tmp_path)
-    assert code == 0 and wire["data"]["settled"] == "settled" and hub.phones[0].reads == 2
+def test_settle_on_the_command_line_says_settled_after_a_quiet_window(tmp_path):
+    hub, clock = FakeHub([J7], screens=[fixture_screen("settings-home")]), FakeClock()
+    code, wire = invoke(["snapshot", "--settle"], hub, tmp_path, clock=clock)
+    assert code == 0 and wire["data"]["settled"] == "settled" and settled_from(clock, 0)
 
 
 def test_settle_with_a_short_timeout_on_a_flickering_screen_still_prints_a_snapshot(tmp_path):

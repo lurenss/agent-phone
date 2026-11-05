@@ -26,7 +26,7 @@ agent-phone devices                      # every device, with its facts
 agent-phone snapshot                     # the active window as compact lines with refs
 agent-phone snapshot --skeleton          # the outline: collections fold their rows into a count
 agent-phone snapshot --root @k3x9q:e3    # one subtree, as a new snapshot, with the same ref numbers
-agent-phone snapshot --settle            # read until two reads in a row agree, and say whether they did
+agent-phone snapshot --settle            # read until the reads agree for 800 ms, and say whether they did
 agent-phone snapshot --surface dialog    # a dialog, the keyboard, the shade, or every window
 agent-phone find --name Wi-Fi --role button   # every match, with its ref
 agent-phone get @k3x9q:e4 --property bounds   # one property of a ref, read live

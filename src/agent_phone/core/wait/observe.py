@@ -14,9 +14,12 @@ from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.screen import Screen
 from agent_phone.core.snapshot.snapshot import SettleState
 from agent_phone.core.wait.clock import POLL_GAP_S
-from agent_phone.core.wait.predicate import Predicate, Settled, holds
+from agent_phone.core.wait.predicate import Predicate, Settled, holds, is_effect
 
 SETTLE_DEADLINE_S = 3.0
+SETTLE_QUIET_S = 0.8
+"""How long every read must print the same lines before a screen is settled. Two equal reads 50 ms
+apart settled an empty grid before its items loaded (#4)."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,6 +48,9 @@ def observe(ctx: Context, predicates: tuple[Predicate, ...], deadline: float) ->
     """Read the screen until every predicate holds or `ctx.clock` reaches `deadline`. It reads at
     least once, so a deadline that is already past returns the one read it made.
 
+    A `Settled` holds once its surface has printed the same lines on every read for
+    `SETTLE_QUIET_S`. A read that prints other lines starts that window again.
+
     An empty read (`NO_SURFACE`) is a read on which no predicate holds, so a `Gone` does not hold on
     it either: an empty dump is no evidence that anything left the screen. It also breaks a run of
     equal reads, so settling starts again. The loop reads again after it. Any other refusal ends
@@ -57,24 +63,30 @@ def observe(ctx: Context, predicates: tuple[Predicate, ...], deadline: float) ->
     `settled` is SETTLED when a Settled predicate held, UNSETTLED when one was asked for and the
     deadline came first, and UNCHECKED when none was asked.
     """
-    asked = any(isinstance(p, Settled) for p in predicates)
+    settles = [p for p in predicates if isinstance(p, Settled)]
+    effects = [p for p in predicates if is_effect(p)]
     previous: Screen | None = None
     last: Screen | None = None
+    quiet_since = ctx.clock.now()
     reads = 0
     while True:
         current = read_or_empty(ctx)
         reads += 1
-        expired = ctx.clock.now() >= deadline
+        now = ctx.clock.now()
+        expired = now >= deadline
         if isinstance(current, Refusal):
             if expired and last is None:
                 raise current
             held, previous = False, None
         else:
-            held = all(holds(p, previous, current) for p in predicates)
+            if not all(holds(p, previous, current) for p in settles):
+                quiet_since = now
+            quiet = not settles or now - quiet_since >= SETTLE_QUIET_S
+            held = quiet and all(holds(p, previous, current) for p in effects)
             last = previous = current
         if held or expired:
             settled = SettleState.UNCHECKED
-            if asked:
+            if settles:
                 settled = SettleState.SETTLED if held else SettleState.UNSETTLED
             return Observation(last, held, reads, settled)
         ctx.clock.pause(POLL_GAP_S)

@@ -69,10 +69,10 @@ agent-phone snapshot --root @k3x9q:e3     # that collection only, with the same 
 
 A plain snapshot reads the screen once, and its `settled` is `unchecked`. Right after the screen changes, that one read can show the screen from before the change. On a Samsung J7, the first read after `adb shell am start` showed the old app in 10 of 10 tries.
 
-- After anything changes the screen, run `agent-phone snapshot --settle`. It reads until two reads in a row print the same lines.
-- `settled` means two reads agreed. `unsettled` means `--timeout-ms` passed first (3000 by default), and you got the last read. Settle again before you trust it.
+- After anything changes the screen, run `agent-phone snapshot --settle`. It reads until every read for 800 ms prints the same lines.
+- `settled` means the reads agreed for 800 ms. `unsettled` means `--timeout-ms` passed first (3000 by default), and you got the last read. Settle again before you trust it. A `--timeout-ms` under 800 always ends `unsettled`.
 - `find` reads once and takes no `--settle`. Run `agent-phone snapshot --settle` first, then `find`.
-- An app that opens animates in. A `--wait-for` after `launch` can hold on a frame where the window is still scaled or off the edge, and a tap sent then can be lost. Before the first tap after `launch`, wait for the app, an element and two equal reads together, as in `agent-phone wait --app com.google.android.youtube --for 'name=Cerca' --settled`.
+- An app that opens animates in. A `--wait-for` after `launch` can hold on a frame where the window is still scaled or off the edge, and a tap sent then can be lost. Before the first tap after `launch`, wait for the app, an element and a settled screen together, as in `agent-phone wait --app com.google.android.youtube --for 'name=Cerca' --settled`.
 
 ## Wait for the screen instead of sleeping
 
@@ -83,7 +83,7 @@ agent-phone wait --for 'role=field name=Search' --timeout-ms 20000
 ```
 
 - `wait` reads the screen until every condition holds on one read, then prints that read as a snapshot, the same object `snapshot` prints. Use it wherever you would sleep and then snapshot again.
-- `--for QUERY` waits until a line that matches shows. `--gone QUERY` waits until no line matches and the window is not a dialog. `--app PACKAGE` waits until the window that has focus belongs to that app. `--settled` waits until two reads in a row print the same lines. Each of `--for` and `--gone` may repeat. A query is the one `--wait-for` takes.
+- `--for QUERY` waits until a line that matches shows. `--gone QUERY` waits until no line matches and the window is not a dialog. `--app PACKAGE` waits until the window that has focus belongs to that app. `--settled` waits until every read for 800 ms prints the same lines. Each of `--for` and `--gone` may repeat. A query is the one `--wait-for` takes.
 - Give at least one condition, or the call is `INVALID_ARGS` and nothing is read. With several, they must hold on the same read. Two conditions that hold on different reads never hold together.
 - `--timeout-ms` is 10000 by default. On a timeout `ok` is false, `error.code` is `TIMEOUT`, `delivery` is `not_delivered` and `retry` is `safe`. `error.details.after` is a snapshot of the last read, so you see what the screen showed instead.
 - The snapshot is recorded like any other. Its refs work for your next command, and it is the observation that the next input needs after an input: no `OBSERVE_FIRST`.

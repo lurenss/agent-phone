@@ -13,6 +13,8 @@ from agent_phone.core.snapshot.budget import fit
 from agent_phone.core.snapshot.snapshot import SettleState, Snapshot, SnapshotId
 from agent_phone.core.snapshot.surface import select_surface
 from agent_phone.core.snapshot.view import Mode, View, build_view
+from agent_phone.core.wait.clock import POLL_GAP_S
+from agent_phone.core.wait.observe import SETTLE_QUIET_S
 
 ROOT = Path(__file__).resolve().parents[1]
 DUMPS = ROOT / "tests" / "fixtures" / "dumps"
@@ -134,3 +136,10 @@ class FakeClock:
     def pause(self, seconds: float) -> None:
         self.pauses.append(seconds)
         self.time += seconds
+
+
+def settled_from(clock: FakeClock, read: int) -> bool:
+    """Whether a settle ended one quiet window after its `read`-th read, counted from 0, so that is
+    the read its run of equal reads began on. The fake reads once per poll gap."""
+    start = read * POLL_GAP_S + SETTLE_QUIET_S
+    return start <= clock.time < start + POLL_GAP_S

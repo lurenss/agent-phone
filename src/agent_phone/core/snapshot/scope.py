@@ -42,7 +42,7 @@ class Look:
 def look(ctx: Context, scope: Scope, settle: bool = False, timeout_ms: int = SETTLE_TIMEOUT_MS) -> Look:
     """Raise `Refusal`. The ref is checked before the phone is read, and found again after.
 
-    With `settle`, read until two consecutive reads print the same lines of the scope's
+    With `settle`, read until every read for `SETTLE_QUIET_S` prints the same lines of the scope's
     surface, or until `timeout_ms` has passed. A timeout is not an error: the last read is
     returned and `settled` says `unsettled`.
     """

@@ -36,8 +36,9 @@ class Foreground:
 
 @dataclass(frozen=True, slots=True)
 class Settled:
-    """Two consecutive reads print the same compact lines of the surface that `pick` and
-    `window` name. Comparing printed lines, not the raw tree, ignores churn the agent cannot
+    """The reads print the same compact lines of the surface that `pick` and `window` name for
+    `SETTLE_QUIET_S` (`observe`). `holds` decides one step of that: this read prints what the
+    previous one did. Comparing printed lines, not the raw tree, ignores churn the agent cannot
     see, such as a progress bar's bounds. A read with no such surface is not settled, so
     `Settled(Pick.DIALOG)` also waits for a dialog to appear."""
 

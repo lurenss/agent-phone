@@ -92,7 +92,7 @@ The 8 KB limit on a snapshot's printed tree (`A4-1`, `core/snapshot/budget.py`).
 
 ### Settle state
 
-Whether the screen had stopped changing when it was read (`SettleState`). `settled` means two reads in a row printed the same compact lines of the surface that was asked for. The uiautomator2 dump does not wait for animations (`A2-5`), so a plain snapshot is `unchecked`.
+Whether the screen had stopped changing when it was read (`SettleState`). `settled` means every read for 800 ms printed the same compact lines of the surface that was asked for. The uiautomator2 dump does not wait for animations (`A2-5`), so a plain snapshot is `unchecked`.
 
 ## Refs and identity
 
@@ -170,7 +170,7 @@ What a command produced (`Outcome`, `core/outcome.py`): `Refused`, `Acted` or `R
 
 ### Wait condition
 
-One thing a wait checks on a read (`Predicate`, `core/wait/predicate.py`): `Present` and `Gone` match a `Query` against the lines of the active window's compact view, as `find` does, `Foreground` names the package of the focused window, and `Settled` says that two reads in a row printed the same lines. Each is decided from the previous and the current read, and a read with no active window or no line decides neither `Present` nor `Gone`. A dialog hides what lies under it (`A2-7`), so a dialog with no matching line does not decide `Gone`. `wait` and `--wait-for` build the same conditions from the same query syntax.
+One thing a wait checks on a read (`Predicate`, `core/wait/predicate.py`): `Present` and `Gone` match a `Query` against the lines of the active window's compact view, as `find` does, `Foreground` names the package of the focused window, and `Settled` says that every read for 800 ms printed the same lines. `observe` times that window, and each condition is decided from the previous and the current read, and a read with no active window or no line decides neither `Present` nor `Gone`. A dialog hides what lies under it (`A2-7`), so a dialog with no matching line does not decide `Gone`. `wait` and `--wait-for` build the same conditions from the same query syntax.
 
 ### Wait
 

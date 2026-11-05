@@ -57,7 +57,7 @@ class RefToken:
 
 
 class SettleState(Enum):
-    """SETTLED: two consecutive reads gave the same lines. UNSETTLED: the settle deadline passed
+    """SETTLED: every read for SETTLE_QUIET_S gave the same lines. UNSETTLED: the settle deadline passed
     first, and this is the last read. UNCHECKED: one read, no settle asked (A2-5)."""
 
     SETTLED = "settled"

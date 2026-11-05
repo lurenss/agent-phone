@@ -8,7 +8,7 @@ import tomllib
 
 import pytest
 from fakes import J7_SERIAL, FakePhone, info_for
-from support import FakeClock, fixture_screen, node, screen_of
+from support import FakeClock, fixture_screen, node, screen_of, settled_from
 
 from agent_phone.cli.policy import DEFAULT_POLICY
 from agent_phone.core.act import ledger
@@ -161,10 +161,10 @@ def test_the_foreground_app_is_the_window_that_has_focus(tmp_path):
     timed_out(run(ctx, WaitCommand((Foreground(Package("com.example.other")),), timeout_ms=100)))
 
 
-def test_settled_needs_two_reads_that_print_the_same_lines(tmp_path):
-    ctx, phone, _ = context(tmp_path, SETTINGS)
+def test_settled_needs_the_same_lines_on_every_read_for_a_quiet_window(tmp_path):
+    ctx, _, clock = context(tmp_path, SETTINGS)
     done = run(ctx, WaitCommand((Settled(),)))
-    assert isinstance(done, Read) and done.payload.settled is SettleState.SETTLED and phone.reads == 2
+    assert isinstance(done, Read) and done.payload.settled is SettleState.SETTLED and settled_from(clock, 0)
 
 
 def test_a_wait_that_asks_for_no_settle_says_unchecked(tmp_path):
