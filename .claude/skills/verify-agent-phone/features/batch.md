@@ -35,7 +35,7 @@ Steps:
   [
     ["launch", "com.android.settings", "--wait-for", "name=Display"],
     ["click", "name=Display", "--wait-for", "name*=Brightness"],
-    ["press", "back", "--wait-for", "name=Display"]
+    ["press", "back", "--wait-for-gone", "name*=Brightness"]
   ]
   ```
 

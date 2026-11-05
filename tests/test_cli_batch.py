@@ -286,16 +286,15 @@ def test_a_grant_and_a_policy_file_serve_only_the_step_that_names_them(tmp_path)
         str(rule),
         "--commit",
         "confirm",
-        "--wait-for",
-        "name=Display",
     ]
+    still = ["wait", "--for", "name=Display"]
     hub = FakeHub([J7], screens=[SETTINGS], after_each=[SETTINGS, SETTINGS])
-    code, wire = batch(tmp_path, [granted, ["click", "name=Display", "--policy", str(rule)]], hub)
-    assert code == 1 and wire["data"]["stopped_at"] == 1 and wire["error"]["code"] == "COMMIT_REFUSED"
-    assert wire["data"]["steps"][1]["error"]["details"]["granted"] == [] and len(sent(hub)) == 1
+    code, wire = batch(tmp_path, [granted, still, ["click", "name=Display", "--policy", str(rule)]], hub)
+    assert code == 1 and wire["data"]["stopped_at"] == 2 and wire["error"]["code"] == "COMMIT_REFUSED"
+    assert wire["data"]["steps"][2]["error"]["details"]["granted"] == [] and len(sent(hub)) == 1
     look(tmp_path, SETTINGS)
     hub = FakeHub([J7], screens=[SETTINGS], after_each=[SETTINGS, SETTINGS])
-    code, wire = batch(tmp_path, [granted, ["click", "name=Display"]], hub, name="plain.json")
+    code, wire = batch(tmp_path, [granted, still, ["click", "name=Display"]], hub, name="plain.json")
     assert code == 0 and len(sent(hub)) == 2, "the file of the first step is not the second step's"
 
 

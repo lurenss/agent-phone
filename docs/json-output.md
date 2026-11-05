@@ -60,7 +60,7 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
 | `not_delivered` | safe | No input left the computer, or the backend proved that nothing reached the device. Running the same command again is safe. |
 | `delivery_uncertain` | unsafe | Input may have reached the device. Look at the screen before you act again. |
 | `delivered_unverified` | unsafe | Input reached the device and nothing checked its effect. |
-| `delivered_verified` | unsafe | Input reached the device and a wait predicate saw its effect. |
+| `delivered_verified` | unsafe | Input reached the device, and every `--wait-for` and `--wait-for-gone` of the input did not hold before it and held after it. A `set-text` with no wait is also `delivered_verified` when the field reads back the text it sent, and that read-back does not check what the field held before. |
 
 `not_delivered` is the only value after which the same command can succeed again, because every input spends the refs taken before it.
 
@@ -68,7 +68,7 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
 
 | Code | Meaning |
 | --- | --- |
-| `INVALID_ARGS` | The arguments do not parse. A target that is neither a ref nor a query, such as `e12` or `Display`, is one case. A step of a batch that does not parse, names its own device, or is not a command that uses the phone is another, and so is a batch file that is not a JSON array of non-empty arrays of strings, or a batch with no file on a terminal. A link for `open-url` that holds a line break or any other control character, written out or percent-encoded, is another. So is a value of `AGENT_PHONE_PERMISSION_MODE` that is neither `ask` nor `dangerously-skip`, which stops the process before a device is opened. |
+| `INVALID_ARGS` | The arguments do not parse. A target that is neither a ref nor a query, such as `e12` or `Display`, is one case. A step of a batch that does not parse, names its own device, or is not a command that uses the phone is another, and so is a batch file that is not a JSON array of non-empty arrays of strings, or a batch with no file on a terminal. A link for `open-url` that holds a line break or any other control character, written out or percent-encoded, is another. So is a value of `AGENT_PHONE_PERMISSION_MODE` that is neither `ask` nor `dangerously-skip`, which stops the process before a device is opened. So is a `--wait-for` or `--wait-for-gone` that already holds on the read the input is planned on: it would hold whether or not the input worked, so it cannot prove anything, and the input is not sent. |
 | `POLICY_INVALID` | A policy file, or the order its layers merge in, is invalid. `details` names the `source`, the `table` and the `field`, or the `rule`. A file that disables a deny rule of the device profile, or of a file the profile names, is one case, and a file whose top-level `languages` names a language the built-in policy does not cover is another. |
 | `NO_DEVICE` | No device is connected and ready, or the requested one is not. |
 | `DEVICE_AMBIGUOUS` | Several devices are ready and neither `-d` nor a ref names one. |
@@ -245,7 +245,7 @@ Every condition has to hold on the same read. `--for` holds when a line of the a
 | `input` | object | What was sent. `kind` is one of the [input kinds](#input-kinds), with its own keys. Typed text and clipboard text are never echoed. |
 | `target` | object or null | For an input on an element: its `ref` (or null for a query), `role`, `name`, and `at`, the point a tap landed on, or null. Null for an input with no element. |
 | `gate` | object | The policy verdict the input was sent under: `{"verdict": "clear", "reason": …}` with a [clear reason](#clear-reasons), or `{"verdict": "commits", "effects": […], "granted": […], "skipped": […]}`. `effects` are the [effects](#effects) the input commits. `granted` is the part of them that the caller's `--commit` named, and `skipped` is the rest, which `dangerously-skip` let through with no grant. `skipped` is always empty in `ask`, and `effects` is `granted` and `skipped` together. |
-| `verified_by` | string or null | What proved the effect, such as `present name="Brightness"`, or why the proof does not count. |
+| `verified_by` | string or null | What proved the effect, such as `present name="Brightness"` or `the field holds the text`. |
 | `after` | object or null | The snapshot the wait ended on, with fresh refs, as in [Snapshot payload](#snapshot-payload). Null when nothing was waited for. |
 
 ```json
