@@ -328,7 +328,8 @@ def _read_back(
 ) -> Acted:
     """Read the field back, on `screen` or by reading until it holds the text or READ_BACK_S
     passes. A secret field is never read, so it stays as it was. A field that left the screen
-    proves nothing either way. A lossy read is compared in the form it shows, and the proof says so."""
+    proves nothing either way. A lossy read is compared in the form it shows. When the read-back
+    is the proof, the proof names the lossy read."""
     resolved = planned.resolved
     if resolved is None or (isinstance(planned.action, SetText) and planned.action.secret):
         return Acted(state, report, after)
