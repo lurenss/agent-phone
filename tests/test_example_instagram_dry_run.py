@@ -67,10 +67,6 @@ def clear_only(example, monkeypatch, tmp_path, first, after_each):
     return code, [type(permit.action) for permit in hub.phones[0].permits]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="#4: the launch and the profile tap wait for what already shows, so act() refuses them",
-)
 def test_a_run_on_an_open_profile_sends_no_launch_and_no_back(example, monkeypatch, tmp_path):
     code, sent = clear_only(example, monkeypatch, tmp_path, PROFILE, [MENU, PICKER, PROFILE])
     assert code == 0 and sent == [Tap, Tap, Tap], "create, create new reel, back to home"
