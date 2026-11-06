@@ -21,6 +21,7 @@
 Preconditions:
 
 - Doctor shows no `stop` line.
+- The phone shows the home screen. Settings' main page shows a line named Settings, so from there the launch's `--wait-for 'name=Settings'` already holds and is refused.
 - Your task allows launching and stopping `com.android.settings`, opening a Settings page by intent, changing the rotation and restoring it, and replacing the clipboard and restoring it. Stop and launch no other package.
 - Read the rotation first: `evidence.py run "$RUN" rotation-before -- adb -s "$SERIAL" shell 'settings get system accelerometer_rotation; settings get system user_rotation'`.
 
