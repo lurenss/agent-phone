@@ -77,16 +77,27 @@ def clip_label(path: Path) -> str:
     return f"{whole // 60}:{whole % 60:02d}"
 
 
+def open_instagram(phone: Driver) -> None:
+    """Launch Instagram unless its tabs already show. A launch of an open app changes nothing, so
+    a wait for the tabs could not prove it and agent-phone refuses it."""
+    if phone.count(PROFILE_TAB) == 0:
+        phone.launch(INSTAGRAM, wait_for=Present(PROFILE_TAB), timeout_ms=COLD_START_MS)
+
+
 def to_profile(phone: Driver) -> None:
     """The profile tab, from wherever Instagram is. A reel viewer that Instagram restores after a
-    cold start can cover the tabs, so back out until the tab is on screen, at most three times."""
+    cold start can cover the tabs, so back out until the tab is on screen, at most three times. An
+    open profile needs no tap: its Create button already shows, so the tap would be refused."""
     for _ in range(3):
+        if phone.count(CREATE) > 0:
+            return
         try:
             phone.click(PROFILE_TAB, wait_for=Present(CREATE), timeout_ms=SCREEN_MS)
             return
         except PhoneError:
             phone.press(KeyName.BACK, wait_for=Settled(), timeout_ms=SCREEN_MS)
-    phone.click(PROFILE_TAB, wait_for=Present(CREATE), timeout_ms=SCREEN_MS)
+    if phone.count(CREATE) == 0:
+        phone.click(PROFILE_TAB, wait_for=Present(CREATE), timeout_ms=SCREEN_MS)
 
 
 def switch_to(phone: Driver, account: str, accounts: tuple[str, ...]) -> bool:
@@ -217,11 +228,7 @@ def main(argv: list[str]) -> int:
             timed(steps, "look first", phone.snapshot)
             if args.cold:
                 timed(steps, "stop instagram", lambda: phone.stop(INSTAGRAM, wait_for=Settled()))
-            timed(
-                steps,
-                "launch instagram",
-                lambda: phone.launch(INSTAGRAM, wait_for=Present(PROFILE_TAB), timeout_ms=COLD_START_MS),
-            )
+            timed(steps, "launch instagram", lambda: open_instagram(phone))
             for account in accounts:
                 if args.clear_only:
                     timed(steps, f"{account}: profile", lambda: to_profile(phone))
