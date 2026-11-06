@@ -59,8 +59,9 @@ def press_back(ctx, *wait_for):
         lambda ctx: tap_display(ctx, Present(Q("Notifications"))),
         lambda ctx: tap_display(ctx, Gone(Q("Brightness"))),
         lambda ctx: press_back(ctx, Present(Q("Display"))),
+        lambda ctx: tap_display(ctx, Present(Q("Notifications")), Present(Q("Brightness"))),
     ],
-    ids=["present on a tap", "gone on a tap", "present on a key"],
+    ids=["present on a tap", "gone on a tap", "present on a key", "one of two conditions"],
 )
 def test_an_effect_wait_that_already_holds_is_refused_and_sends_nothing(tmp_path, request_for):
     ctx, phone = context(tmp_path, SETTINGS, after_input=[DISPLAY_PAGE])
@@ -97,3 +98,23 @@ def test_a_dialog_over_the_target_does_not_prove_it_gone(tmp_path, dialog):
     gone = act(ctx, tap_display(ctx, Gone(Q("Display"))))
     assert gone.disposition is Disposition.DELIVERED_VERIFIED
     assert [line.name for line in gone.after.lines] == ["Brightness"], "the wait stopped on the dialog"
+
+
+DIALOG_WITH_CANCEL = screen_of(
+    node(
+        "android.widget.FrameLayout",
+        node("android.widget.TextView", text="Rename this device?", bounds="[140,850][940,920]"),
+        node("android.widget.Button", text="Cancel", clickable=True, bounds="[140,1000][500,1080]"),
+        package="com.android.settings",
+        bounds="[90,800][990,1100]",
+    )
+)
+
+
+def test_a_line_of_a_dialog_proves_the_tap_that_opened_it_and_its_going_proves_the_key(tmp_path):
+    ctx, _ = context(tmp_path, SETTINGS, after_input=[DIALOG_WITH_CANCEL])
+    opened = act(ctx, tap_display(ctx, Present(Q("Cancel"))))
+    assert opened.disposition is Disposition.DELIVERED_VERIFIED, opened
+    ctx, _ = context(tmp_path, DIALOG_WITH_CANCEL, after_input=[DISPLAY_PAGE])
+    closed = act(ctx, press_back(ctx, Gone(Q("Cancel"))))
+    assert closed.disposition is Disposition.DELIVERED_VERIFIED, closed
