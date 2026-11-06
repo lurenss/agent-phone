@@ -107,20 +107,12 @@ def test_a_run_from_the_launcher_launches_instagram_and_taps_the_profile_tab(exa
     assert code == 0 and sent == ["Launch", "tab", "create", "create new reel", "back to home"]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="#4: Gone never holds on a dialog, so the wait for Create new reel to go times out",
-)
 def test_a_pending_session_is_closed_through_its_keep_editing_dialog(example, monkeypatch, tmp_path):
     after = [MENU, KEEP_EDITING, EDITOR, PICKER, PROFILE]
     code, sent = clear_only(example, monkeypatch, tmp_path, PROFILE, after)
     assert code == 0 and sent == ["create", "create new reel", "keep editing", "cancel", "back to home"]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="#4: a profile that shows by the tap's own read makes its wait hold, and the refusal sends Back",
-)
 def test_a_profile_that_shows_by_the_read_the_tap_is_planned_on_is_not_backed_out_of(example, tmp_path):
     hub = FakeHub([J7], screens=[FEED, FEED, PROFILE])
     with session(hub, tmp_path) as phone:

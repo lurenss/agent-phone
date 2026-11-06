@@ -78,26 +78,22 @@ def clip_label(path: Path) -> str:
 
 
 def open_instagram(phone: Driver) -> None:
-    """Launch Instagram unless its tabs already show. A launch of an open app changes nothing, so
-    a wait for the tabs could not prove it and agent-phone refuses it."""
     if phone.count(PROFILE_TAB) == 0:
         phone.launch(INSTAGRAM, wait_for=Present(PROFILE_TAB), timeout_ms=COLD_START_MS)
 
 
 def to_profile(phone: Driver) -> None:
     """The profile tab, from wherever Instagram is. A reel viewer that Instagram restores after a
-    cold start can cover the tabs, so back out until the tab is on screen, at most three times. An
-    open profile needs no tap: its Create button already shows, so the tap would be refused."""
+    cold start can cover the tabs, so back out until the tab is on screen, at most three times."""
     for _ in range(3):
-        if phone.count(CREATE) > 0:
-            return
         try:
             phone.click(PROFILE_TAB, wait_for=Present(CREATE), timeout_ms=SCREEN_MS)
             return
         except PhoneError:
+            if phone.count(CREATE) > 0:
+                return
             phone.press(KeyName.BACK, wait_for=Settled(), timeout_ms=SCREEN_MS)
-    if phone.count(CREATE) == 0:
-        phone.click(PROFILE_TAB, wait_for=Present(CREATE), timeout_ms=SCREEN_MS)
+    phone.click(PROFILE_TAB, wait_for=Present(CREATE), timeout_ms=SCREEN_MS)
 
 
 def switch_to(phone: Driver, account: str, accounts: tuple[str, ...]) -> bool:
@@ -130,7 +126,7 @@ def open_picker(phone: Driver) -> Snapshot:
     """The gallery of a new reel. Start over leaves the last session pending, clip and caption, and
     the next new reel asks "Keep editing your draft?". Its Start new video saves that session as a
     draft, as the old script does. Keep editing and the editor's X end it with no draft."""
-    phone.click(Q("Create new reel"), wait_for=Gone(Q("Create new reel")), timeout_ms=SCREEN_MS)
+    phone.click(Q("Create new reel"), timeout_ms=SCREEN_MS)
     for _ in range(3):
         try:
             return phone.wait(Present(THUMBNAIL), timeout_ms=4000)
