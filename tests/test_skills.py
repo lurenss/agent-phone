@@ -59,3 +59,12 @@ def test_every_guide_folder_is_served_and_named_after_its_folder():
     for name in on_disk:
         fields = front_matter((SKILLS_ROOT / name / "SKILL.md").read_text(encoding="utf-8"))
         assert fields["name"] == name and fields["description"]
+
+
+@pytest.mark.xfail(strict=True, reason="one guide of 35 KB is all there is")
+def test_the_short_guide_is_a_quarter_of_the_reference_and_says_how_to_get_it():
+    reference = (SKILLS_ROOT / "agent-phone-reference" / "SKILL.md").read_text(encoding="utf-8")
+    assert len(GUIDE.encode()) * 4 <= len(reference.encode()), "an agent reads the short guide on every run"
+    assert "`agent-phone skills get reference`" in GUIDE
+    code, wire = invoke(["skills", "get", "reference"], NoDevices())
+    assert code == 0 and wire["data"] == {"name": "agent-phone-reference", "content": reference}
