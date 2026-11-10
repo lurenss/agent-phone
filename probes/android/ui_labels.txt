@@ -4,7 +4,9 @@ Advanced Button
 Advertise
 Airplane,mode,Off.,Button
 Allow
+Allow Camera to take pictures and record video?
 An app is asking to turn on Bluetooth.
+Attendi
 Auto rotate,On.,Button
 Available networks
 Battery charging, 100 percent
@@ -13,16 +15,20 @@ Blue light,filter,On.,Button
 Bluetooth,Off.,Button
 Brightness settings panel
 Brightness, Blue light filter, Home screen
+Chiudi app
 Clear
 Clear,Button
+Close app
 Connected
 Connections
+Consentire all'app Fotocamera di scattare foto e registrare video?
 Create new post
 Create post
 Current network
 Deny
 Display
 Display brightness
+Don’t allow
 Edit profile
 Expanded
 Finder search
@@ -32,6 +38,8 @@ Home
 Instagram Home Feed
 Instagram followers
 Instagram profile picture
+L'app Impostazioni non risponde
+Mentre usi l'app
 Message
 Messages and comments
 Mobile,Hotspot,Off.,Button
@@ -39,10 +47,12 @@ Mobile,data,Off.,Button
 More
 More actions for this post
 Navigate up
+Non consentire
 Notification settings
 Notification settings,Button
 Notifications
 On
+Only this time
 Open settings.
 Opens Notifications
 Phone signal full.
@@ -59,13 +69,17 @@ Search
 Search and explore
 See more
 Settings
+Settings isn't responding
+Solo questa volta
 Sound mode, Ringtone, Volume
 Sounds and vibration
 Story
 Suggested
 Suggested for you
 Vibrate On.,Button
+Wait
 Welcome to Meta Business Suite
+While using the app
 Wi-Fi
 Wi-Fi Direct
 Wi-Fi Direct Button
