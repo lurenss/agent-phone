@@ -1,14 +1,12 @@
 """`scroll <direction> <list> --until QUERY`: swipe the list until a line that matches shows, in one
 call. Each swipe is its own gated input, and the result is the last one, with the screen it ended on."""
 
-import pytest
 from fakes import J7_SERIAL, FakeHub, invoke
 from support import node, screen_of
 
 from agent_phone.core.device import Connected
 
 J7 = Connected(J7_SERIAL, "SM_J730F", ready=True)
-PENDING = pytest.mark.xfail(strict=True, reason="scroll takes no --until yet")
 
 
 def page(*names):
@@ -48,7 +46,6 @@ def looked(root):
     assert code == 0
 
 
-@PENDING
 def test_until_swipes_until_the_line_shows_and_returns_that_screen(tmp_path):
     looked(tmp_path)
     hub = FakeHub([J7], screens=[TOP], after_each=[MIDDLE, BOTTOM])
@@ -61,7 +58,6 @@ def test_until_swipes_until_the_line_shows_and_returns_that_screen(tmp_path):
     assert code == 0 and wire["data"]["target"]["name"] == "About phone"
 
 
-@PENDING
 def test_until_stops_when_the_list_stops_moving(tmp_path):
     looked(tmp_path)
     hub = FakeHub([J7], screens=[TOP], after_each=[MIDDLE, MIDDLE])
@@ -71,7 +67,6 @@ def test_until_stops_when_the_list_stops_moving(tmp_path):
     assert any('"Display"' in line for line in wire["data"]["after"]["tree"]), "the screen it stopped on"
 
 
-@PENDING
 def test_until_sends_nothing_when_the_line_already_shows(tmp_path):
     looked(tmp_path)
     hub = FakeHub([J7], screens=[TOP], after_each=[MIDDLE])
@@ -80,7 +75,6 @@ def test_until_sends_nothing_when_the_line_already_shows(tmp_path):
     assert hub.phones[0].permits == []
 
 
-@PENDING
 def test_until_takes_a_query_for_the_list_and_not_a_ref(tmp_path):
     hub = FakeHub([J7], screens=[TOP])
     code, wire = invoke(["scroll", "down", "@abcde:e1", "--until", "name=About phone"], hub, tmp_path)
@@ -88,7 +82,6 @@ def test_until_takes_a_query_for_the_list_and_not_a_ref(tmp_path):
     assert "query" in wire["error"]["message"], "a ref is spent by the first swipe"
 
 
-@PENDING
 def test_until_gives_up_after_its_swipes_and_says_how_many(tmp_path):
     looked(tmp_path)
     endless = [page(f"Row {n}", f"Row {n + 1}", f"Row {n + 2}") for n in range(1, 40)]
@@ -98,7 +91,6 @@ def test_until_gives_up_after_its_swipes_and_says_how_many(tmp_path):
     assert len(hub.phones[0].permits) == 10 and "10 swipes" in wire["error"]["message"]
 
 
-@PENDING
 def test_until_takes_no_wait_for_and_ignores_a_settle_beside_it(tmp_path):
     looked(tmp_path)
     hub = FakeHub([J7], screens=[TOP], after_each=[MIDDLE, BOTTOM])

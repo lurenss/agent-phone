@@ -80,7 +80,7 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
 | `STALE_REF` | The ref cannot be trusted. `details.reason` is `spent` (input was sent after its snapshot), `rebooted` (the snapshot is from an earlier boot) or `gone` (its element is no longer on screen). |
 | `OBSERVE_FIRST` | Input was sent after the device's latest snapshot, so a query or an input without a target needs a new snapshot first. |
 | `AMBIGUOUS_TARGET` | More than one live element matches, and nothing was sent. `details.matches` is their number, for a query and for a ref that now matches several elements. Narrow the query, or take a ref from `find`. |
-| `NOT_FOUND` | No element matches the query, the snapshot has no ref with that number, nothing on screen scrolls, or no app handles the link or intent. |
+| `NOT_FOUND` | No element matches the query, the snapshot has no ref with that number, nothing on screen scrolls, no app handles the link or intent, or the line of a `scroll --until` never showed. |
 | `NO_SURFACE` | The window asked for is not on screen. No window has input focus (the screen is off), or `--surface` finds none, or `--window` is not an id of this read. The message lists the windows that are. A wait reads again after an empty dump, so it reports `NO_SURFACE` only at its deadline, and only when none of its reads showed a screen. A `snapshot` without `--settle` reads once and reports it at once. |
 | `NOT_ACTIONABLE` | The element cannot take this input. `details.reason` is `hidden` or `disabled` when it stayed so until the deadline, and `no_tap`, `not_a_field`, `not_scrollable`, `no_area` or `wrong_axis` (a sideways scroll of a list that runs down, a sideways scroll of a pager whose page is a list that covers its whole height, or an up or down scroll of a collection that runs across) when it never can. |
 | `UNSTABLE` | The element moved between two reads. |
@@ -285,6 +285,16 @@ The same tap under `dangerously-skip` goes out with no grant, and the gate says 
 - A settled screen proves nothing about the input. `delivery` is `delivered_unverified` and `verified_by` is null, unless a `--wait-for` or a `--wait-for-gone` beside it saw its effect.
 - With a `--wait-for` beside it, the wait ends on the first read where the effect holds and the screen has settled. An effect that holds on a screen that never settles still verifies the input, and an effect that never shows is `TIMEOUT` as without the flag.
 - The snapshot is recorded like any `after`, so its refs serve the next input.
+
+### Scroll until a line shows
+
+`agent-phone scroll <direction> [TARGET] --until QUERY` swipes the list again and again until a line that matches the query shows. Each swipe is an input of its own: it is planned on a fresh read, judged by the gate and spent, and the screen settles before the next one. The result is the last swipe's `data`, and `after` is the settled screen it ended on.
+
+- The list is named by a query, or left out when one element scrolls. A ref is `INVALID_ARGS`, because the first swipe spends it. So is a `--wait-for` beside `--until`. A `--settle` beside it changes nothing.
+- When the line already shows, the call is `INVALID_ARGS` and nothing is sent.
+- When the line never shows, the result is an error with `code` `NOT_FOUND`, the `delivery` of the last swipe and `data.after`. It comes when a swipe did not move the list, or after 10 swipes.
+- A swipe that is refused after another went out is reported with its code on the swipe that went out, so `delivery` never says `not_delivered` once the list moved.
+- A line that shows proves nothing about the last swipe by itself, so `delivery` is `delivered_unverified`.
 
 ### After as a diff
 

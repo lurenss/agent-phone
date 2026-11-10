@@ -21,6 +21,7 @@ from agent_phone.core.commands.set_text import SetTextCommand
 from agent_phone.core.commands.stop import StopCommand
 from agent_phone.core.device import Package
 from agent_phone.core.envelope import After
+from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.phone import NAME, KeyName, Orientation
 from agent_phone.core.policy.rules import Effect
 from agent_phone.core.query import Match, Query
@@ -124,6 +125,13 @@ def add_inputs(commands: argparse._SubParsersAction, after: argparse.ArgumentPar
     scroll = command(commands, after, "scroll", "swipe a list; down shows what is below")
     scroll.add_argument("direction", choices=[d.value for d in Direction])
     scroll.add_argument("target", nargs="?", **target)
+    scroll.add_argument(
+        "--until",
+        type=query_text,
+        metavar="QUERY",
+        help="swipe again until a line that matches shows, up to 10 swipes or the end of the list, and "
+        "print the settled screen; the list is named by a query or left out, never by a ref",
+    )
     press = command(commands, after, "press", "press a key; enter needs --commit send", commit=True)
     press.add_argument("key", choices=[k.value for k in KeyName])
     for name, about in (("launch", "start an app's launcher screen"), ("stop", "force-stop an app")):
@@ -223,6 +231,23 @@ def waits(parsed: argparse.Namespace) -> tuple[Predicate, ...]:
     )
 
 
+def until(parsed: argparse.Namespace) -> Query | None:
+    """Raise INVALID_ARGS for an `--until` that cannot work: the first swipe spends a ref, and the
+    line that shows is already the wait. `--settle` beside it changes nothing, because every swipe
+    settles."""
+    if parsed.until is None:
+        return None
+    if isinstance(parsed.target, RefTarget):
+        raise Refusal(
+            ErrorCode.INVALID_ARGS,
+            "--until swipes more than once, and the first swipe spends the ref. Name the list by a "
+            "query, such as id=recycler_view, or leave it out when one list scrolls.",
+        )
+    if parsed.wait_for or parsed.wait_for_gone:
+        raise Refusal(ErrorCode.INVALID_ARGS, "--until is the wait. Leave out --wait-for.")
+    return parsed.until
+
+
 def input_command(parsed: argparse.Namespace) -> InputCommand:
     match parsed.command:
         case "clipboard" if parsed.action == "get":
@@ -239,7 +264,7 @@ def input_command(parsed: argparse.Namespace) -> InputCommand:
         case "set-text":
             return SetTextCommand(parsed.target, parsed.text, **timing)
         case "scroll":
-            return ScrollCommand(Direction(parsed.direction), parsed.target, **timing)
+            return ScrollCommand(Direction(parsed.direction), parsed.target, **timing, until=until(parsed))
         case "press":
             return PressCommand(KeyName(parsed.key), granted, **timing)
         case "launch":

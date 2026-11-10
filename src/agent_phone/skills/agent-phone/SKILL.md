@@ -33,7 +33,8 @@ The inputs and the reads you need most:
 ```bash
 agent-phone click @q7m2k:e7 --settle                 # tap; --long holds the touch
 agent-phone set-text @r2c8w:e3 'display' --settle    # replace a field's text, with no tap first and no keyboard
-agent-phone scroll down @r2c8w:e5 --settle           # swipe a list; down shows what is below
+agent-phone scroll down @r2c8w:e5 --settle           # swipe a list once; down shows what is below
+agent-phone scroll down 'id=recycler_view' --until 'name=About phone'   # swipe until that line shows
 agent-phone press back --settle                      # also home, recents and enter
 agent-phone launch com.android.settings --settle     # open an app
 agent-phone wait --for 'name=Uploaded' --timeout-ms 30000   # wait for something slow that comes by itself
@@ -69,7 +70,7 @@ agent-phone find --name Wi-Fi                        # the matching lines only, 
 - A TARGET that starts with `@` is a ref. It names the element you saw, so prefer it after a look.
 - Anything else is a query: `name=Display`, `name*=Bright` (a part), `name^=Create` (a prefix), `role=button name=OK`, `id=recycler_view`, `text=…`, `value=…`. It must match exactly one element on the live screen. Two matches are `AMBIGUOUS_TARGET`, and none is `NOT_FOUND` after the timeout.
 - A row and its switch are two elements. Tap the one whose line carries the ref you mean. `NOT_ACTIONABLE` on a switch means its row takes the tap.
-- What you need may be below the fold. Scroll the list that holds it, by the list's ref, and read `after`.
+- What you need may be below the fold. `scroll` with `--until QUERY` swipes the list until a line that matches shows, up to 10 swipes or the end of the list, and `after` is that screen. Name the list by a query, such as the `#<resource-id>` its line prints (`id=recycler_view`), or leave the target out when one list scrolls. A ref cannot name it, because the first swipe spends it. `NOT_FOUND` means the line never showed, and `after` is where the list stopped.
 
 ## Say what you expect only when you know it
 
