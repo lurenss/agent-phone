@@ -204,7 +204,7 @@ agent_phone/core/
   outcome.py envelope.py phone.py context.py
   snapshot/  surface.py view.py budget.py snapshot.py capture.py
   refs/      fingerprint.py resolve.py store.py   (store.py also holds the device lock)
-  policy/    model.py rules.py reads.py engine.py
+  policy/    model.py rules.py reads.py verdict.py engine.py
   act/       intent.py hit.py axis.py site.py ledger.py act.py
   wait/      clock.py predicate.py observe.py until.py
   commands/  snapshot.py click.py set_text.py press.py stop.py wait.py screenshot.py devices.py server.py
