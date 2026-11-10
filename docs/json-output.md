@@ -53,6 +53,30 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
 | `hint` | string or null | A recovery step for codes whose recovery the message does not make obvious, otherwise null. |
 | `details` | object | Machine-readable facts for the code, such as `reason` for `STALE_REF`, `source`, `table` and `field` for `POLICY_INVALID`, or `after`, a [snapshot](#snapshot-payload), for the `TIMEOUT` of `wait`. |
 
+### Lean form
+
+`--lean` on a command prints the short form of its envelope, for an agent that reads one result per step. It is made from the full envelope, so it says nothing else, and a key it leaves out has its usual value.
+
+```json
+{"ok":true,"delivery":"delivered_unverified","data":{"after":{"id":"v9mme","app":"com.android.settings","settled":"settled","tree":["text \"Brightness\"","@v9mme:e1 button \"Back\""]}}}
+```
+
+| Left out | Unless |
+| --- | --- |
+| `v`, `command`, `device` | Never printed. The caller ran the command and chose the device. |
+| `permission_mode` | It is not `ask`. |
+| `retry` | The envelope is an error. |
+| `error.hint`, `error.details` | They are not null and not empty. |
+| `data.input`, `data.target` of an input | Never printed. The caller named what it sent. |
+| `data.gate` of an input | Its verdict is not `clear`, so the input committed something. |
+| `data.verified_by` of an input | It is not null. |
+| `window`, `mode`, `keyboard`, `dialog`, `truncated` of a snapshot | They are not `application`, `compact`, false, false and 0. |
+| `toasts`, `interruptions` of a snapshot | They are not empty. |
+| `others` of a snapshot | A window besides the system bars is there. Only those windows are listed. |
+| The bounds of a line of `tree`, `added`, `gone` or `matches` | Never printed. |
+
+Every other key prints as in the full form. A snapshot inside `error.details`, and each step's envelope of a `batch`, print lean too. The exit code, what is recorded and what is traced do not change.
+
 ## Delivery
 
 | Value | Retry | Meaning |

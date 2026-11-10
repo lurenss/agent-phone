@@ -19,51 +19,48 @@ This short guide covers the usual loop. `agent-phone skills get reference` print
 ## The loop
 
 ```bash
-agent-phone snapshot --settle            # 1. look: the screen as lines, each with a ref
-agent-phone click @q7m2k:e7 --settle     # 2. act on a ref, and get back the screen the input ends on
-agent-phone click @v9mme:e3 --settle     # 3. act again, on a ref from that screen
+agent-phone snapshot --settle --lean            # 1. look: the screen as lines, each with a ref
+agent-phone click @q7m2k:e7 --settle --lean     # 2. act on a ref, and get back the screen the input ends on
+agent-phone click @v9mme:e3 --settle --lean     # 3. act again, on a ref from that screen
 ```
 
-1. Look first, with `agent-phone snapshot --settle`. An input sent before any look fails with `OBSERVE_FIRST`.
+1. Look first, with `agent-phone snapshot --settle --lean`. An input sent before any look fails with `OBSERVE_FIRST`.
 2. Send each input with `--settle`. Its result holds `data.after`: the screen once it stopped changing, with fresh refs. That is your next look. Take no snapshot after it.
 3. Take the ref for your next input from the newest screen you have. Every input spends all refs taken before it, so an older ref fails with `STALE_REF`.
+4. Put `--lean` on every command. It prints the short form of the same result, which is all the loop needs.
 
 The inputs and the reads you need most:
 
 ```bash
-agent-phone click @q7m2k:e7 --settle                 # tap; --long holds the touch
-agent-phone set-text @r2c8w:e3 'display' --settle    # replace a field's text, with no tap first and no keyboard
-agent-phone scroll down @r2c8w:e5 --settle           # swipe a list once; down shows what is below
-agent-phone scroll down 'id=recycler_view' --until 'name=About phone'   # swipe until that line shows
-agent-phone press back --settle                      # also home, recents and enter
-agent-phone launch com.android.settings --settle     # open an app
-agent-phone wait --for 'name=Uploaded' --timeout-ms 30000   # wait for something slow that comes by itself
-agent-phone find --name Wi-Fi                        # the matching lines only, each with a ref
+agent-phone click @q7m2k:e7 --settle --lean                 # tap; --long holds the touch
+agent-phone set-text @r2c8w:e3 'display' --settle --lean    # replace a field's text, with no tap first and no keyboard
+agent-phone scroll down @r2c8w:e5 --settle --lean           # swipe a list once; down shows what is below
+agent-phone scroll down 'id=recycler_view' --until 'name=About phone' --lean   # swipe until that line shows
+agent-phone press back --settle --lean                      # also home, recents and enter
+agent-phone launch com.android.settings --settle --lean     # open an app
+agent-phone wait --for 'name=Uploaded' --timeout-ms 30000 --lean   # wait for something slow that comes by itself
+agent-phone find --name Wi-Fi --lean                        # the matching lines only, each with a ref
 ```
 
 ## Read the output
 
 ```json
-{"v":1,"ok":true,"command":"click","permission_mode":"ask","device":"emulator-5554",
- "delivery":"delivered_unverified","retry":"unsafe","data":{
- "input":{"kind":"tap","at":[540,771]},"target":{"ref":"@q7m2k:e7","role":"button","name":"Display","at":[540,771]},
- "gate":{"verdict":"clear","reason":"no_commit_words"},"verified_by":null,
- "after":{"id":"v9mme","app":"com.android.settings","window":"application","mode":"compact","settled":"settled",
-  "keyboard":false,"dialog":false,"others":[],"toasts":[],"interruptions":[],"truncated":0,
+{"ok":true,"delivery":"delivered_unverified","data":{"after":{"id":"v9mme","app":"com.android.settings","settled":"settled",
   "tree":[
-   "@v9mme:e1 button \"Navigate up\" [0,63,147,210]",
-   "@v9mme:e2 list #recycler_view (2 rows) [0,210,1080,2337]",
-   "  @v9mme:e3 button \"Dark theme\" \"Will never turn on automatically\" [0,1233,1080,1439]",
-   "    @v9mme:e4 switch \"Dark theme\" checked [901,1273,1038,1399]"]}}}
+   "@v9mme:e1 button \"Navigate up\"",
+   "@v9mme:e2 list #recycler_view (2 rows)",
+   "  @v9mme:e3 button \"Dark theme\" \"Will never turn on automatically\"",
+   "    @v9mme:e4 switch \"Dark theme\" checked"]}}}
 ```
 
 - A `snapshot` and a `wait` print the object under `after` as their `data`.
-- A tree line holds the indent, the ref, the role, the name, the detail (a second quoted text, such as a row's summary), `value="…"` for typed text, `#<resource-id>`, the states (`checked`, `focused`, `disabled`, `selected`), `(N rows)` and the bounds. A line with no ref is text you cannot act on. A switch or a checkbox that is on shows `checked`, so you need no other call to read it.
+- A tree line holds the indent, the ref, the role, the name, the detail (a second quoted text, such as a row's summary), `value="…"` for typed text, `#<resource-id>`, the states (`checked`, `focused`, `disabled`, `selected`) and `(N rows)`. A line with no ref is text you cannot act on. A switch or a checkbox that is on shows `checked`, so you need no other call to read it.
 - A ref is `@<snapshot id>:e<N>`. Pass it as printed.
-- `settled` is `settled` when every read for 800 ms printed the same lines. `unsettled` means the screen still changed when the time ran out: look again with `agent-phone snapshot --settle` before you trust it.
-- `dialog: true` means a dialog is the window, and the page behind it has no lines until it closes. `keyboard: true` means the keyboard is up. `set-text` needs no keyboard.
-- `interruptions` lists pop-ups you did not ask for, such as a permission prompt, each with `dismiss`, the ref of its safe way out. When `needs_human` is true, stop and ask your user.
-- On an error, `ok` is false and `error` holds `code`, `message` and `hint`. Branch on `error.code`. The exit code is 0 for ok, 1 for an error and 2 for arguments that do not parse.
+- `settled` is `settled` when every read for 800 ms printed the same lines. `unsettled` means the screen still changed when the time ran out: look again with `agent-phone snapshot --settle --lean` before you trust it.
+- The lean form leaves out a key that holds its usual value, so a missing key means that value. `dialog: true` shows only when a dialog is the window, and then the page behind it has no lines until it closes. `keyboard: true` shows only when the keyboard is up. `set-text` needs no keyboard. `permission_mode` shows only when it is not `ask`, and `gate` only when the input committed something.
+- `interruptions` shows when a pop-up you did not ask for is up, such as a permission prompt, each with `dismiss`, the ref of its safe way out. When `needs_human` is true, stop and ask your user.
+- On an error, `ok` is false and `error` holds `code`, `message` and sometimes `hint`. Branch on `error.code`. The exit code is 0 for ok, 1 for an error and 2 for arguments that do not parse.
+- Without `--lean` a command prints the full form: every key, each line's bounds, what was sent and where, and the gate's verdict. The reference describes it.
 
 ## Name the target
 
@@ -89,7 +86,7 @@ agent-phone click @m9q4t:e21 --commit schedule  # sent, because the user asked t
 
 - A tap that would publish, schedule, send, delete, purchase, follow or block, change the system, give a consent or confirm such a thing fails with `COMMIT_REFUSED`, and nothing is sent. `--commit` with the effect's name grants one effect for one input. Grant it only when your user asked for exactly that.
 - `DENIED` comes from a rule of the device's profile. No flag opens it. `press back` and `press home` are never refused, so you can always leave a screen.
-- `permission_mode` is `ask` or `dangerously-skip`. Your user chooses it when launching you. Never set `AGENT_PHONE_PERMISSION_MODE` yourself. In `dangerously-skip` nothing asks before a commit goes out, so act on one only when your user asked for exactly that.
+- The permission mode is `ask` or `dangerously-skip`. Your user chooses it when launching you. Never set `AGENT_PHONE_PERMISSION_MODE` yourself. In `dangerously-skip` nothing asks before a commit goes out, so act on one only when your user asked for exactly that.
 
 ## When a command fails
 

@@ -2,15 +2,14 @@
 and without the keys that hold their usual value, so it says nothing the full form does not."""
 
 import json
+import re
 
-import pytest
 from fakes import J7_SERIAL, FakeHub, invoke
-from support import node, screen_of
+from support import ROOT, node, screen_of
 
 from agent_phone.core.device import Connected
 
 J7 = Connected(J7_SERIAL, "SM_J730F", ready=True)
-PENDING = pytest.mark.xfail(strict=True, reason="no command takes --lean yet")
 
 
 def page(*children):
@@ -47,7 +46,6 @@ def without_ids(lines):
     return [" ".join(word for word in line.split(" ") if not word.startswith("@")) for line in lines]
 
 
-@PENDING
 def test_a_lean_snapshot_is_its_id_app_settle_state_and_lines_without_bounds(tmp_path):
     (_, full), (code, lean) = both(["snapshot", "--settle"], tmp_path)
     assert code == 0 and set(lean) == {"ok", "data"}
@@ -61,7 +59,6 @@ def test_a_lean_snapshot_is_its_id_app_settle_state_and_lines_without_bounds(tmp
     ], "each lean line is the full line without its bounds"
 
 
-@PENDING
 def test_a_lean_input_keeps_its_delivery_and_the_screen_and_its_refs_still_work(tmp_path):
     (_, full), (code, lean) = both(["click", "@ID:e1", "--settle"], tmp_path, after_input=[AFTER])
     assert code == 0 and set(lean) == {"ok", "delivery", "data"} and lean["delivery"] == full["delivery"]
@@ -74,7 +71,6 @@ def test_a_lean_input_keeps_its_delivery_and_the_screen_and_its_refs_still_work(
     assert code == 0 and wire["data"]["target"]["name"] == "Back"
 
 
-@PENDING
 def test_lean_keeps_what_proved_an_input(tmp_path):
     click = ["click", "@ID:e1", "--wait-for", "name=Brightness"]
     (_, full), (_, lean) = both(click, tmp_path, after_input=[AFTER])
@@ -82,7 +78,6 @@ def test_lean_keeps_what_proved_an_input(tmp_path):
     assert lean["data"]["verified_by"] == full["data"]["verified_by"] == 'present name="Brightness"'
 
 
-@PENDING
 def test_a_lean_error_keeps_its_code_message_hint_retry_and_the_last_screen(tmp_path):
     (_, full), (code, lean) = both(["click", "@ID:e2"], tmp_path)
     assert code == 1 and lean["error"]["code"] == "COMMIT_REFUSED" and lean["retry"] == "safe"
@@ -93,7 +88,6 @@ def test_a_lean_error_keeps_its_code_message_hint_retry_and_the_last_screen(tmp_
     assert lean["error"]["details"]["after"]["tree"][0].endswith('button "Display"')
 
 
-@PENDING
 def test_lean_shows_every_key_that_does_not_hold_its_usual_value():
     from agent_phone.core.lean import lean
 
@@ -117,7 +111,6 @@ def test_lean_shows_every_key_that_does_not_hold_its_usual_value():
     }
 
 
-@PENDING
 def test_a_lean_batch_prints_each_step_lean(tmp_path):
     steps = [["snapshot"], ["click", "name=Display", "--settle"]]
     path = tmp_path / "steps.json"
@@ -126,3 +119,11 @@ def test_a_lean_batch_prints_each_step_lean(tmp_path):
     code, wire = invoke(["batch", str(path), "--lean"], hub, tmp_path)
     assert code == 0 and wire["data"]["stopped_at"] is None
     assert wire["data"]["steps"][1]["data"]["after"]["tree"][0] == 'text "Brightness"'
+
+
+def test_the_documented_lean_example_is_what_the_code_prints_for_its_screens(tmp_path):
+    blocks = re.findall(r"```json\n(.*?)```", (ROOT / "docs" / "json-output.md").read_text(), re.S)
+    example = next(wire for wire in map(json.loads, blocks) if "command" not in wire)
+    (_, _), (_, lean) = both(["click", "@ID:e1", "--settle"], tmp_path, after_input=[AFTER])
+    printed = json.dumps(lean).replace(lean["data"]["after"]["id"], example["data"]["after"]["id"])
+    assert json.loads(printed) == example

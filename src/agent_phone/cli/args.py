@@ -62,6 +62,7 @@ class Invocation:
     policies: tuple[Path, ...] = ()
     after: After = After.TREE
     argv: tuple[str, ...] = ()
+    lean: bool = False
 
 
 class Parser(argparse.ArgumentParser):
@@ -87,6 +88,11 @@ def build() -> Parser:
     device = dict(metavar="SERIAL", help="the adb serial; needed when several devices are ready")
     after = Parser(add_help=False)
     after.add_argument("-d", "--device", default=argparse.SUPPRESS, **device)
+    after.add_argument(
+        "--lean",
+        action="store_true",
+        help="print the short form: tree lines without bounds, and no key that holds its usual value",
+    )
     parser = Parser(
         prog="agent-phone",
         description="Drive an Android phone over adb. Every command prints one JSON object.",
@@ -284,4 +290,5 @@ def parse_args(argv: Sequence[str]) -> Invocation:
     serial = Serial(parsed.device) if parsed.device else None
     name = f"{parsed.command} {parsed.action}" if parsed.command in ("clipboard", "flow") else parsed.command
     after = After(getattr(parsed, "after", After.TREE.value))
-    return Invocation(name, serial, command, tuple(getattr(parsed, "policy", ())), after, tuple(argv))
+    policies = tuple(getattr(parsed, "policy", ()))
+    return Invocation(name, serial, command, policies, after, tuple(argv), getattr(parsed, "lean", False))

@@ -38,6 +38,7 @@ agent-phone reads the screen and sends input. Every input names what it acts on 
   "  @q7m2k:e4 button \"Connections\" \"Wi-Fi, Bluetooth, Data usage, Airplane m…\" focused [0,179,1920,394]"]}}
 ```
 
+- `--lean` on any command prints the short form: tree lines without bounds, and no key that holds its usual value, such as `dialog` when it is false or `gate` when it is `clear`. A missing key means that value. Use it in a loop of look and act, and leave it out when you need the bounds, the other windows or what was sent.
 - On an error, `ok` is false and `error` holds `code`, `message`, `hint` and `details`. Branch on `error.code`, because the message wording can change.
 - `permission_mode` is the permission mode you run in, `ask` or `dangerously-skip`. A snapshot's own `mode` is its view. See [Know your permission mode](#know-your-permission-mode).
 - The exit code is 0 on success, 1 on an error and 2 when the arguments do not parse.

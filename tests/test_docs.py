@@ -52,7 +52,9 @@ def first_column(heading):
 
 
 def json_blocks():
-    return [json.loads(block) for block in re.findall(r"```json\n(.*?)```", CONTRACT, re.S)]
+    """The full envelopes. The lean example has no `command`, and `test_lean.py` checks it."""
+    blocks = [json.loads(block) for block in re.findall(r"```json\n(.*?)```", CONTRACT, re.S)]
+    return [block for block in blocks if "command" in block]
 
 
 @pytest.mark.parametrize(

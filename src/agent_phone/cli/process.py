@@ -38,6 +38,7 @@ from agent_phone.core.commands.skills import SkillsGetCommand, SkillsListCommand
 from agent_phone.core.commands.snapshot import SnapshotCommand
 from agent_phone.core.device import Serial, select_device
 from agent_phone.core.envelope import After, encode, exit_code, floor_envelope, to_wire
+from agent_phone.core.lean import lean
 from agent_phone.core.outcome import Outcome, Refusal, Refused
 from agent_phone.core.phone import PhoneHub
 from agent_phone.core.refs.resolve import RefTarget
@@ -57,11 +58,11 @@ def run(
 ) -> int:
     """Run one command line against `hub` and print its envelope to `out`. `stdin` is where a
     batch reads its steps when it is given no file."""
-    name, device, after = "", None, After.TREE
+    name, device, after, form = "", None, After.TREE, dict
     outcome: Outcome | BatchResult | FlowResult | FlowDraft
     try:
         invocation = parse_args(argv)
-        name, after = invocation.name, invocation.after
+        name, after, form = invocation.name, invocation.after, lean if invocation.lean else dict
         outcome, device = execute(invocation, hub, settings, clock or SystemClock(), stdin or sys.stdin)
     except Refusal as refusal:
         if unrefunded():
@@ -76,9 +77,9 @@ def run(
         out.write(encode(floor) + "\n")
         return 1
     if isinstance(outcome, BatchResult | FlowResult | FlowDraft):
-        out.write(encode(outcome.wire()) + "\n")
+        out.write(encode(form(outcome.wire())) + "\n")
         return outcome.exit_code
-    out.write(encode(to_wire(name, device, outcome, mode=settings.permission_mode, after=after)) + "\n")
+    out.write(encode(form(to_wire(name, device, outcome, mode=settings.permission_mode, after=after))) + "\n")
     return exit_code(outcome)
 
 
