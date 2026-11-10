@@ -312,13 +312,14 @@ The same tap under `dangerously-skip` goes out with no grant, and the gate says 
 
 ### Scroll until a line shows
 
-`agent-phone scroll <direction> [TARGET] --until QUERY` swipes the list again and again until a line that matches the query shows. Each swipe is an input of its own: it is planned on a fresh read, judged by the gate and spent, and the screen settles before the next one. The result is the last swipe's `data`, and `after` is the settled screen it ended on.
+`agent-phone scroll <direction> [TARGET] --until QUERY` swipes the list again and again until a line that matches the query shows. Each swipe is an input of its own: it is planned on a fresh read, judged by the gate and spent, and the screen settles before the next one. The result is one input payload for all the swipes.
 
-- The list is named by a query, or left out when one element scrolls. A ref is `INVALID_ARGS`, because the first swipe spends it. So is a `--wait-for` beside `--until`. A `--settle` beside it changes nothing.
+- The list is named by a query, or left out when one element scrolls. A ref is `INVALID_ARGS`, because the first swipe spends it. So is a `--wait-for` or a `--wait-for-gone` beside `--until`. A `--settle` beside it changes nothing. `--timeout-ms` bounds each swipe, not the call.
 - When the line already shows, the call is `INVALID_ARGS` and nothing is sent.
-- When the line never shows, the result is an error with `code` `NOT_FOUND`, the `delivery` of the last swipe and `data.after`. It comes when a swipe did not move the list, or after 10 swipes.
-- A swipe that is refused after another went out is reported with its code on the swipe that went out, so `delivery` never says `not_delivered` once the list moved.
-- A line that shows proves nothing about the last swipe by itself, so `delivery` is `delivered_unverified`.
+- `data.input` and `data.target` are the last swipe's, and `data.input.times` counts the swipes when more than one went out. `delivery` is `delivery_uncertain` when any swipe's was. A line that shows proves nothing about a swipe, so it is `delivered_unverified` otherwise.
+- `data.after` is the screen the line showed on. It is the settled screen of the last swipe, or the read after it, with `settled` `unchecked`, when the line loaded after the screen had settled. With `--after diff` it is compared with the snapshot the first swipe stood on.
+- When the line never shows, the result is an error with `code` `NOT_FOUND` and `data.after`. It comes when a swipe did not move the list, when the screen did not settle after a swipe, so that the end of the list cannot be told, or after 10 swipes.
+- A swipe that is refused after another went out is reported with its code and its `details` on the swipes that went out, so `delivery` never says `not_delivered` once the list moved.
 
 ### After as a diff
 
@@ -355,7 +356,7 @@ The same tap under `dangerously-skip` goes out with no grant, and the gate says 
 | `tap` | `at` | A touch at a point (`click`). |
 | `long_press` | `at`, `ms` | A touch held for `ms` (`click --long`). |
 | `activate` | none | The accessibility click of a backend that has one. The uiautomator2 backend has none (`A2-11`). |
-| `swipe` | `from`, `to` | A swipe across a list (`scroll`). |
+| `swipe` | `from`, `to`, `times` | A swipe across a list (`scroll`). `times` is there only when a `scroll --until` sent more than one, and counts them. |
 | `set_text` | `secret` | A field's text replaced through the accessibility action (`set-text`). |
 | `key` | `key` | A key: `back`, `home`, `recents` or `enter` (`press`). |
 | `launch` | `package` | An app's launcher screen started. |

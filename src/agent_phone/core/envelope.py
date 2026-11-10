@@ -96,7 +96,7 @@ def to_wire(
             wire.update(delivery_keys(outcome.disposition))
             wire["data"] = acted_data(outcome, after)
             if outcome.error is not None:
-                wire["error"] = error_object(outcome.error, outcome.message, {})
+                wire["error"] = error_object(outcome.error, outcome.message, outcome.details)
     return wire
 
 
@@ -193,7 +193,7 @@ def acted_data(acted: Acted, after: After = After.TREE) -> dict[str, object]:
     report = acted.report
     target = report.target
     return {
-        "input": input_data(report.action),
+        "input": input_data(report.action) | ({"times": acted.inputs} if acted.inputs > 1 else {}),
         "target": None
         if target is None
         else {

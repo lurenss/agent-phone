@@ -16,12 +16,11 @@ from agent_phone.core.commands.launch import LaunchCommand
 from agent_phone.core.commands.open_url import OpenUrlCommand
 from agent_phone.core.commands.press import PressCommand
 from agent_phone.core.commands.rotate import RotateCommand
-from agent_phone.core.commands.scroll import ScrollCommand
+from agent_phone.core.commands.scroll import ScrollCommand, check_until
 from agent_phone.core.commands.set_text import SetTextCommand
 from agent_phone.core.commands.stop import StopCommand
 from agent_phone.core.device import Package
 from agent_phone.core.envelope import After
-from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.phone import NAME, KeyName, Orientation
 from agent_phone.core.policy.rules import Effect
 from agent_phone.core.query import Match, Query
@@ -232,19 +231,9 @@ def waits(parsed: argparse.Namespace) -> tuple[Predicate, ...]:
 
 
 def until(parsed: argparse.Namespace) -> Query | None:
-    """Raise INVALID_ARGS for an `--until` that cannot work: the first swipe spends a ref, and the
-    line that shows is already the wait. `--settle` beside it changes nothing, because every swipe
-    settles."""
-    if parsed.until is None:
-        return None
-    if isinstance(parsed.target, RefTarget):
-        raise Refusal(
-            ErrorCode.INVALID_ARGS,
-            "--until swipes more than once, and the first swipe spends the ref. Name the list by a "
-            "query, such as id=recycler_view, or leave it out when one list scrolls.",
-        )
-    if parsed.wait_for or parsed.wait_for_gone:
-        raise Refusal(ErrorCode.INVALID_ARGS, "--until is the wait. Leave out --wait-for.")
+    """Raise INVALID_ARGS for an `--until` that cannot work, before any device is opened."""
+    if parsed.until is not None:
+        check_until(parsed.target, waits(parsed))
     return parsed.until
 
 

@@ -271,9 +271,10 @@ class Driver:
         *,
         wait_for: Predicate | Sequence[Predicate] = (),
         timeout_ms: int = INPUT_TIMEOUT_MS,
+        until: Query | None = None,
     ) -> Acted:
         aimed = None if target is None else target_of(target)
-        return acted(self.run(ScrollCommand(direction, aimed, predicates(wait_for), timeout_ms)))
+        return acted(self.run(ScrollCommand(direction, aimed, predicates(wait_for), timeout_ms, until)))
 
     def press(
         self,
