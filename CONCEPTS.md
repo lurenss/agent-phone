@@ -174,7 +174,7 @@ What a command produced (`Outcome`, `core/outcome.py`): `Refused`, `Acted` or `R
 
 ### Wait condition
 
-One thing a wait checks on a read (`Predicate`, `core/wait/predicate.py`): `Present` and `Gone` match a `Query` against the lines of the active window's compact view, as `find` does, `Foreground` names the package of the focused window, and `Settled` says that every read for 800 ms printed the same lines. `observe` times that window, and each condition is decided from the previous and the current read, and a read with no active window or no line decides neither `Present` nor `Gone`. A dialog hides what lies under it (`A2-7`), so a dialog with no matching line does not decide `Gone`. `wait` and `--wait-for` build the same conditions from the same query syntax.
+One thing a wait checks on a read (`Predicate`, `core/wait/predicate.py`): `Present` and `Gone` match a `Query` against the lines of the active window's compact view, as `find` does, `Foreground` names the package of the focused window, and `Settled` says that every read for 800 ms printed the same lines. `observe` times that window, and each condition is decided from the previous and the current read, and a read with no active window or no line decides neither `Present` nor `Gone`. A dialog hides what lies under it (`A2-7`), so a dialog with no matching line does not decide `Gone`. `wait` and `--wait-for` build the same conditions from the same query syntax, and `--settle` on an input adds a `Settled` to them.
 
 ### Wait
 

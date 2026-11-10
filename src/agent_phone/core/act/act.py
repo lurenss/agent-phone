@@ -276,7 +276,9 @@ def _after_send(ctx: Context, request: Request, delivery: Sent, planned: Planned
     """Never raises. Any exception here becomes `Acted(error=INTERNAL)` with the sent state.
 
     Verification: an effect predicate in `wait_for` that holds after the input makes the action
-    VERIFIED. It was false on the read the input was planned on, or act() refused. Fill reads the
+    VERIFIED. It was false on the read the input was planned on, or act() refused. A `Settled` in
+    `wait_for` proves nothing and fails nothing: a screen that is still changing at the deadline
+    is returned with `settled` UNSETTLED, and only an effect that did not show is TIMEOUT. Fill reads the
     field back on its own (not for secrets). A contradicted read-back is ACTION_FAILED, still
     delivered. The observation the wait ends on is recorded as a snapshot at the new epoch and
     returned in `after`, so the caller has fresh refs without another call.
@@ -290,7 +292,8 @@ def _after_send(ctx: Context, request: Request, delivery: Sent, planned: Planned
             return Acted(sent, report, None)
         seen = observe(ctx, request.wait_for, ctx.clock.now() + request.timeout_ms / 1000)
         after = record(ctx, seen.screen, seen.settled)
-        if not seen.held:
+        effects = [p for p in request.wait_for if is_effect(p)]
+        if not seen.held and not all(holds(p, None, seen.screen) for p in effects):
             wanted = " and ".join(describe(p) for p in request.wait_for)
             return Acted(
                 sent,
@@ -299,7 +302,6 @@ def _after_send(ctx: Context, request: Request, delivery: Sent, planned: Planned
                 ErrorCode.TIMEOUT,
                 f"{wanted} did not hold within {request.timeout_ms} ms.",
             )
-        effects = [p for p in request.wait_for if is_effect(p)]
         state = sent
         if effects:
             state = sent if sent is SentState.UNCERTAIN else SentState.VERIFIED

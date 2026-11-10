@@ -27,7 +27,7 @@ from agent_phone.core.query import Match, Query
 from agent_phone.core.refs.resolve import QueryTarget, RefTarget, Target
 from agent_phone.core.role import Role
 from agent_phone.core.snapshot.snapshot import RefToken
-from agent_phone.core.wait.predicate import Gone, Predicate, Present
+from agent_phone.core.wait.predicate import Gone, Predicate, Present, Settled
 
 INPUTS = (
     "click",
@@ -191,11 +191,18 @@ def command(
         help="wait until it goes",
     )
     parser.add_argument(
+        "--settle",
+        action="store_true",
+        help="wait until the screen stops changing, and print it as the result's after snapshot, with "
+        "refs for the next input; use it when you cannot say what the input will show",
+    )
+    parser.add_argument(
         "--timeout-ms",
         type=positive,
         default=INPUT_TIMEOUT_MS,
         metavar="N",
-        help=f"how long to wait for the target and then for --wait-for (default {INPUT_TIMEOUT_MS})",
+        help="how long to wait for the target, and then for --wait-for and --settle "
+        f"(default {INPUT_TIMEOUT_MS})",
     )
     parser.add_argument("--policy", action="append", type=Path, default=[], metavar="FILE", help=POLICY_HELP)
     parser.add_argument(
@@ -209,7 +216,11 @@ def command(
 
 
 def waits(parsed: argparse.Namespace) -> tuple[Predicate, ...]:
-    return (*(Present(q) for q in parsed.wait_for), *(Gone(q) for q in parsed.wait_for_gone))
+    return (
+        *(Present(q) for q in parsed.wait_for),
+        *(Gone(q) for q in parsed.wait_for_gone),
+        *((Settled(),) if parsed.settle else ()),
+    )
 
 
 def input_command(parsed: argparse.Namespace) -> InputCommand:

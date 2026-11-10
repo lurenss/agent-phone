@@ -136,6 +136,7 @@ agent-phone is @p4n8c:e4 --property enabled       # one boolean of the element, 
 
 ```bash
 agent-phone snapshot --settle                                  # look first, and take the ref
+agent-phone click @q7m2k:e7 --settle                           # tap, and get the screen it ends on
 agent-phone click @q7m2k:e7 --wait-for 'name=Brightness'      # tap, then wait for the effect
 agent-phone click 'name=Display' --wait-for 'name*=Brightness'  # the same tap, found by a query
 agent-phone set-text @r2c8w:e3 'display'                       # replace a field's text
@@ -152,6 +153,7 @@ agent-phone press back                                         # also home, rece
 - `click --long` holds the touch. `set-text` replaces the whole text through the accessibility action, with no keyboard and no tap, and reads the field back. When the field reads `lossy`, each character above U+FFFF of your text, such as an emoji, is compared as `..`. Without a `--wait-for`, `verified_by` then names the lossy read.
 - `--wait-for QUERY` waits until a match shows after the input, and `--wait-for-gone QUERY` until it goes. Like `wait --gone`, it never holds while a dialog is the window. A query is `name=…`, `text=…`, `value=…`, `role=…` or `id=…`, and `^=` or `*=` match a prefix or a part. The result's `after` is a snapshot of the screen the wait ended on, with fresh refs for your next input.
 - Add `--after diff` to read less when the input changes part of the screen. `after` then has `kept`, a count of the lines that stayed, `added`, the new lines with their refs, and `gone`, the lines that left, in place of `tree`. Use the ref of an added line for your next input. A kept line has a new ref that the diff does not print, so name it by a query. The diff compares with the snapshot your input stood on, so take the ref from a whole `snapshot`, not from a `find` or a `--root`. After those, `added` also lists lines that were on screen before. When the input replaced the screen, `after` has `tree` as usual, because a diff would list both screens.
+- Add `--settle` to an input when you cannot say exactly what it will show, which is most inputs on a screen you have not seen: a tap that opens a page, `press back`, a scroll, a search. The result's `after` is the screen once every read for 800 ms printed the same lines, with fresh refs for your next input, so no `snapshot` and no `wait` follows. Do not guess a `--wait-for`: a guess that never shows costs the whole timeout, and one that already holds is refused. `--settle` proves nothing about the input, so `delivery` stays `delivered_unverified`: read `after` to see what the input did. A screen that still changes at `--timeout-ms` comes back with `settled` `unsettled`, and that is not an error. With a `--wait-for` beside it, the effect verifies the input and the screen settles too.
 - `delivery` is `delivered_verified` when the wait saw its effect appear, and `delivered_unverified` otherwise. Read the screen before you trust an unverified input.
 
 ## Grant only the commit your user asked for

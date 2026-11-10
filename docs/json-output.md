@@ -89,7 +89,7 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
 | `COMMIT_REFUSED` | The input would commit an effect that `--commit` did not grant, in `ask` mode. `details` lists the `effects`, the `granted` effects and the `evidence`. `dangerously-skip` never raises it. |
 | `DENIED` | A deny rule forbids the input whatever the caller grants, and in either permission mode. `details` names the `rule`, its `source` and the `evidence`. A device profile's protected package is denied this way. A deny rule reads a tap, a set-text, a scroll and Enter, and never back, home or recents. |
 | `LOCALE_UNSUPPORTED` | The device language has no policy rules, so input that commit rules read, a tap or Enter, cannot be judged. |
-| `TIMEOUT` | A wait reached its deadline. For `wait`, nothing was sent, `delivery` is `not_delivered`, and `details.after` is the snapshot of the last screen it read, or null when that screen had no window to describe. For `--wait-for` on an input, the input went out, `delivery` says how far, and `data.after` is that snapshot. A wait that read a screen and then only empty dumps is a `TIMEOUT` with that screen. |
+| `TIMEOUT` | A wait reached its deadline. For `wait`, nothing was sent, `delivery` is `not_delivered`, and `details.after` is the snapshot of the last screen it read, or null when that screen had no window to describe. For `--wait-for` on an input, the input went out, `delivery` says how far, and `data.after` is that snapshot. An input's `--settle` alone never times out (see [After a settle](#after-a-settle)). A wait that read a screen and then only empty dumps is a `TIMEOUT` with that screen. |
 | `TRANSPORT` | adb or the server failed, or the device returned output that does not parse. |
 | `ACTION_FAILED` | The input went out, and reading the screen back contradicts what was asked, such as a field that does not hold the text `set-text` sent. |
 | `INTERNAL` | A defect in agent-phone. |
@@ -276,6 +276,15 @@ The same tap under `dangerously-skip` goes out with no grant, and the gate says 
   "target":{"ref":"@m9q4t:e1","role":"button","name":"Schedule reel","at":[540,1750]},
   "gate":{"verdict":"commits","effects":["schedule"],"granted":[],"skipped":["schedule"]},"verified_by":null,"after":null}}
 ```
+
+### After a settle
+
+`--settle` on an input reads the screen after the input until every read for 800 ms prints the same lines, or until `--timeout-ms` has passed, and prints that screen as `after`. It is for an input whose effect the caller cannot name before it looks, so no query is guessed.
+
+- `after.settled` is `settled`, or `unsettled` when the deadline came first. `unsettled` is not an error: the result is `ok: true` and `after` is the last screen read.
+- A settled screen proves nothing about the input. `delivery` is `delivered_unverified` and `verified_by` is null, unless a `--wait-for` or a `--wait-for-gone` beside it saw its effect.
+- With a `--wait-for` beside it, the wait ends on the first read where the effect holds and the screen has settled. An effect that holds on a screen that never settles still verifies the input, and an effect that never shows is `TIMEOUT` as without the flag.
+- The snapshot is recorded like any `after`, so its refs serve the next input.
 
 ### After as a diff
 
