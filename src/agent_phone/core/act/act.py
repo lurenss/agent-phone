@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from agent_phone.core.act.axis import refuse_wrong_axis
 from agent_phone.core.act.hit import plan_point, require_active, swipe_across, visible_area
 from agent_phone.core.act.intent import ActionReport, Click, Fill, Request, Scroll, TargetReport
+from agent_phone.core.act.interrupted import refuse_interrupted
 from agent_phone.core.act.site import element_site, focus_site
 from agent_phone.core.context import Context
 from agent_phone.core.device import Capability
@@ -127,7 +128,9 @@ def _settle_target(ctx: Context, request: Request) -> Planned:
 
     Transient refusals (`NotYet`: hidden or disabled, UNSTABLE, OCCLUDED, NOT_FOUND for a
     query) are read again until the deadline. Terminal ones (WRONG_DEVICE, STALE_REF,
-    OBSERVE_FIRST, AMBIGUOUS_TARGET, an element that cannot take this input) fail at once.
+    OBSERVE_FIRST, AMBIGUOUS_TARGET, an element that cannot take this input) fail at once. So does
+    INTERRUPTED: an OCCLUDED or NOT_FOUND read whose focused window is a pop-up the policy recognises
+    (`act/interrupted.py`).
     """
     target = target_of(request)
     observed = observed_snapshot(target, ctx.store, ctx.info.identity, ctx.ledger.epoch())
@@ -144,9 +147,13 @@ def _settle_target(ctx: Context, request: Request) -> Planned:
 
     def attempt() -> Planned | None:
         screen = ctx.phone.read()
+        window = None
         try:
-            return _plan(screen, intent, _find(target, observed, screen), observed, previous)
+            resolved = _find(target, observed, screen)
+            window = screen.node(resolved.node).window
+            return _plan(screen, intent, resolved, observed, previous)
         except NotYet as refusal:
+            refuse_interrupted(ctx, screen, window, refusal)
             last[:] = [refusal]
             return None
 

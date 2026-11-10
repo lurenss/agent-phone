@@ -152,7 +152,7 @@ Where a tap lands and which node takes it (`core/act/hit.py`). The server's clic
 
 ### Auto-wait
 
-What act() does with a target that is not ready yet (`NotYet`, `core/act/act.py`). While the element is hidden, disabled, at another place than on the read before, or covered, act() reads again until the request's deadline and then reports the last refusal. A refusal that waiting cannot clear, such as a spent ref, fails at once.
+What act() does with a target that is not ready yet (`NotYet`, `core/act/act.py`). While the element is hidden, disabled, at another place than on the read before, or covered, act() reads again until the request's deadline and then reports the last refusal. A refusal that waiting cannot clear, such as a spent ref, fails at once. So does a covered or missing target on a read whose focused window is an interruption: that is `INTERRUPTED` (`core/act/interrupted.py`), with nothing sent and the epoch left.
 
 ### Verdict and grant
 

@@ -3,7 +3,8 @@
 An interruption is a window in which every phrase of one rule shows: a dialog that says an app is
 not responding, a permission prompt, a purchase sheet, or a consumer's own "Rate us" sheet from
 that consumer's policy file. Every recorded snapshot names the ones on screen
-(`snapshot/capture.py`).
+(`snapshot/capture.py`), and an input whose target one of them covers ends early
+(`act/interrupted.py`).
 
 agent-phone never answers one. `dismiss` is the button a rule calls the safe way out, for the
 caller to click through the gate like any other button.
