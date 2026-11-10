@@ -3,6 +3,7 @@ an enum without the doc, or when the doc's example stops matching what the code 
 
 import json
 import re
+import tomllib
 
 import pytest
 from fakes import FakeHub, invoke
@@ -228,6 +229,25 @@ def test_the_example_wait_timeout_is_what_the_code_prints_for_its_fixture(tmp_pa
     id = wire["error"]["details"]["after"]["id"]
     printed = json.dumps(wire, ensure_ascii=False).replace(id, example["error"]["details"]["after"]["id"])
     assert code == 1 and json.loads(printed) == example
+
+
+def test_the_example_flow_is_what_the_code_prints_for_the_example_file(tmp_path):
+    example = next(block for block in json_blocks() if block["command"] == "flow run")
+    assert list(example["data"]) == first_column("## Flow payload")
+    [written] = re.findall(r"```toml\n(.*?)```", CONTRACT, re.S)
+    shipped = (ROOT / "examples" / "flows" / "settings-search.toml").read_text()
+    assert tomllib.loads(written) == tomllib.loads(shipped)
+    file_keys = [f"flow.{key}" for key in tomllib.loads(written)["flow"]] + ["step.run", "step.expect"]
+    assert first_column("### Flow file") == file_keys
+    file = tmp_path / "flow.toml"
+    file.write_text(written)
+    j7 = Connected(Serial(example["device"]), "SM_J730F", True)
+    hub = FakeHub(
+        [j7], screens=[fixture_screen("settings-home")], after_each=[search_field(), search_field("battery")]
+    )
+    code, wire = invoke(["flow", "run", str(file), "--param", "query=battery"], hub, tmp_path)
+    wire["data"]["trace"] = example["data"]["trace"]
+    assert code == 0 and wire == example
 
 
 def run_batch(tmp_path, steps, serial="0a1b2c3d4e5f6a7b"):

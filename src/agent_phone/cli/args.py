@@ -11,6 +11,7 @@ from typing import NoReturn
 
 from agent_phone.cli.batch_args import BatchCommand, add_batch, batch_command
 from agent_phone.cli.commands import InputCommand
+from agent_phone.cli.flow_args import FlowRunCommand, add_flow, flow_command
 from agent_phone.cli.input_args import INPUTS, add_inputs, input_command
 from agent_phone.cli.wait_args import add_wait, wait_command
 from agent_phone.core.commands.devices import DevicesCommand
@@ -40,6 +41,7 @@ Command = (
     | IsCommand
     | WaitCommand
     | BatchCommand
+    | FlowRunCommand
     | SkillsListCommand
     | SkillsGetCommand
     | InputCommand
@@ -100,6 +102,7 @@ def build() -> Parser:
     add_wait(commands, after)
     add_inputs(commands, after)
     add_batch(commands, after)
+    add_flow(commands, after)
     add_skills(commands)
     return parser
 
@@ -264,6 +267,8 @@ def parse_args(argv: Sequence[str]) -> Invocation:
             command = wait_command(parsed)
         case "batch":
             command = batch_command(parsed)
+        case "flow":
+            command = flow_command(parsed)
         case "server":
             command = ServerCommand(ServerAction(parsed.action))
         case "skills" if parsed.action == "list":
@@ -273,5 +278,5 @@ def parse_args(argv: Sequence[str]) -> Invocation:
         case name if name in INPUTS:
             command = input_command(parsed)
     serial = Serial(parsed.device) if parsed.device else None
-    name = parsed.command if parsed.command != "clipboard" else f"clipboard {parsed.action}"
+    name = f"{parsed.command} {parsed.action}" if parsed.command in ("clipboard", "flow") else parsed.command
     return Invocation(name, serial, command, tuple(getattr(parsed, "policy", ())), tuple(argv))

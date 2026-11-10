@@ -18,6 +18,8 @@ from agent_phone.cli.batch import BatchResult, read_steps, run_batch
 from agent_phone.cli.batch_args import BatchCommand
 from agent_phone.cli.commands import READS, DriverCommand
 from agent_phone.cli.driver import Driver, PhoneError, device_lock, open_phone
+from agent_phone.cli.flow import FlowResult, run_flow_file
+from agent_phone.cli.flow_args import FlowRunCommand
 from agent_phone.cli.policy import load_profiles
 from agent_phone.cli.settings import Settings
 from agent_phone.cli.trace import Trace, redacted, without_device
@@ -55,7 +57,7 @@ def run(
     """Run one command line against `hub` and print its envelope to `out`. `stdin` is where a
     batch reads its steps when it is given no file."""
     name, device = "", None
-    outcome: Outcome | BatchResult
+    outcome: Outcome | BatchResult | FlowResult
     try:
         invocation = parse_args(argv)
         name = invocation.name
@@ -72,7 +74,7 @@ def run(
         floor = floor_envelope(name, device, error, unrefunded=unrefunded(), mode=settings.permission_mode)
         out.write(encode(floor) + "\n")
         return 1
-    if isinstance(outcome, BatchResult):
+    if isinstance(outcome, BatchResult | FlowResult):
         out.write(encode(outcome.wire()) + "\n")
         return outcome.exit_code
     out.write(encode(to_wire(name, device, outcome, mode=settings.permission_mode)) + "\n")
@@ -81,7 +83,7 @@ def run(
 
 def execute(
     invocation: Invocation, hub: PhoneHub, settings: Settings, clock: Clock, stdin: TextIO
-) -> tuple[Outcome | BatchResult, Serial | None]:
+) -> tuple[Outcome | BatchResult | FlowResult, Serial | None]:
     """The outcome and the serial the command ran against, None when it chose no device."""
     match invocation.command:
         case DevicesCommand():
@@ -108,6 +110,9 @@ def execute(
             ref = next((found for step in steps if (found := ref_of(step.command)) is not None), None)
             result = run_batch(steps, invocation.serial, ref, hub, settings, clock)
             return result, result.device
+        case FlowRunCommand() as command:
+            flow = run_flow_file(command, invocation.serial, hub, settings, clock)
+            return flow, flow.device
         case ServerCommand() as command:
             serial = select_device(hub.connected(), invocation.serial, None)
             try:

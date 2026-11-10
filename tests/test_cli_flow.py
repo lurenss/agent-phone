@@ -6,12 +6,10 @@ import json
 
 import pytest
 from fakes import J7_SERIAL, FakeHub, invoke
-from support import fixture_screen, node, screen_of, search_field
+from support import ROOT, fixture_screen, node, screen_of, search_field
 
 from agent_phone.core.device import Connected
 from agent_phone.core.phone import Key, Launch, SetText, Tap
-
-pytestmark = pytest.mark.xfail(strict=True, reason="P3.6: flow run is not built yet")
 
 J7 = Connected(J7_SERIAL, "SM_J730F", ready=True)
 HOME = screen_of(
@@ -31,20 +29,7 @@ BRIGHTNESS = screen_of(
         bounds="[0,0][1080,1920]",
     )
 )
-SEARCH = """
-[flow]
-name = "settings-search"
-app = "com.android.settings"
-grants = []
-params = ["query"]
-
-[[step]]
-run = ["launch", "com.android.settings"]
-
-[[step]]
-expect = ["name=Search settings"]
-run = ["set-text", "name=Search settings", "{query}"]
-"""
+SEARCH = (ROOT / "examples" / "flows" / "settings-search.toml").read_text()
 DISPLAY_COMMITS = (
     '[[commit]]\nid = "t.display"\neffect = "confirm"\nwords = ["display"]\n'
     'packages = ["com.android.settings"]\nreason = "A test commit."\n'
@@ -97,7 +82,8 @@ def test_the_settings_flow_runs_from_a_cold_start_and_prints_one_small_envelope(
     )
     data = wire["data"]
     assert (data["flow"], data["steps"], data["ran"], data["stopped_at"]) == ("settings-search", 2, 2, None)
-    assert "error" not in wire and len(json.dumps(wire)) < 400, "a replay costs one small object"
+    size = len(json.dumps(wire, separators=(",", ":"))) - len(data["trace"])
+    assert "error" not in wire and size < 300, "a replay costs one small object, whatever its steps printed"
     launch, typed = sent(hub)
     assert isinstance(launch, Launch) and isinstance(typed, SetText) and typed.text == "battery"
     assert len(hub.phones) == 1 and hub.phones[0].closed, "one process opens the phone once"
@@ -111,6 +97,14 @@ def test_a_flow_runs_only_when_the_caller_grants_every_declared_effect(tmp_path)
     assert hub.phones == [], "the phone is not opened for a flow the caller did not grant"
     code, wire = run(tmp_path, display_flow(tmp_path), hub, "--commit", "confirm")
     assert code == 0 and wire["data"]["ran"] == 3 and wire["delivery"] == "delivered_verified"
+    assert [type(action) for action in sent(hub)] == [Launch, Tap, Key]
+
+
+def test_dangerously_skip_lifts_the_callers_grant_as_it_lifts_a_steps(tmp_path):
+    hub = display_hub()
+    env = {"AGENT_PHONE_PERMISSION_MODE": "dangerously-skip"}
+    code, wire = run(tmp_path, display_flow(tmp_path, commit=()), hub, env=env)
+    assert code == 0 and wire["permission_mode"] == "dangerously-skip" and wire["data"]["ran"] == 3
     assert [type(action) for action in sent(hub)] == [Launch, Tap, Key]
 
 
@@ -140,6 +134,15 @@ def test_dry_run_stops_before_the_first_commit(tmp_path, mode):
     assert (data["dry_run"], data["stopped_at"], data["ran"], data["commit"]) == (True, 1, 1, ["confirm"])
     assert wire["permission_mode"] == "ask", "a dry run judges every step as ask does"
     assert [type(action) for action in sent(hub)] == [Launch], "the commit and the steps after it stay unsent"
+
+
+def test_a_dry_run_fails_on_a_commit_that_the_real_run_would_refuse(tmp_path):
+    hub = display_hub()
+    undeclared = display_flow(tmp_path, commit=())
+    code, wire = run(tmp_path, undeclared, hub, "--dry-run")
+    assert code == 1 and wire["ok"] is False and wire["error"]["code"] == "COMMIT_REFUSED"
+    assert (wire["error"]["details"]["step"], wire["data"]["commit"]) == (1, None)
+    assert [type(action) for action in sent(hub)] == [Launch]
 
 
 def test_a_dry_run_of_a_flow_with_no_commit_runs_every_step(tmp_path):
@@ -230,7 +233,42 @@ def test_a_parameter_fills_a_query_too(tmp_path):
     assert [type(action) for action in sent(hub)] == [Launch, Tap]
 
 
-def test_a_parameter_is_never_written_to_the_trace_or_printed(tmp_path):
+def test_a_value_that_holds_another_parameters_name_is_typed_as_given(tmp_path):
+    hub = FakeHub([J7], screens=[HOME], after_each=[search_field(), search_field("{query}")])
+    text = SEARCH.replace('params = ["query"]', 'params = ["query", "other"]').replace(
+        '"{query}"]', '"{other}"]'
+    )
+    code, _ = run(tmp_path, text, hub, "--param", "other={query}", "--param", "query=battery")
+    assert code == 0 and sent(hub)[1].text == "{query}"
+
+
+@pytest.mark.parametrize("value", ["--commit=confirm", "--commit", "-x", "--long"])
+def test_a_parameter_never_adds_a_flag_to_its_step(tmp_path, value):
+    hub = display_hub()
+    text = display_flow(tmp_path, commit=("{extra}",)).replace(
+        'grants = ["confirm"]', 'grants = ["confirm"]\nparams = ["extra"]'
+    )
+    code, wire = run(tmp_path, text, hub, "--param", f"extra={value}", "--commit", "confirm")
+    assert code == 2 and wire["error"]["code"] == "INVALID_ARGS" and hub.phones == []
+    assert value not in json.dumps(wire)
+
+
+def test_a_value_that_starts_with_a_dash_is_typed_after_a_double_dash(tmp_path):
+    hub = FakeHub([J7], screens=[HOME], after_each=[search_field(), search_field("-12 C")])
+    refused = run(tmp_path, SEARCH, hub, "--param", "query=-12 C")
+    assert refused[0] == 2 and hub.phones == []
+    after = SEARCH.replace('"{query}"]', '"--", "{query}"]')
+    code, _ = run(tmp_path, after, hub, "--param", "query=-12 C")
+    assert code == 0 and sent(hub)[1].text == "-12 C"
+
+
+def test_a_name_in_braces_that_the_flow_does_not_declare_is_refused(tmp_path):
+    hub = search_hub()
+    code, wire = run(tmp_path, SEARCH.replace('"{query}"]', '"{qury}"]'), hub, "--param", "query=battery")
+    assert code == 2 and wire["error"]["code"] == "INVALID_ARGS" and hub.phones == []
+
+
+def test_typed_text_reaches_no_trace_line_and_no_envelope_of_a_run_that_is_ok(tmp_path):
     hub = FakeHub([J7], screens=[HOME], after_each=[search_field(), search_field("hunter2")])
     path = tmp_path / "flow.toml"
     path.write_text(SEARCH)
@@ -239,6 +277,18 @@ def test_a_parameter_is_never_written_to_the_trace_or_printed(tmp_path):
     assert "hunter2" not in json.dumps(wire) and path.read_text() == SEARCH
     written = "".join(p.read_text() for p in (tmp_path / "traces").rglob("*") if p.is_file())
     assert "hunter2" not in written and '"{query}"' in written
+
+
+def test_a_step_gets_a_look_only_when_the_step_before_it_left_no_observation(tmp_path):
+    hub = display_hub()
+    code, _ = run(tmp_path, display_flow(tmp_path), hub, "--commit", "confirm")
+    begun = [line for line in trace_lines(tmp_path) if line["line"] == "begin"]
+    assert code == 0 and [(line["command"], line["step"]) for line in begun] == [
+        ("snapshot", 0),
+        ("launch", 0),
+        ("click", 1),
+        ("press", 2),
+    ], "each --wait-for left the observation the next step needs"
 
 
 def test_each_step_leaves_its_lines_in_the_trace_of_the_day(tmp_path):
