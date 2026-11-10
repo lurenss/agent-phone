@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, NewType
 
 from agent_phone.core.device import DeviceIdentity, Package
 from agent_phone.core.outcome import ErrorCode, Refusal
-from agent_phone.core.query import Query
+from agent_phone.core.query import Query, said
 from agent_phone.core.screen import WindowKind
 from agent_phone.core.snapshot.surface import OtherWindow
 from agent_phone.core.snapshot.view import Line, Mode
@@ -86,10 +86,41 @@ class Snapshot:
         return RefToken(self.id, number)
 
     def pick(self, query: Query, below: Query | None = None) -> RefToken:
-        """The one ref line matching `query`, optionally below the first line matching `below`.
+        """The one ref line matching `query`, optionally below the first line matching `below`:
+        among the lines printed after it.
 
         Strict like resolution: no match is `Refusal(NOT_FOUND)`, several are
-        `Refusal(AMBIGUOUS_TARGET)` listing their refs. `query.resource_id` matches a line's
-        `id_hint`, which is printed only for nameless lines.
+        `Refusal(AMBIGUOUS_TARGET)` listing their refs. It reads the lines as printed, so `text` is
+        a line's name or one of the values of its detail, and a detail that was cut at its length
+        limit loses the values past the cut. `query.resource_id` matches a line's `id_hint`, which
+        is printed only for nameless lines.
         """
-        raise NotImplementedError
+        lines = self.lines
+        if below is not None:
+            start = next((at for at, line in enumerate(lines) if printed(below, line)), None)
+            lines = () if start is None else lines[start + 1 :]
+        refs = [str(self.ref(line.ref)) for line in lines if line.ref is not None and printed(query, line)]
+        where = "" if below is None else f" below {below.describe()}"
+        if not refs:
+            raise Refusal(
+                ErrorCode.NOT_FOUND, f"No ref line of snapshot {self.id} matches {query.describe()}{where}."
+            )
+        if len(refs) > 1:
+            raise Refusal(
+                ErrorCode.AMBIGUOUS_TARGET,
+                f"{len(refs)} ref lines of snapshot {self.id} match {query.describe()}{where}: "
+                f"{', '.join(refs)}. Narrow the query.",
+                {"matches": len(refs), "refs": refs},
+            )
+        return RefToken.parse(refs[0])
+
+
+def printed(query: Query, line: Line) -> bool:
+    """What `core.query.matches` asks of a live node, asked of a printed line."""
+    return (
+        (query.role is None or line.role is query.role)
+        and (query.resource_id is None or line.id_hint == query.resource_id.rpartition("/")[2])
+        and (query.name is None or said(query, query.name, (line.name,)))
+        and (query.text is None or said(query, query.text, (line.name, *line.detail.split(", "))))
+        and (query.value is None or (line.value != "" and said(query, query.value, (line.value,))))
+    )

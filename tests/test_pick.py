@@ -11,8 +11,6 @@ from agent_phone.core.device import DeviceIdentity
 from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.snapshot.snapshot import SnapshotId
 
-pytestmark = pytest.mark.xfail(strict=True, reason="P3.5: Snapshot.pick is not implemented yet")
-
 DEVICE = DeviceIdentity(J7_SERIAL, J7_BOOT)
 
 
@@ -28,7 +26,11 @@ def test_pick_returns_the_one_ref_a_query_names():
 
 def test_pick_matches_the_fields_a_line_prints():
     settings = snapshot("settings-home")
-    assert settings.pick(Q(text="Ringtone", match=Match.CONTAINS)) == settings.ref(5)
+    assert settings.pick(Q(text="Ringtone")) == settings.ref(5)
+    assert settings.pick(Q(text="Bluetooth")) == settings.ref(4), (
+        "one value of a detail, as find --text reads it"
+    )
+    assert settings.pick(Q(text="notif", match=Match.PREFIX)) == settings.ref(6)
     assert settings.pick(Q(id="dashboard_container")) == settings.ref(3)
     assert settings.pick(Q(role=Role.LIST)) == settings.ref(3)
 
