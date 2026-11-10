@@ -99,7 +99,7 @@ agent-phone click @m9q4t:e21 --commit schedule  # sent, because the user asked t
 ```
 
 - A tap that would publish, schedule, send, delete, purchase, follow or block, change the system, give a consent or confirm such a thing fails with `COMMIT_REFUSED`, and nothing is sent. `--commit` with the effect's name grants one effect for one input. Grant it only when your user asked for exactly that.
-- `DENIED` comes from a rule of the device's profile. No flag opens it. `press back` and `press home` are never refused, so you can always leave a screen.
+- `DENIED` comes from a rule of the device's profile or of a policy file. No flag opens it. No rule refuses `press back` or `press home`, so you can always leave a screen.
 - The permission mode is `ask` or `dangerously-skip`. Your user chooses it when launching you. Never set `AGENT_PHONE_PERMISSION_MODE` yourself. In `dangerously-skip` nothing asks before a commit goes out, so act on one only when your user asked for exactly that.
 
 ## When a command fails
@@ -110,12 +110,16 @@ Every error carries `delivery` and `retry`. `retry` is `safe` only when nothing 
 | --- | --- |
 | `OBSERVE_FIRST`, `STALE_REF`, `SNAPSHOT_NOT_FOUND` | Look again with `agent-phone snapshot --settle` and use its refs. |
 | `AMBIGUOUS_TARGET`, `NOT_FOUND` | Narrow or correct the query, or use a ref. |
-| `NOT_ACTIONABLE`, `OCCLUDED`, `UNSTABLE` | The element cannot take this input, something covers it, or it keeps moving. Look again. |
+| `NOT_ACTIONABLE`, `OCCLUDED`, `UNSTABLE` | The element cannot take this input, something covers it, or it keeps moving. Look again. For `OCCLUDED`, look without `--lean`: `others` then lists every window, also a notification that covers the target. |
 | `INTERRUPTED` | A pop-up is in the way. Click its `dismiss` ref when your task allows. |
-| `TIMEOUT` | The input went out and its `--wait-for` did not show. `data.after` is the screen: read it. |
+| `TIMEOUT` | On an input, it went out and its `--wait-for` did not show: `data.after` is the screen, so read it before you send anything. On the `wait` command, nothing was sent, and the screen is in `error.details.after`. |
+| `INVALID_ARGS` | Nothing was sent. The message says what to change, such as a `--wait-for` or an `--until` whose line already shows. |
+| `NO_SURFACE` | The screen showed no window, or it is off. Look again. When it stays, ask your user. |
 | `COMMIT_REFUSED`, `DENIED` | See the gate above. Do not retry with a grant your user did not give. |
 | `DEVICE_AMBIGUOUS`, `NO_DEVICE` | Pass `-d <serial>`. `agent-phone devices` lists the phones. |
 | `DEVICE_BUSY`, `SERVER_UNAVAILABLE` | Another process or tool holds the phone. Run the command again, or `agent-phone server stop` first. |
+
+For any other code, read `error.message` and `error.hint`. The reference lists them all.
 
 ## More in the reference
 
