@@ -238,6 +238,7 @@ Every error carries `delivery` and `retry`.
 - `WRONG_DEVICE` means `-d` names another device than the ref does.
 - `NO_DEVICE` means no device is ready. Run `agent-phone devices` to see why.
 - A `devices` row also carries facts read from the phone, such as `api`, `display`, `density`, `locale` and `boot_id`.
+- Its `capabilities` list says what the phone can take, such as `key_back` or `intent_links`. An input that needs one the list lacks fails with `NOT_SUPPORTED` before it is sent, and your refs stay good. A key or a link fails before anything is read.
 
 ## Mind the server on the phone
 

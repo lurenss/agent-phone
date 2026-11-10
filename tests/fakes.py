@@ -33,7 +33,16 @@ def info_for(
     boot: BootId = J7_BOOT,
     locale: str = "en-US",
     capabilities: frozenset[Capability] = frozenset(
-        {Capability.POINT_INPUT, Capability.CLIPBOARD, Capability.SCREENSHOT}
+        {
+            Capability.POINT_INPUT,
+            Capability.KEY_BACK,
+            Capability.KEY_RECENTS,
+            Capability.INTENT_LINKS,
+            Capability.ROTATE,
+            Capability.POWER,
+            Capability.CLIPBOARD,
+            Capability.SCREENSHOT,
+        }
     ),
 ) -> DeviceInfo:
     return DeviceInfo(

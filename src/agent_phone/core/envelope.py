@@ -255,6 +255,7 @@ def device_data(row: Listed) -> dict[str, object]:
             "locale": info.locale,
             "ime": info.default_ime,
             "boot_id": info.identity.boot_id,
+            "capabilities": sorted(capability.value for capability in info.capabilities),
         }
     if row.problem is not None:
         data["problem"] = row.problem

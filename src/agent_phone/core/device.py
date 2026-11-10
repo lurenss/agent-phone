@@ -28,12 +28,18 @@ class DeviceIdentity:
 
 
 class Capability(Enum):
-    """What a backend can do beyond `read`. Core plans around these. Without POINT_INPUT, a touch
-    at a point (a tap, a long press or a swipe) is refused with NOT_SUPPORTED before a permit is
-    spent, and so are the clipboard and screenshot commands without theirs."""
+    """What a backend can do beyond `read`. Core plans around these. `act/capability.py` says
+    which one each input needs, and an input whose capability the backend lacks is refused with
+    NOT_SUPPORTED before a permit is spent. So are reading the clipboard and the screenshot command
+    without theirs."""
 
     POINT_INPUT = "point_input"
     SEMANTIC_CLICK = "semantic_click"
+    KEY_BACK = "key_back"
+    KEY_RECENTS = "key_recents"
+    INTENT_LINKS = "intent_links"
+    ROTATE = "rotate"
+    POWER = "power"
     WINDOW_LAYERS = "window_layers"
     NODE_IDS = "node_ids"
     TOASTS = "toasts"

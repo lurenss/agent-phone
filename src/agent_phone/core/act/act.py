@@ -2,6 +2,8 @@
 
     resolve -> actionable and stable -> plan -> judge -> spend -> inject -> verify
 
+An input the backend cannot do (`act/capability.py`) is refused as soon as its action is known:
+before any read for an input with no target, after the plan for a click, a fill or a scroll.
 Everything before `spend` raises `Refusal` and leaves the device untouched. Everything from
 `inject` on is caught and reported as `Acted` with the disposition the delivery earned, because
 from that point on "nothing happened" can no longer be claimed. A backend that raises inside
@@ -13,11 +15,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from agent_phone.core.act.axis import refuse_wrong_axis
+from agent_phone.core.act.capability import refuse_unsupported
 from agent_phone.core.act.hit import plan_point, require_active, swipe_across, visible_area
 from agent_phone.core.act.intent import ActionReport, Click, Fill, Request, Scroll, TargetReport
 from agent_phone.core.act.site import element_site, focus_site
 from agent_phone.core.context import Context
-from agent_phone.core.device import Capability
 from agent_phone.core.labels import display_name, holds_text, typed_text
 from agent_phone.core.outcome import Acted, ErrorCode, Outcome, Refusal, Refused, SentState
 from agent_phone.core.phone import (
@@ -30,7 +32,6 @@ from agent_phone.core.phone import (
     NotSent,
     Sent,
     SetText,
-    Swipe,
     Tap,
 )
 from agent_phone.core.policy.engine import Site, Verdict, classify
@@ -70,12 +71,10 @@ class Planned:
 
 def act(ctx: Context, request: Request) -> Outcome:
     try:
+        if not isinstance(request.intent, Click | Fill | Scroll):
+            refuse_unsupported(request.intent, ctx.info.capabilities)
         planned = _settle_target(ctx, request)
-        if (
-            isinstance(planned.action, Tap | LongPress | Swipe)
-            and Capability.POINT_INPUT not in ctx.info.capabilities
-        ):
-            raise Refusal(ErrorCode.NOT_SUPPORTED, "This backend cannot touch a point on the screen.")
+        refuse_unsupported(planned.action, ctx.info.capabilities)
         refuse_held_effects(request, planned.before)
         verdict = classify(ctx.policy, planned.action, planned.site, ctx.info.locale)
         admit(verdict, request.grant, ctx.mode)

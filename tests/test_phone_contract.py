@@ -17,6 +17,7 @@ from test_u2_phone import IDLE_LIMIT_S, Forward, Server, Shell, answered
 
 from agent_phone.adapters.uiautomator2.phone import DUMP_METHOD, U2Phone
 from agent_phone.adapters.uiautomator2.rpc import Phase, RpcResult
+from agent_phone.core.act.capability import required
 from agent_phone.core.act.ledger import Ledger
 from agent_phone.core.device import Package, Power
 from agent_phone.core.geometry import Point, Rect
@@ -66,10 +67,11 @@ INPUTS: tuple[InputAction, ...] = (
     Activate(FIELD),
     Swipe(Point(540, 1500), Point(540, 500), 275),
     SetText(FIELD, "display", False),
-    Key(KeyName.BACK),
+    *(Key(key) for key in KeyName),
     Launch(APP),
     Stop(APP),
     OpenUri("https://example.com", None),
+    OpenUri("intent:#Intent;action=android.settings.SETTINGS;end", None),
     Rotate(Orientation.AUTO),
     SetPower(Power.ON),
     SetClipboard("copied"),
@@ -143,6 +145,8 @@ def test_a_permit_is_sent_once_or_is_proven_unsent(rig_for, tmp_path, action):
     delivery = rig.phone.inject(permit(tmp_path, action))
     assert isinstance(delivery, Sent | NotSent), "every kind of input gets an answer, never None"
     assert rig.sends() == (1 if isinstance(delivery, Sent) else 0)
+    if required(action) in (None, *rig.phone.info().capabilities):
+        assert isinstance(delivery, Sent), "a backend delivers every input it declares it can do"
 
 
 @pytest.mark.parametrize("action", INPUTS, ids=lambda action: type(action).__name__)

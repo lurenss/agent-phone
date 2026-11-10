@@ -24,10 +24,10 @@ class ClipboardSetCommand:
 
 
 def run(ctx: Context, cmd: ClipboardGetCommand | ClipboardSetCommand) -> Outcome:
-    if Capability.CLIPBOARD not in ctx.info.capabilities:
-        return Refused(ErrorCode.NOT_SUPPORTED, "This backend cannot reach the clipboard.")
     match cmd:
         case ClipboardGetCommand():
+            if Capability.CLIPBOARD not in ctx.info.capabilities:
+                return Refused(ErrorCode.NOT_SUPPORTED, "This backend cannot read the clipboard.")
             try:
                 return Read(Value(ctx.phone.clipboard()))
             except Refusal as refusal:

@@ -11,6 +11,7 @@ from test_u2_phone import phone_with
 
 from agent_phone.adapters.uiautomator2.phone import U2Hub
 from agent_phone.core.act.act import act
+from agent_phone.core.act.capability import required
 from agent_phone.core.act.intent import Request
 from agent_phone.core.device import Capability, Connected, Package, Power
 from agent_phone.core.geometry import Point, Rect
@@ -67,20 +68,12 @@ U2_HAS = {
     "clipboard",
     "screenshot",
 }
-PENDING = "Capability has no key_back yet, and no table says what an input needs"
-
-
-def required(action):
-    from agent_phone.core.act.capability import required
-
-    return required(action)
 
 
 def info_without(name):
     return info_for(J7_SERIAL, capabilities=info_for(J7_SERIAL).capabilities - {Capability(name)})
 
 
-@pytest.mark.xfail(strict=True, reason=PENDING)
 def test_every_input_action_has_a_capability_row():
     assert {type(action) for action, _ in NEEDS} == set(get_args(InputAction)), (
         "a new kind of input needs a row here and a case in required()"
@@ -95,7 +88,6 @@ def test_every_input_action_has_a_capability_row():
         required(object())
 
 
-@pytest.mark.xfail(strict=True, reason=PENDING)
 def test_a_key_the_backend_lacks_is_refused_before_any_read(tmp_path):
     ctx, phone = context(tmp_path, SETTINGS, info=info_without("key_back"))
     taken = look(ctx)
@@ -107,14 +99,12 @@ def test_a_key_the_backend_lacks_is_refused_before_any_read(tmp_path):
     assert isinstance(act(ctx, click(taken, DISPLAY_TILE)), Acted), "the refusal spent no ref"
 
 
-@pytest.mark.xfail(strict=True, reason=PENDING)
 def test_a_key_the_backend_lacks_is_refused_before_the_agent_is_told_to_look_first(tmp_path):
     ctx, phone = context(tmp_path, SETTINGS, info=info_without("key_back"))
     refused(act(ctx, Request(Key(KeyName.BACK))), ErrorCode.NOT_SUPPORTED)
     assert phone.reads == 0 and phone.permits == []
 
 
-@pytest.mark.xfail(strict=True, reason=PENDING)
 def test_an_intent_link_needs_intent_links_and_a_web_link_does_not(tmp_path):
     ctx, phone = context(tmp_path, SETTINGS, info=info_without("intent_links"))
     look(ctx)
@@ -124,14 +114,12 @@ def test_an_intent_link_needs_intent_links_and_a_web_link_does_not(tmp_path):
     assert len(phone.permits) == 1
 
 
-@pytest.mark.xfail(strict=True, reason="uiautomator2 declares three capabilities, and only on an open phone")
 def test_the_uiautomator2_backend_declares_what_it_has_before_and_after_it_opens_a_phone():
     listed = U2Hub(ScriptedAdb(RECORDED)).inspect(J7_SERIAL)
     assert {c.value for c in listed.capabilities} == U2_HAS
     assert phone_with(None).info().capabilities == listed.capabilities
 
 
-@pytest.mark.xfail(strict=True, reason="a devices row has no capabilities key")
 def test_devices_prints_the_capabilities_of_a_device_whose_facts_it_read():
     _, wire = invoke(["devices"], FakeHub([Connected(J7_SERIAL, "SM_J730F", ready=True)]))
     assert wire["data"]["devices"][0]["capabilities"] == sorted(U2_HAS), "the fake declares what u2 does"
