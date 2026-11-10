@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from enum import Enum
 
 from agent_phone.core.commands.find import Found
 from agent_phone.core.commands.skills import SkillCatalog, SkillText
@@ -39,6 +40,7 @@ from agent_phone.core.phone import (
 from agent_phone.core.policy.engine import Clear, Commits, Denied, Grant, Verdict
 from agent_phone.core.policy.mode import PermissionMode
 from agent_phone.core.snapshot.budget import render_line
+from agent_phone.core.snapshot.diff import diff
 from agent_phone.core.snapshot.snapshot import Snapshot
 
 VERSION = 1
@@ -57,8 +59,21 @@ HINTS: Mapping[ErrorCode, str] = {
 """Only codes whose recovery is not obvious from the message have a hint."""
 
 
+class After(Enum):
+    """How an input's `after` prints: the snapshot's tree, or what the tree gained and lost since
+    the snapshot the input stood on, when that is shorter. Either way the same snapshot was recorded."""
+
+    TREE = "tree"
+    DIFF = "diff"
+
+
 def to_wire(
-    command: str, device: Serial | None, outcome: Outcome, *, mode: PermissionMode | None
+    command: str,
+    device: Serial | None,
+    outcome: Outcome,
+    *,
+    mode: PermissionMode | None,
+    after: After = After.TREE,
 ) -> dict[str, object]:
     wire: dict[str, object] = {
         "v": VERSION,
@@ -77,7 +92,7 @@ def to_wire(
         case Acted():
             wire["ok"] = outcome.error is None
             wire.update(delivery_keys(outcome.disposition))
-            wire["data"] = acted_data(outcome)
+            wire["data"] = acted_data(outcome, after)
             if outcome.error is not None:
                 wire["error"] = error_object(outcome.error, outcome.message, {})
     return wire
@@ -171,7 +186,7 @@ def found_data(found: Found) -> dict[str, object]:
     return data
 
 
-def acted_data(acted: Acted) -> dict[str, object]:
+def acted_data(acted: Acted, after: After = After.TREE) -> dict[str, object]:
     report = acted.report
     target = report.target
     return {
@@ -186,8 +201,25 @@ def acted_data(acted: Acted) -> dict[str, object]:
         },
         "gate": gate_data(report.verdict, report.grant),
         "verified_by": report.verified_by,
-        "after": None if acted.after is None else snapshot_data(acted.after),
+        "after": after_data(acted, after),
     }
+
+
+def after_data(acted: Acted, form: After) -> dict[str, object] | None:
+    """The snapshot payload. As a diff, `kept`, `added` and `gone` take the place of `tree`. The
+    tree stays when the diff would mislead or cost more: nothing was kept, so the screen was
+    replaced and a diff lists both screens; the earlier snapshot printed in another mode, so lines
+    differ that the screen did not change; or the three keys are not shorter in bytes."""
+    if acted.after is None:
+        return None
+    data = snapshot_data(acted.after)
+    if form is After.DIFF and acted.before is not None and acted.before.mode is acted.after.mode:
+        changed = diff(acted.before, acted.after)
+        shown = {"kept": changed.kept, "added": list(changed.added), "gone": list(changed.gone)}
+        if changed.kept and len(encode(shown).encode()) < len(encode({"tree": data["tree"]}).encode()):
+            del data["tree"]
+            data |= shown
+    return data
 
 
 def input_data(action: InputAction) -> dict[str, object]:

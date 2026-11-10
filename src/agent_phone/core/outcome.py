@@ -109,13 +109,15 @@ class Refused:
 class Acted:
     """`error` is set when the input went out but the command still failed: the transport lost
     the answer (TRANSPORT), a `--wait-for` timed out (TIMEOUT), or a read-back contradicted the
-    request (ACTION_FAILED). `after` is the observation recorded after the input, when one was."""
+    request (ACTION_FAILED). `after` is the observation recorded after the input, when one was.
+    `before` is the snapshot the input stood on: the one its ref names, or the device's latest."""
 
     sent: SentState
     report: ActionReport
     after: Snapshot | None
     error: ErrorCode | None = None
     message: str = ""
+    before: Snapshot | None = None
 
     @property
     def disposition(self) -> Disposition:

@@ -12,7 +12,7 @@ from that point on "nothing happened" can no longer be claimed. A backend that r
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from agent_phone.core.act.axis import refuse_wrong_axis
 from agent_phone.core.act.capability import refuse_unsupported
@@ -60,13 +60,15 @@ class NotYet(Refusal):
 @dataclass(frozen=True, slots=True)
 class Planned:
     """The input act() will judge, the site the engine reads for it, and the read it was planned
-    on. `site` holds the screen around the element the input lands on (`act/site.py`)."""
+    on. `site` holds the screen around the element the input lands on (`act/site.py`). `observed`
+    is the snapshot that passed check 1."""
 
     action: InputAction
     site: Site | None
     target: TargetReport | None
     before: Screen | None
     resolved: Resolved | None
+    observed: Snapshot
 
 
 def act(ctx: Context, request: Request) -> Outcome:
@@ -95,7 +97,7 @@ def act(ctx: Context, request: Request) -> Outcome:
     if isinstance(delivery, NotSent):
         ctx.ledger.refund(permit)
         return Refused(delivery.code, delivery.detail)
-    return _after_send(ctx, request, delivery, planned, verdict)
+    return replace(_after_send(ctx, request, delivery, planned, verdict), before=planned.observed)
 
 
 def refuse_held_effects(request: Request, before: Screen | None) -> None:
@@ -137,7 +139,7 @@ def _settle_target(ctx: Context, request: Request) -> Planned:
         before = ctx.phone.read() if enter or any(is_effect(p) for p in request.wait_for) else None
         if enter and before is not None:
             site = focus_site(before, site)
-        return Planned(intent, site, None, before, None)
+        return Planned(intent, site, None, before, None, observed)
     last: list[NotYet] = []
     previous: list[Node] = []
 
@@ -225,7 +227,7 @@ def _plan(
     except Refusal as refusal:
         raise NotYet(refusal.code, refusal.message, refusal.details) from refusal
     report = TargetReport(ref, role, display_name(screen, node, role), point)
-    return Planned(action, element_site(screen, node), report, screen, resolved)
+    return Planned(action, element_site(screen, node), report, screen, resolved, observed)
 
 
 def ready(intent: Click | Fill | Scroll, node: Node, screen: Screen) -> None:
