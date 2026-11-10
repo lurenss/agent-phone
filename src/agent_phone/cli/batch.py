@@ -111,13 +111,7 @@ class BatchResult:
             "permission_mode": self.mode.value,
             "device": self.device,
         }
-        if failed is not None:
-            earlier = any(result.sent for result in self.results[:-1])
-            wire["delivery"] = failed.envelope["delivery"]
-            wire["retry"] = "unsafe" if earlier else failed.envelope["retry"]
-        elif any(result.sent for result in self.results):
-            sent = (Disposition(str(r.envelope["delivery"])) for r in self.results if r.sent)
-            wire |= delivery_keys(min(sent, key=WEAKEST_FIRST.index))
+        wire |= delivery_of(self.results)
         wire["data"] = {
             "steps": [result.envelope for result in self.results],
             "stopped_at": None if failed is None else failed.step.index,
@@ -130,6 +124,21 @@ class BatchResult:
                 "details": {"step": failed.step.index}
             }
         return wire
+
+
+def delivery_of(results: Sequence[StepResult]) -> dict[str, object]:
+    """`delivery` and `retry` of steps that ran in order and stopped at the first one that was not
+    ok. They are the failed step's, but `retry` is `unsafe` when an earlier step sent input. Steps
+    that all succeeded have the weakest delivery of their inputs, and none when nothing was sent."""
+    if results and not results[-1].ok:
+        failed = results[-1]
+        earlier = any(result.sent for result in results[:-1])
+        return {
+            "delivery": failed.envelope["delivery"],
+            "retry": "unsafe" if earlier else failed.envelope["retry"],
+        }
+    sent = [Disposition(str(r.envelope["delivery"])) for r in results if r.sent]
+    return delivery_keys(min(sent, key=WEAKEST_FIRST.index)) if sent else {}
 
 
 def read_steps(command: BatchCommand, stdin: TextIO) -> tuple[Step, ...]:
@@ -162,9 +171,10 @@ def source_text(command: BatchCommand, stdin: TextIO) -> str:
     return stdin.read()
 
 
-def parse_step(index: int, argv: tuple[str, ...]) -> Step:
-    """The step through the CLI's own parser. Help text goes nowhere: a batch prints one envelope."""
-    where = f"steps[{index}] {shlex.join(argv)!r}"
+def parse_step(index: int, argv: tuple[str, ...], shown: Sequence[str] | None = None) -> Step:
+    """The step through the CLI's own parser. Help text goes nowhere: a batch prints one envelope.
+    A refusal names the step by `shown` when the caller may not print `argv` itself."""
+    where = f"steps[{index}] {shlex.join(shown or argv)!r}"
     try:
         with redirect_stdout(io.StringIO()):
             invocation = parse_args(argv)

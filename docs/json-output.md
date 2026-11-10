@@ -68,7 +68,7 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
 
 | Code | Meaning |
 | --- | --- |
-| `INVALID_ARGS` | The arguments do not parse. A target that is neither a ref nor a query, such as `e12` or `Display`, is one case. A step of a batch that does not parse, names its own device, or is not a command that uses the phone is another, and so is a batch file that is not a JSON array of non-empty arrays of strings, or a batch with no file on a terminal. A link for `open-url` that holds a line break or any other control character, written out or percent-encoded, is another. So is a value of `AGENT_PHONE_PERMISSION_MODE` that is neither `ask` nor `dangerously-skip`, which stops the process before a device is opened. So is a `--wait-for` or `--wait-for-gone` that already holds on the read the input is planned on: it would hold whether or not the input worked, so it cannot prove anything, and the input is not sent. |
+| `INVALID_ARGS` | The arguments do not parse. A target that is neither a ref nor a query, such as `e12` or `Display`, is one case. A step of a batch or of a [flow](#flow-file) that does not parse, names its own device, or is not a command that uses the phone is another, and so is a flow file that breaks one of its rules, and a batch file that is not a JSON array of non-empty arrays of strings, or a batch with no file on a terminal. A link for `open-url` that holds a line break or any other control character, written out or percent-encoded, is another. So is a value of `AGENT_PHONE_PERMISSION_MODE` that is neither `ask` nor `dangerously-skip`, which stops the process before a device is opened. So is a `--wait-for` or `--wait-for-gone` that already holds on the read the input is planned on: it would hold whether or not the input worked, so it cannot prove anything, and the input is not sent. |
 | `POLICY_INVALID` | A policy file, or the order its layers merge in, is invalid. `details` names the `source`, the `table` and the `field`, or the `rule`. A file that disables a deny rule of the device profile, or of a file the profile names, is one case, and a file whose top-level `languages` names a language the built-in policy does not cover is another. |
 | `NO_DEVICE` | No device is connected and ready, or the requested one is not. |
 | `DEVICE_AMBIGUOUS` | Several devices are ready and neither `-d` nor a ref names one. |
@@ -300,7 +300,7 @@ The same tap under `dangerously-skip` goes out with no grant, and the gate says 
   "target":{"ref":"@fky1a:e2","role":"button","name":"Display","at":[540,350]},
   "gate":{"verdict":"clear","reason":"no_commit_words"},"verified_by":"present name=\"Brightness\"",
   "after":{"id":"v9mme","app":"com.android.settings","window":"application","mode":"compact","settled":"unchecked",
-   "keyboard":false,"dialog":false,"others":[],"toasts":[],"truncated":0,"kept":2,
+   "keyboard":false,"dialog":false,"others":[],"toasts":[],"interruptions":[],"truncated":0,"kept":2,
    "added":["@v9mme:e1 button \"Back\" [0,100,1080,200]","text \"Brightness\" [0,700,1080,800]"],
    "gone":["button \"Display\""]}}}
 ```
@@ -416,6 +416,130 @@ Each batch writes one JSONL file, `<state root>/traces/<serial>/<UTC timestamp>-
 {"line":"step","i":0,"argv":["launch","com.android.settings"],"permission_mode":"ask","started_utc":"2026-11-01T09:15:00.211Z","ms":412,"ok":true,"delivery":"delivered_unverified","retry":"unsafe","error":null,"input":"launch","target":null,"gate":{"verdict":"clear","reason":"not_labeled_input"}}
 {"line":"step","i":1,"argv":["click","name=Nowhere","--timeout-ms","100"],"permission_mode":"ask","started_utc":"2026-11-01T09:15:00.624Z","ms":3,"ok":false,"delivery":"not_delivered","retry":"safe","error":"OBSERVE_FIRST","input":null,"target":{"ref":null,"query":"name=\"Nowhere\"","role":null,"name":null},"gate":null}
 {"line":"end","stopped_at":1,"ms":416}
+```
+
+## Flow payload
+
+`agent-phone flow run FILE [--param NAME=VALUE]... [--commit EFFECT]... [--dry-run]` replays a job that was written once as a [flow file](#flow-file). It runs the file's steps in one process, under one device lock, as a batch does, and it prints one envelope whatever the number of steps. The steps' own envelopes are not printed, so a replay costs an agent one call and one small object.
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `flow` | string | The flow's `name`. |
+| `steps` | int | How many steps the file has. |
+| `ran` | int | How many steps ran and were ok. |
+| `stopped_at` | int or null | The index of the step the run stopped at, from 0, or null when every step ran. |
+| `dry_run` | bool | Whether `--dry-run` was given. |
+| `commit` | array of strings or null | In a dry run that stopped before a commit, the [effects](#effects) the step at `stopped_at` would commit. Null otherwise. |
+| `trace` | string | The path of the device's [trace](#command-trace) of the day, which has a begin and an end line for every call the run made. |
+
+- `delivery` and `retry` follow the [batch's](#batch-payload) rule over every call the run made. When a step fails, `delivery` is that step's, and `retry` is `unsafe` when an earlier step sent input.
+- The run stops at the first step whose `expect` does not show, and at the first step that is not ok. `ok` is then false, and `error` is that call's own `code`, `message`, `hint` and `details`, such as the snapshot a wait timed out on. `details` also has `step`, the step's index, and `during`: `expect` for the step's expectation, `look` for the snapshot taken for it, `run` for the step itself.
+- A dry run that stops before a commit is ok: `stopped_at` names the step, `commit` its effects, and nothing of that step was sent. The steps before it ran and sent their input. When the step's own `--commit` does not name those effects, a real run would refuse the step, so the dry run fails on it with `COMMIT_REFUSED`. `permission_mode` is `ask` in every dry run, because a dry run judges each step as `ask` does.
+- A failure before the first step, such as a file that is not a flow, a step that does not parse, a parameter that is missing, or a flow whose `grants` the caller's `--commit` does not cover (`COMMIT_REFUSED`), is an ordinary error envelope with `command` `flow run`, `delivery` `not_delivered`, `retry` `safe` and no `data`. No device was opened. A step's `--policy` file that does not parse is `POLICY_INVALID` after the device is opened and before the first step, with nothing sent, as in a batch.
+
+```json
+{"v":1,"ok":true,"command":"flow run","permission_mode":"ask","device":"0a1b2c3d4e5f6a7b","delivery":"delivered_unverified","retry":"unsafe",
+ "data":{"flow":"settings-search","steps":2,"ran":2,"stopped_at":null,"dry_run":false,"commit":null,
+  "trace":"/home/agent/.agent-phone/traces/0a1b2c3d4e5f6a7b/2026-11-10.jsonl"}}
+```
+
+The launch had no `--wait-for`, so it proved nothing, and the run's `delivery` is the weakest of its inputs.
+
+### Flow file
+
+```toml
+[flow]
+name = "settings-search"
+app = "com.android.settings"
+grants = []
+params = ["query"]
+
+[[step]]
+run = ["launch", "com.android.settings"]
+
+[[step]]
+expect = ["name=Search settings"]
+run = ["set-text", "name=Search settings", "{query}"]
+```
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `flow.name` | string | The flow's name. Required. |
+| `flow.app` | string | The package the flow is for. It is for the reader: nothing checks it. |
+| `flow.grants` | array of strings | The [effects](#effects) the flow may commit. Default none. |
+| `flow.params` | array of strings | The names of the flow's parameters. Default none. |
+| `step.run` | array of strings | The arguments of one command, as a [batch](#batch-payload) step has them. Required. |
+| `step.expect` | array of strings | Queries that must all show before the step acts. Default none. |
+
+- The CLI's own parser reads each `run`, so a step means what the same words mean on a command line, and the same gate judges it. A step must be a command that reads or drives the phone, and it may name no device.
+- A target is a query, such as `name=Display`. A step that names a ref or a point is refused, because a ref belongs to one snapshot. So are `get`, `is` and `--root`, which take a ref.
+- `{name}` in a word of `run` or `expect` stands for the parameter `name`. `--param name=value` must give every parameter of `params` once, and no other. A `{name}` that `params` does not list is refused, so a misspelt name is never typed as it stands. A parameter fills a value and never adds a flag: a value that starts with `-` is refused, unless its word stands after a `"--"` word in `run`, where the parser reads every word as text.
+- `grants` is a cap. A step whose `--commit` names an effect outside it is refused. The flow runs only when the caller's `--commit` names every effect in `grants`, except in a dry run and in `dangerously-skip`. The caller's grant reaches no step: a step is judged under its own `--commit`, so an input that commits an effect its step did not grant is `COMMIT_REFUSED`, as in a batch.
+- `--dry-run` runs every step with no grant, judged as `ask` judges. The steps that commit nothing run and send their input. The gate refuses the first step that would commit, and the run stops there.
+- `expect` is waited for as `wait --for` waits, and the read it holds on is the observation the step needs. A step with no `expect` gets one snapshot first when the step before it left no observation, so a flow may start with `launch`.
+- The file's rules above are checked before a device is opened, and a file that breaks one is `INVALID_ARGS`. So is an unknown key in the file.
+- Text that a parameter typed is written to no trace line: a begin line of a flow has the words of the file, with `{name}` in them, and the keys `flow` and `step` after `started_utc`. Typed text can still show where the screen shows it. A snapshot prints what a field holds unless it is a password field, so the `details.after` of a later step that fails can show it, as a snapshot after `set-text` does. A parameter inside a query names something on the screen: the end line holds the query and the name it resolved to, and an error message can quote the query. So put a secret only where it is typed, and only into a password field.
+
+### Flow record
+
+`agent-phone flow record TRACE --out FILE` writes the draft of a flow file from a device's [trace](#command-trace) of one day, so a job an agent did by hand can be replayed. It reads that one file and opens no device, so `device` is null. A draft never replaces a file that exists, and it has mode 0600, because it holds names from the screen.
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `out` | string | The path of the draft. |
+| `steps` | int | How many steps the draft has. |
+| `params` | array of strings | The parameters the draft declares, one for each command that typed text: `text`, `text2` and so on. |
+| `refs` | array of ints | The steps that still name a ref, because the element had no name. The draft does not load until each is named by a query. |
+| `skipped` | array of ints | The `seq` of each command that was ok and is not in the draft, because its traced words do not parse. A trace hides typed text wherever it stands, so a text of one or two characters can change another word of its line. |
+
+- Each command in the trace that sent input or waited, and was ok, is a step, with the words that were typed. `snapshot`, `find`, `get`, `is`, `clipboard get` and `screenshot`, a command that failed, a command with no end line, and the lines of a flow's own run are left out.
+- A target that was named by ref becomes a query on the role and the name the ref resolved to, such as `role=button name="Display"`.
+- Typed text is `<N chars>` in a trace, and becomes `{text}` in the step. So no draft holds text that was typed, and `flow run` asks for it with `--param`.
+- The effects that the commands granted with `--commit` become the draft's `grants`. A commit that `dangerously-skip` let through had no `--commit`, so the draft declares no grant for it. Its dry run then fails at that step with `COMMIT_REFUSED`, which names the `--commit` to add.
+- A file that is not such a trace, a trace with nothing to replay, and an `--out` that exists are `INVALID_ARGS`.
+
+```json
+{"v":1,"ok":true,"command":"flow record","permission_mode":"ask","device":null,
+ "data":{"out":"settings-search.toml","steps":2,"params":["text"],"refs":[],"skipped":[]}}
+```
+
+A draft is a start. It has no `expect`, and a query on a role and a name can match two elements on another day. Read it, and try it with `--dry-run`.
+
+## Command trace
+
+Every command that reads or drives the phone, run by itself, appends two lines to `<state root>/traces/<serial>/<UTC date>.jsonl`: a begin line before it runs and an end line after it. The file has mode 0600 in a folder of mode 0700, like a batch's trace. A begin line with no end line is a command that died on the way. The end line is read from the command's envelope, so the two agree. `devices`, `skills` and `server` write no line, and a batch writes its own file. [`flow record`](#flow-record) drafts a flow from these lines.
+
+#### Command begin line
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `line` | string | `begin`. |
+| `seq` | int | The command's number in the file, from 0. Its end line has the same number. |
+| `command` | string | The command's name, as in its envelope. |
+| `argv` | array of strings | The command's arguments from the command word on, without the flag that named the device. Typed text is replaced by `<N chars>`, as in a [batch's step line](#trace-step-line). Every other word is written as given, so a link given to `open-url` is in the file. |
+| `started_utc` | string | When the command started, in UTC with milliseconds. |
+
+#### Command end line
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `line` | string | `end`. |
+| `seq` | int | The `seq` of the command's begin line. |
+| `permission_mode` | string | The command's `permission_mode`. |
+| `ms` | int | How long the command took. |
+| `ok` | bool | The command's `ok`. |
+| `delivery` | string or null | The command's `delivery`, null for a read that succeeded. |
+| `retry` | string or null | The command's `retry`, null when it has no `delivery`. |
+| `error` | string or null | The command's error code. |
+| `input` | string or null | The kind of the input that went out, from the [input kinds](#input-kinds), or null. |
+| `target` | object or null | As in a [batch's step line](#trace-step-line). |
+| `gate` | object or null | The verdict the input was sent under, as in the [input payload](#input-payload), or null. |
+
+```jsonl
+{"line":"begin","seq":0,"command":"snapshot","argv":["snapshot"],"started_utc":"2026-11-10T09:15:00.211Z"}
+{"line":"end","seq":0,"permission_mode":"ask","ms":212,"ok":true,"delivery":null,"retry":null,"error":null,"input":null,"target":null,"gate":null}
+{"line":"begin","seq":1,"command":"set-text","argv":["set-text","name=Search settings","<7 chars>"],"started_utc":"2026-11-10T09:15:03.870Z"}
+{"line":"end","seq":1,"permission_mode":"ask","ms":655,"ok":true,"delivery":"delivered_verified","retry":"unsafe","error":null,"input":"set_text","target":{"ref":null,"query":"name=\"Search settings\"","role":"field","name":"Search settings"},"gate":{"verdict":"clear","reason":"not_labeled_input"}}
 ```
 
 ## Device reads

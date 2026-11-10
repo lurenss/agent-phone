@@ -223,6 +223,48 @@ cat steps.json | agent-phone batch
 - The trace is a JSONL file, readable only by you, with one line for each step that ran and a last line for the end. A step line has its index, its arguments, `started_utc`, `ms`, `ok`, `delivery`, `retry`, the error code, and for an input its kind, its target and its gate verdict. The text of `set-text` and `clipboard set` shows as `<N chars>`. It holds no snapshot.
 - A Python caller does not need `batch`: a `Driver` from `open_phone()` already runs one step after another in one process.
 
+## Replay a job from a flow file
+
+```bash
+agent-phone flow run settings-search.toml --param query=battery
+agent-phone flow run schedule.toml --param hour=7 --dry-run       # stops before the first commit
+```
+
+```toml
+[flow]
+name = "settings-search"
+grants = []
+params = ["query"]
+
+[[step]]
+run = ["launch", "com.android.settings"]
+
+[[step]]
+expect = ["name=Search settings"]
+run = ["set-text", "name=Search settings", "{query}"]
+```
+
+- A flow is a job you do often, written once. One call runs every step and prints one small envelope, so you spend one turn where the same steps by hand cost one turn each.
+- A step's `run` is the arguments of one command, as a batch step has them, and the same gate judges it. Its target is a query. A ref or a point is `INVALID_ARGS`, because a ref belongs to one snapshot.
+- `{name}` stands for a parameter. Give each one of `params` once with `--param`. A value fills a word and never adds a flag. A value that starts with a dash works only when the flow's `run` has a `"--"` word before it.
+- `expect` lists queries that must all show before the step acts. Use it where the step needs a screen that the step before it opens.
+- `grants` lists the effects the flow may commit. Run it with `--commit` for each of them, and only when your user asked for those commits. A step still needs its own `--commit`, and it may name only effects from `grants`.
+- `--dry-run` grants nothing. The steps before the first one that would commit run and send their input, so a dry run does open the app, type and tap. It stops at that step and sends nothing of it. `data.commit` names the effects and `data.stopped_at` the step. Use it to try a flow.
+- The run stops at the first step that fails or whose `expect` does not show. `error.details.step` is its index, and `error` is that step's own error, so a wait that timed out carries the screen in `details.after`. Go on by hand from there.
+- `retry` is `unsafe` when any step sent input. Look at the screen before you run the flow again, because it starts at its first step.
+
+Draft a flow from what you just did by hand:
+
+```bash
+agent-phone flow record ~/.agent-phone/traces/<serial>/2026-11-10.jsonl --out settings-search.toml
+```
+
+- Every command that reads or drives the phone leaves a begin and an end line in `<state root>/traces/<serial>/<UTC date>.jsonl`, readable only by you. `flow record` turns the inputs and waits in it that were ok into steps. It leaves out your snapshots and the commands that failed.
+- A target you named by ref becomes a query on its role and name. Text you typed becomes a parameter, `{text}`, so the draft never holds it.
+- `data.refs` lists the steps that still name a ref, because the element had no name. Name each by a query before you run the draft.
+- `data.skipped` lists the `seq` of each command the draft left out because its traced words no longer parse. Add those steps by hand.
+- A draft is a start. Read it, add `expect` where a step needs a screen, and try it with `--dry-run`.
+
 ## Retry only what did not reach the phone
 
 Every error carries `delivery` and `retry`.

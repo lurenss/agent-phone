@@ -188,7 +188,11 @@ Several steps run in one process (`batch`, `cli/batch.py`). A step is the CLI's 
 
 ### Trace
 
-The record of one batch (`Trace`, `cli/trace.py`): a JSONL file under `traces/<serial>/` in the state root, mode 0600 in a folder of mode 0700, with a line appended as each step ends and a last line for the end. A step's line is read from its envelope: whether it was ok, its delivery and retry, its error code, and for an input its kind, its target and its gate verdict. It holds no snapshot, and the text of `set-text` and `clipboard set` shows as `<N chars>`. *Avoid:* "log" for `decisions.tsv`, which records decisions and not steps.
+The record of what commands did (`Trace`, `cli/trace.py`): JSONL files under `traces/<serial>/` in the state root, mode 0600 in a folder of mode 0700. A batch has its own file, with a line appended as each step ends and a last line for the end. Every other command that reads or drives the phone appends a begin line and an end line to the device's file of the UTC day, so a begin line with no end line is a command that died on the way. A step's line and an end line are read from the command's envelope: whether it was ok, its delivery and retry, its error code, and for an input its kind, its target and its gate verdict. It holds no snapshot, and the text of `set-text` and `clipboard set` shows as `<N chars>`. *Avoid:* "log" for `decisions.tsv`, which records decisions and not steps.
+
+### Flow
+
+A job written once as a file of steps and replayed in one call (`flow run`, `cli/flow.py`, `cli/flow_file.py`). A step is an argv that `parse_args` parses, as a batch step is, with a query for its target and never a ref, and `{name}` where a parameter goes. Its `expect` queries are waited for before it acts. The file's `grants` cap what a step may grant itself, and the flow runs only when the caller's `--commit` names every effect in `grants`. A dry run judges every step with no grant, as `ask` does, and stops before the first one that would commit. The run stops at the first expectation that does not show or step that is not ok, and prints one small envelope that names the step. `flow record` drafts a flow file from the trace of a day (`cli/flow_record.py`): the inputs and waits that were ok, with a query on the role and name each ref resolved to, and a parameter where text was typed. *Avoid:* "routine", "macro" and "script". A flow has no branches, loops or retries, and it is not a second way to send input: each step passes the same `act()` as the same words on a command line.
 
 ## Devices and the server
 
