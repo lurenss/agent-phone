@@ -8,12 +8,11 @@ from urllib.parse import quote, unquote
 import pytest
 from fakes import EMULATOR_SERIAL, J7_SERIAL, info_for
 from support import FakeClock, fixture_xml
-from test_u2_phone import Forward, Rpc, Server, Shell, answered, phone_with
+from test_u2_phone import Rpc, Shell, answered, phone_with
 
 from agent_phone.adapters.uiautomator2.adb import AdbResult
 from agent_phone.adapters.uiautomator2.address import MASKS, selector_for
 from agent_phone.adapters.uiautomator2.delivery import classify, classify_shell
-from agent_phone.adapters.uiautomator2.phone import U2Phone
 from agent_phone.adapters.uiautomator2.rpc import Phase, RpcResult
 from agent_phone.adapters.uiautomator2.shell import Shell as AdbShell
 from agent_phone.adapters.uiautomator2.shell import commands_for
@@ -236,11 +235,6 @@ def test_the_clipboard_and_a_screenshot_are_reads_of_the_server():
         phone_with(Rpc(RpcResult(Phase.WRITTEN, None, None))).clipboard()
     image = phone_with(Rpc(answered(base64.b64encode(b"\xff\xd8jpeg").decode()))).screenshot()
     assert image == b"\xff\xd8jpeg"
-
-
-def test_the_phone_reports_what_this_backend_can_do():
-    phone = U2Phone(INFO, Rpc(), Forward(), Server(), 900, FakeClock(), Shell())
-    assert {c.value for c in phone.info().capabilities} == {"point_input", "clipboard", "screenshot"}
 
 
 class AmStartAdb:

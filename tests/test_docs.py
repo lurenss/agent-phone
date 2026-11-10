@@ -13,6 +13,7 @@ from agent_phone.core.commands.get import GetProperty
 from agent_phone.core.commands.is_ import IsProperty
 from agent_phone.core.device import (
     BootId,
+    Capability,
     Connected,
     DeviceIdentity,
     DeviceInfo,
@@ -97,7 +98,7 @@ def test_the_example_device_list_is_what_the_code_prints():
         listed["density"],
         listed["locale"],
         Package(listed["ime"]),
-        frozenset(),
+        frozenset(Capability(name) for name in listed["capabilities"]),
     )
     rows = (
         Listed(Connected(info.identity.serial, "SM_J730F", True), info, None, None),

@@ -75,7 +75,7 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
 | `WRONG_DEVICE` | The ref belongs to another device, or `-d` contradicts the device the ref names. |
 | `DEVICE_BUSY` | Another process drives this device (`A3-4`). |
 | `SERVER_UNAVAILABLE` | The on-device server did not answer its health check in time. |
-| `NOT_SUPPORTED` | The backend cannot perform this input. |
+| `NOT_SUPPORTED` | The backend cannot perform this input. For an input that needs a capability the backend lacks, `details.capability` names it, one of the `capabilities` that `devices` prints. The refusal comes before any screen read for an input with no target, such as `press back`, and always before the input spends the refs. |
 | `SNAPSHOT_NOT_FOUND` | No stored snapshot has that id. It was never taken here, it is older than the newest 64 of its device, or it was written in a form this version cannot read. |
 | `STALE_REF` | The ref cannot be trusted. `details.reason` is `spent` (input was sent after its snapshot), `rebooted` (the snapshot is from an earlier boot) or `gone` (its element is no longer on screen). |
 | `OBSERVE_FIRST` | Input was sent after the device's latest snapshot, so a query or an input without a target needs a new snapshot first. |
@@ -109,6 +109,7 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
 | `locale` | string | with facts | The user's language tag, such as `en-US`. |
 | `ime` | string or null | with facts | The package of the default keyboard, or null when none is set. |
 | `boot_id` | string | with facts | The kernel's boot id. It changes at every reboot, and a ref from an earlier boot is `STALE_REF`. |
+| `capabilities` | array | with facts | What the backend can do on this device, sorted: `point_input` (click, scroll), `key_back`, `key_recents`, `intent_links` (an `intent:` link of `open-url`), `rotate`, `power`, `clipboard`, `screenshot`. An input that needs one the list lacks is `NOT_SUPPORTED`. |
 | `problem` | string | when facts failed | Why a ready device has no facts. |
 | `profile` | string or null | always | The `name` of the device profile in `<state root>/profiles/` whose `serial` is this device's, or null when none is. |
 
@@ -116,6 +117,7 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
 {"v":1,"ok":true,"command":"devices","permission_mode":"ask","device":null,"data":{"devices":[
  {"serial":"0a1b2c3d4e5f6a7b","model":"SM-J730F","ready":true,"api":28,"abi":"armeabi-v7a","display":[1080,1920],
   "density":420,"locale":"en-US","ime":"com.sec.android.inputmethod","boot_id":"8d3f6c1e-0b5a-4c2e-9f1d-2a7b3c4d5e6f",
+  "capabilities":["clipboard","intent_links","key_back","key_recents","point_input","power","rotate","screenshot"],
   "profile":null},
  {"serial":"R58M1234567","model":"","ready":false,"profile":null}]}}
 ```

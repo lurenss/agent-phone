@@ -52,7 +52,7 @@ tests/                      behavior tests and redacted golden fixtures
 
 **Design.** `docs/design/core-types.md` explains the types and the reasons behind them. Read it before you change a type in `core/`.
 
-**Backends.** The adapter interface is the `Phone` protocol in `core/phone.py`. A second backend, such as a custom `app_process` server, is a new folder under `adapters/` and changes no command.
+**Backends.** The adapter interface is the `Phone` protocol in `core/phone.py`. A second backend, such as a custom `app_process` server, is a new folder under `adapters/` and changes no command. It adds a rig to `tests/test_phone_contract.py`, the suite every `Phone` passes, the test fake included.
 
 ## Coding standards
 
