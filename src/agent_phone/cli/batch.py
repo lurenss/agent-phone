@@ -34,7 +34,7 @@ from agent_phone.cli.settings import Settings
 from agent_phone.cli.trace import Trace, end_record, step_record
 from agent_phone.core.act.ledger import spends, unrefunded
 from agent_phone.core.device import Serial
-from agent_phone.core.envelope import VERSION, delivery_keys, floor_envelope, to_wire
+from agent_phone.core.envelope import VERSION, After, delivery_keys, floor_envelope, to_wire
 from agent_phone.core.envelope import exit_code as outcome_code
 from agent_phone.core.outcome import Disposition, ErrorCode, Outcome, Refusal, Refused
 from agent_phone.core.phone import PhoneHub
@@ -59,6 +59,7 @@ class Step:
     name: str
     command: DriverCommand
     policies: tuple[Path, ...]
+    after: After
 
 
 @dataclass(frozen=True, slots=True)
@@ -183,7 +184,7 @@ def parse_step(index: int, argv: tuple[str, ...]) -> Step:
         )
     if invocation.serial is not None:
         raise Refusal(ErrorCode.INVALID_ARGS, f"{where} names its own device. Give -d once, on the batch.")
-    return Step(index, argv, invocation.name, command, invocation.policies)
+    return Step(index, argv, invocation.name, command, invocation.policies, invocation.after)
 
 
 def run_batch(
@@ -245,7 +246,7 @@ def run_step(step: Step, driver: Driver, clock: Clock) -> StepResult:
             step.name, driver.serial, error, unrefunded=unrefunded(spent), mode=driver.mode
         )
         return StepResult(step, started, milliseconds(clock.now() - began), envelope, 1)
-    envelope = to_wire(step.name, driver.serial, outcome, mode=driver.mode)
+    envelope = to_wire(step.name, driver.serial, outcome, mode=driver.mode, after=step.after)
     return StepResult(step, started, milliseconds(clock.now() - began), envelope, outcome_code(outcome))
 
 

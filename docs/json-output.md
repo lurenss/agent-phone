@@ -274,6 +274,34 @@ The same tap under `dangerously-skip` goes out with no grant, and the gate says 
   "gate":{"verdict":"commits","effects":["schedule"],"granted":[],"skipped":["schedule"]},"verified_by":null,"after":null}}
 ```
 
+### After as a diff
+
+`--after diff` on an input prints `after` as what the screen gained and lost, in place of `tree`. It compares the lines of `after` with the lines of the snapshot the input stood on: the one its ref names, or the device's latest snapshot for a query or an input with no target. Every other key of the [snapshot payload](#snapshot-payload) stays. The same snapshot is recorded either way, so the ref of an added line works for the next input.
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `kept` | int | How many lines both snapshots print. A line is kept when only its ref, its indent or its bounds changed, so a renumbered or scrolled line is not a change. |
+| `added` | array of strings | The lines only `after` prints, as it prints them, with their refs and bounds and without indent. |
+| `gone` | array of strings | The lines only the earlier snapshot printed, without ref and bounds. |
+
+- A kept line has a new ref in the recorded snapshot, and the diff does not print it. Name a kept element by a query, or take a `snapshot`.
+- `after` prints `tree` as usual in three cases. No line was kept, so the input replaced the screen and a diff would list both screens. The earlier snapshot is not in the same mode, such as one taken with `--full`. Or the three keys are not shorter than `tree` in bytes.
+- The comparison is with what the earlier snapshot printed. When that snapshot printed a part of the screen, as a `find` or a `snapshot --root` does, `added` also lists lines that were on screen and that it did not print. A line that the size budget printed with less, such as without its detail, is in `gone` in its old form and in `added` in its new one.
+- Of two equal lines, the one that kept its bounds is the kept one.
+- `--after diff` adds no read and records nothing more. `after` is null wherever it is null without the flag.
+- A diff proves nothing. `delivery` is what it is without the flag.
+
+```json
+{"v":1,"ok":true,"command":"click","permission_mode":"ask","device":"0a1b2c3d4e5f6a7b","delivery":"delivered_verified","retry":"unsafe",
+ "data":{"input":{"kind":"tap","at":[540,350]},
+  "target":{"ref":"@fky1a:e2","role":"button","name":"Display","at":[540,350]},
+  "gate":{"verdict":"clear","reason":"no_commit_words"},"verified_by":"present name=\"Brightness\"",
+  "after":{"id":"v9mme","app":"com.android.settings","window":"application","mode":"compact","settled":"unchecked",
+   "keyboard":false,"dialog":false,"others":[],"toasts":[],"truncated":0,"kept":2,
+   "added":["@v9mme:e1 button \"Back\" [0,100,1080,200]","text \"Brightness\" [0,700,1080,800]"],
+   "gone":["button \"Display\""]}}}
+```
+
 ### Input kinds
 
 | Kind | Keys | Input |

@@ -20,6 +20,7 @@ from agent_phone.core.commands.scroll import ScrollCommand
 from agent_phone.core.commands.set_text import SetTextCommand
 from agent_phone.core.commands.stop import StopCommand
 from agent_phone.core.device import Package
+from agent_phone.core.envelope import After
 from agent_phone.core.phone import NAME, KeyName, Orientation
 from agent_phone.core.policy.rules import Effect
 from agent_phone.core.query import Match, Query
@@ -161,7 +162,8 @@ def command(
     about: str,
     commit: bool = False,
 ) -> argparse.ArgumentParser:
-    """The flags every input shares: what to wait for after it, how long, and which policy files."""
+    """The flags every input shares: what to wait for after it, how long, which policy files, and
+    how the `after` snapshot prints."""
     parser = commands.add_parser(name, parents=[after], help=about)
     if commit:
         parser.add_argument(
@@ -196,6 +198,13 @@ def command(
         help=f"how long to wait for the target and then for --wait-for (default {INPUT_TIMEOUT_MS})",
     )
     parser.add_argument("--policy", action="append", type=Path, default=[], metavar="FILE", help=POLICY_HELP)
+    parser.add_argument(
+        "--after",
+        choices=[form.value for form in After],
+        default=After.TREE.value,
+        help="how the result's after snapshot prints: its tree (default), or with diff only the "
+        "lines that the snapshot the input stood on did not print, and the ones it alone printed",
+    )
     return parser
 
 

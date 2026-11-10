@@ -22,6 +22,7 @@ from agent_phone.core.commands.skills import SKILLS, SkillsGetCommand, SkillsLis
 from agent_phone.core.commands.snapshot import SnapshotCommand
 from agent_phone.core.commands.wait import WaitCommand
 from agent_phone.core.device import Serial
+from agent_phone.core.envelope import After
 from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.query import Match, Query
 from agent_phone.core.role import Role
@@ -49,12 +50,14 @@ SKILL_NAMES = {name: skill for skill in SKILLS for name in (skill.name, skill.al
 
 @dataclass(frozen=True, slots=True)
 class Invocation:
-    """`policies` are the caller's policy files, which only input commands take."""
+    """`policies` are the caller's policy files and `after` is the form of the `after` snapshot.
+    Only input commands take them."""
 
     name: str
     serial: Serial | None
     command: Command
     policies: tuple[Path, ...] = ()
+    after: After = After.TREE
 
 
 class Parser(argparse.ArgumentParser):
@@ -273,4 +276,5 @@ def parse_args(argv: Sequence[str]) -> Invocation:
             command = input_command(parsed)
     serial = Serial(parsed.device) if parsed.device else None
     name = parsed.command if parsed.command != "clipboard" else f"clipboard {parsed.action}"
-    return Invocation(name, serial, command, tuple(getattr(parsed, "policy", ())))
+    after = After(getattr(parsed, "after", After.TREE.value))
+    return Invocation(name, serial, command, tuple(getattr(parsed, "policy", ())), after)

@@ -33,7 +33,7 @@ from agent_phone.core.commands.set_text import SetTextCommand
 from agent_phone.core.commands.skills import SkillsGetCommand, SkillsListCommand
 from agent_phone.core.commands.snapshot import SnapshotCommand
 from agent_phone.core.device import Serial, select_device
-from agent_phone.core.envelope import encode, exit_code, floor_envelope, to_wire
+from agent_phone.core.envelope import After, encode, exit_code, floor_envelope, to_wire
 from agent_phone.core.outcome import Outcome, Refusal, Refused
 from agent_phone.core.phone import PhoneHub
 from agent_phone.core.refs.resolve import RefTarget
@@ -53,11 +53,11 @@ def run(
 ) -> int:
     """Run one command line against `hub` and print its envelope to `out`. `stdin` is where a
     batch reads its steps when it is given no file."""
-    name, device = "", None
+    name, device, after = "", None, After.TREE
     outcome: Outcome | BatchResult
     try:
         invocation = parse_args(argv)
-        name = invocation.name
+        name, after = invocation.name, invocation.after
         outcome, device = execute(invocation, hub, settings, clock or SystemClock(), stdin or sys.stdin)
     except Refusal as refusal:
         if unrefunded():
@@ -74,7 +74,7 @@ def run(
     if isinstance(outcome, BatchResult):
         out.write(encode(outcome.wire()) + "\n")
         return outcome.exit_code
-    out.write(encode(to_wire(name, device, outcome, mode=settings.permission_mode)) + "\n")
+    out.write(encode(to_wire(name, device, outcome, mode=settings.permission_mode, after=after)) + "\n")
     return exit_code(outcome)
 
 
