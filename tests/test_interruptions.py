@@ -3,7 +3,8 @@
 The dialogs are built here, not captured from a phone, so no test names a real app. The words for an
 app that does not respond and for a permission are those of AOSP's string resources. The paste and
 purchase prompts have no AOSP dialog behind them: their words are this project's own.
-`dialog-over-app` and `samsung-j7-dialog` are the captured dialogs."""
+`CAPTURED` lists the dialogs read from a device: the `emu-*-35-*` ones are Android 15's own, raised
+on the emulator in `en-US` and `it-IT`."""
 
 import tomllib
 
@@ -189,11 +190,25 @@ def test_the_built_in_rules_cover_four_kinds_in_both_languages_and_name_no_app()
     assert all(not rule.scope.packages and len(rule.scope.languages) == 1 for rule in rules)
 
 
-def test_the_captured_bluetooth_prompt_is_a_permission_and_every_other_fixture_is_quiet():
+CAPTURED = {
+    "dialog-over-app": ("en", "default.permission.deny.en", "Deny"),
+    "samsung-j7-dialog": ("en", "default.permission.deny.en", "Deny"),
+    "emu-en-35-permission": ("en", "default.permission.en", "Don’t allow"),
+    "emu-it-35-permission": ("it", "default.permission.it", "Non consentire"),
+    "emu-en-35-not-responding": ("en", "default.not-responding.en", "Wait"),
+    "emu-it-35-not-responding": ("it", "default.not-responding.it", "Attendi"),
+}
+
+
+def test_each_captured_dialog_is_named_with_its_way_out_and_every_other_fixture_is_quiet():
     for path in sorted(DUMPS.glob("*.xml")):
-        named = found(fixture_screen(path.stem))
-        asks = path.stem in ("dialog-over-app", "samsung-j7-dialog")
-        assert named == ([("default.permission.deny.en", "permission", False)] if asks else []), path.stem
+        screen = fixture_screen(path.stem)
+        language, rule, way_out = CAPTURED.get(path.stem, ("en", None, None))
+        named = [
+            (i.rule, i.dismiss and screen.node(i.dismiss).attrs.text)
+            for i in interruptions_of(POLICY, screen, f"{language}-XX")
+        ]
+        assert named == ([(rule, way_out)] if rule else []), path.stem
 
 
 def test_a_consumer_file_names_its_own_apps_pop_up_and_only_in_that_app(tmp_path):
