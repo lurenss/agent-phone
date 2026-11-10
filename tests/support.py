@@ -115,6 +115,24 @@ def checkbox_row(label: str) -> Screen:
     )
 
 
+def search_field(typed: str = "") -> Screen:
+    """A Settings page with one text field named "Search settings" that holds `typed`."""
+    return screen_of(
+        node(
+            "android.widget.FrameLayout",
+            node(
+                "android.widget.EditText",
+                text=typed,
+                content_desc="Search settings",
+                clickable=True,
+                bounds="[0,200][1080,300]",
+            ),
+            package="com.android.settings",
+            bounds="[0,0][1080,1920]",
+        )
+    )
+
+
 def dump(*windows: str, rotation: int = 0) -> str:
     return f'<hierarchy rotation="{rotation}">{"".join(windows)}</hierarchy>'
 

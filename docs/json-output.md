@@ -387,6 +387,43 @@ Each batch writes one JSONL file, `<state root>/traces/<serial>/<UTC timestamp>-
 {"line":"end","stopped_at":1,"ms":416}
 ```
 
+## Command trace
+
+Every command that reads or drives the phone, run by itself, appends two lines to `<state root>/traces/<serial>/<UTC date>.jsonl`: a begin line before it runs and an end line after it. The file has mode 0600 in a folder of mode 0700, like a batch's trace. A begin line with no end line is a command that died on the way. The end line is read from the command's envelope, so the two agree. `devices`, `skills` and `server` write no line, and a batch writes its own file.
+
+#### Command begin line
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `line` | string | `begin`. |
+| `seq` | int | The command's number in the file, from 0. Its end line has the same number. |
+| `command` | string | The command's name, as in its envelope. |
+| `argv` | array of strings | The command's arguments from the command word on, without the flag that named the device. Typed text is replaced by `<N chars>`, as in a [batch's step line](#trace-step-line). Every other word is written as given, so a link given to `open-url` is in the file. |
+| `started_utc` | string | When the command started, in UTC with milliseconds. |
+
+#### Command end line
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `line` | string | `end`. |
+| `seq` | int | The `seq` of the command's begin line. |
+| `permission_mode` | string | The command's `permission_mode`. |
+| `ms` | int | How long the command took. |
+| `ok` | bool | The command's `ok`. |
+| `delivery` | string or null | The command's `delivery`, null for a read that succeeded. |
+| `retry` | string or null | The command's `retry`, null when it has no `delivery`. |
+| `error` | string or null | The command's error code. |
+| `input` | string or null | The kind of the input that went out, from the [input kinds](#input-kinds), or null. |
+| `target` | object or null | As in a [batch's step line](#trace-step-line). |
+| `gate` | object or null | The verdict the input was sent under, as in the [input payload](#input-payload), or null. |
+
+```jsonl
+{"line":"begin","seq":0,"command":"snapshot","argv":["snapshot"],"started_utc":"2026-11-10T09:15:00.211Z"}
+{"line":"end","seq":0,"permission_mode":"ask","ms":212,"ok":true,"delivery":null,"retry":null,"error":null,"input":null,"target":null,"gate":null}
+{"line":"begin","seq":1,"command":"set-text","argv":["set-text","name=Search settings","<7 chars>"],"started_utc":"2026-11-10T09:15:03.870Z"}
+{"line":"end","seq":1,"permission_mode":"ask","ms":655,"ok":true,"delivery":"delivered_verified","retry":"unsafe","error":null,"input":"set_text","target":{"ref":null,"query":"name=\"Search settings\"","role":"field","name":"Search settings"},"gate":{"verdict":"clear","reason":"not_labeled_input"}}
+```
+
 ## Device reads
 
 `clipboard get` prints `{"value": <text or null>}`, null when the clipboard holds no text. `screenshot` saves a JPEG under the state root, in `devices/<serial>/screenshots/`, readable only by the user, and prints `{"value": <path>}`. Neither sends input, so no ref changes.

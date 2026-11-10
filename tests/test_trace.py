@@ -61,6 +61,8 @@ def test_two_traces_never_share_a_file(tmp_path):
         (["set-text", "@k3x9q:e3", "héllo wörld"], ["set-text", "@k3x9q:e3", "<11 chars>"]),
         (["set-text", "@k3x9q:e3", ""], ["set-text", "@k3x9q:e3", "<0 chars>"]),
         (["clipboard", "set", "a secret"], ["clipboard", "set", "<8 chars>"]),
+        (["set-text", "role=field", "--", "-hunter2"], ["set-text", "role=field", "--", "<8 chars>"]),
+        (["clipboard", "set", "--", "--pw"], ["clipboard", "set", "--", "<4 chars>"]),
         (["click", "name=hunter2"], ["click", "name=hunter2"]),
         (["clipboard", "get"], ["clipboard", "get"]),
     ],

@@ -16,10 +16,11 @@ from agent_phone.adapters.uiautomator2.phone import U2Hub
 from agent_phone.cli.args import Command, Invocation, parse_args
 from agent_phone.cli.batch import BatchResult, read_steps, run_batch
 from agent_phone.cli.batch_args import BatchCommand
-from agent_phone.cli.commands import READS
-from agent_phone.cli.driver import PhoneError, device_lock, open_phone
+from agent_phone.cli.commands import READS, DriverCommand
+from agent_phone.cli.driver import Driver, PhoneError, device_lock, open_phone
 from agent_phone.cli.policy import load_profiles
 from agent_phone.cli.settings import Settings
+from agent_phone.cli.trace import Trace, redacted, without_device
 from agent_phone.core.act.ledger import unrefunded
 from agent_phone.core.commands import devices, server, skills
 from agent_phone.core.commands.click import ClickCommand
@@ -101,7 +102,7 @@ def execute(
                 ref=ref_of(command),
                 first_read=True,
             ) as driver:
-                return driver.run(command), driver.serial
+                return traced(invocation, command, driver, settings, clock), driver.serial
         case BatchCommand() as command:
             steps = read_steps(command, stdin)
             ref = next((found for step in steps if (found := ref_of(step.command)) is not None), None)
@@ -126,7 +127,22 @@ def execute(
                 command=invocation.name,
                 ref=ref_of(command),
             ) as driver:
-                return driver.run(command), driver.serial
+                return traced(invocation, command, driver, settings, clock), driver.serial
+
+
+def traced(
+    invocation: Invocation, command: DriverCommand, driver: Driver, settings: Settings, clock: Clock
+) -> Outcome:
+    """Run the command between its begin line and its end line in the device's trace of the day
+    (`cli/trace.py`). A command that raises leaves the begin line alone."""
+    argv = redacted(without_device(invocation.argv, invocation.serial), command)
+    with Trace.daily(settings.state_root, driver.serial) as trace:
+        seq = trace.begin(invocation.name, argv)
+        began = clock.now()
+        outcome = driver.run(command)
+        wire = to_wire(invocation.name, driver.serial, outcome, mode=driver.mode)
+        trace.end(seq, command, wire, round((clock.now() - began) * 1000))
+    return outcome
 
 
 def ref_of(command: Command) -> RefToken | None:

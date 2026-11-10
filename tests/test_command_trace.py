@@ -9,11 +9,9 @@ import stat
 
 import pytest
 from fakes import J7_SERIAL, FakeHub, FakePhone, invoke
-from support import fixture_screen, node, screen_of
+from support import fixture_screen, node, screen_of, search_field
 
 from agent_phone.core.device import Connected
-
-todo = pytest.mark.xfail(strict=True, reason="the trace of single commands is not written yet")
 
 J7 = Connected(J7_SERIAL, "SM_J730F", ready=True)
 SETTINGS = fixture_screen("settings-home")
@@ -21,20 +19,6 @@ BRIGHTNESS = screen_of(
     node(
         "android.widget.FrameLayout",
         node("android.widget.TextView", text="Brightness", bounds="[0,200][1080,300]"),
-        package="com.android.settings",
-        bounds="[0,0][1080,1920]",
-    )
-)
-SEARCH = screen_of(
-    node(
-        "android.widget.FrameLayout",
-        node(
-            "android.widget.EditText",
-            text="Search settings",
-            resource_id="com.android.settings:id/search",
-            clickable=True,
-            bounds="[0,200][1080,300]",
-        ),
         package="com.android.settings",
         bounds="[0,0][1080,1920]",
     )
@@ -58,7 +42,6 @@ def mode(path):
     return stat.S_IMODE(os.stat(path).st_mode)
 
 
-@todo
 def test_a_single_click_leaves_a_begin_and_an_end_line(tmp_path):
     phone = hub()
     _, taken = invoke(["snapshot"], phone, tmp_path)
@@ -77,7 +60,6 @@ def test_a_single_click_leaves_a_begin_and_an_end_line(tmp_path):
     assert end["target"] == {"ref": ref, "query": None, "role": "button", "name": "Display"}
 
 
-@todo
 def test_the_trace_is_one_private_file_per_device_and_utc_day(tmp_path):
     invoke(["snapshot"], hub(), tmp_path)
     invoke(["snapshot"], hub(), tmp_path)
@@ -87,7 +69,6 @@ def test_the_trace_is_one_private_file_per_device_and_utc_day(tmp_path):
     assert [line["seq"] for line in lines(tmp_path)] == [0, 0, 1, 1]
 
 
-@todo
 def test_a_refused_command_has_an_end_line_with_its_error(tmp_path):
     invoke(["snapshot"], hub(), tmp_path)
     code, _ = invoke(["click", "name=Nowhere", "--timeout-ms", "100"], hub(), tmp_path)
@@ -96,11 +77,11 @@ def test_a_refused_command_has_an_end_line_with_its_error(tmp_path):
     assert end["target"] == {"ref": None, "query": 'name="Nowhere"', "role": None, "name": None}
 
 
-@todo
 def test_the_text_a_command_typed_is_not_in_the_trace(tmp_path):
-    phone = hub(SEARCH, SEARCH)
+    phone = hub(search_field(), search_field("hunter2"))
     invoke(["snapshot"], phone, tmp_path)
-    invoke(["set-text", "name=Search settings", "hunter2"], phone, tmp_path)
+    code, _ = invoke(["set-text", "name=Search settings", "hunter2"], phone, tmp_path)
+    assert code == 0
     invoke(["clipboard", "set", "hunter2"], phone, tmp_path)
     assert "hunter2" not in trace_file(tmp_path).read_text()
     typed, copied = (line for line in lines(tmp_path) if line["line"] == "begin" and line["seq"] > 0)
@@ -108,13 +89,14 @@ def test_the_text_a_command_typed_is_not_in_the_trace(tmp_path):
     assert (copied["command"], copied["argv"]) == ("clipboard set", ["clipboard", "set", "<7 chars>"])
 
 
-@todo
 @pytest.mark.parametrize(
     "argv",
     [
         ["-d", J7_SERIAL, "press", "back"],
         ["press", "back", "--device", J7_SERIAL],
         [f"--device={J7_SERIAL}", "press", "back"],
+        [f"-d{J7_SERIAL}", "press", "back"],
+        ["press", "back", "--dev", J7_SERIAL],
     ],
 )
 def test_the_argv_of_a_line_starts_at_the_command_and_names_no_device(tmp_path, argv):
@@ -123,7 +105,6 @@ def test_the_argv_of_a_line_starts_at_the_command_and_names_no_device(tmp_path, 
     assert lines(tmp_path)[2]["argv"] == ["press", "back"]
 
 
-@todo
 def test_a_command_that_dies_leaves_a_begin_line_with_no_end_line(tmp_path):
     class Broken(FakePhone):
         def read(self):

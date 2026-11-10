@@ -184,7 +184,7 @@ Several steps run in one process (`batch`, `cli/batch.py`). A step is the CLI's 
 
 ### Trace
 
-The record of one batch (`Trace`, `cli/trace.py`): a JSONL file under `traces/<serial>/` in the state root, mode 0600 in a folder of mode 0700, with a line appended as each step ends and a last line for the end. A step's line is read from its envelope: whether it was ok, its delivery and retry, its error code, and for an input its kind, its target and its gate verdict. It holds no snapshot, and the text of `set-text` and `clipboard set` shows as `<N chars>`. *Avoid:* "log" for `decisions.tsv`, which records decisions and not steps.
+The record of what commands did (`Trace`, `cli/trace.py`): JSONL files under `traces/<serial>/` in the state root, mode 0600 in a folder of mode 0700. A batch has its own file, with a line appended as each step ends and a last line for the end. Every other command that reads or drives the phone appends a begin line and an end line to the device's file of the UTC day, so a begin line with no end line is a command that died on the way. A step's line and an end line are read from the command's envelope: whether it was ok, its delivery and retry, its error code, and for an input its kind, its target and its gate verdict. It holds no snapshot, and the text of `set-text` and `clipboard set` shows as `<N chars>`. *Avoid:* "log" for `decisions.tsv`, which records decisions and not steps.
 
 ## Devices and the server
 

@@ -6,7 +6,7 @@ import re
 
 import pytest
 from fakes import FakeHub, invoke
-from support import GOLDEN, ROOT, fixture_screen, node, screen_of, snapshot_of
+from support import GOLDEN, ROOT, fixture_screen, node, screen_of, search_field, snapshot_of
 
 from agent_phone.cli.settings import Settings
 from agent_phone.core.commands.get import GetProperty
@@ -259,7 +259,24 @@ def test_the_trace_tables_list_exactly_the_keys_a_line_carries(tmp_path):
 
 
 def test_the_example_trace_has_the_keys_of_the_tables():
-    [block] = re.findall(r"```jsonl\n(.*?)```", CONTRACT, re.S)
+    block, _ = re.findall(r"```jsonl\n(.*?)```", CONTRACT, re.S)
     *steps, end = [json.loads(line) for line in block.splitlines()]
     assert all(list(step) == first_column("#### Trace step line") for step in steps)
     assert list(end) == first_column("#### Trace end line")
+
+
+def test_the_command_trace_tables_list_exactly_the_keys_a_line_carries(tmp_path):
+    j7 = Connected(Serial("0a1b2c3d4e5f6a7b"), "SM_J730F", True)
+    hub = FakeHub([j7], screens=[search_field()], after_input=[search_field("hunter2")])
+    invoke(["snapshot"], hub, tmp_path)
+    invoke(["set-text", "name=Search settings", "hunter2"], hub, tmp_path)
+    [file] = (tmp_path / "traces" / "0a1b2c3d4e5f6a7b").iterdir()
+    written = [json.loads(line) for line in file.read_text().splitlines()]
+    _, block = re.findall(r"```jsonl\n(.*?)```", CONTRACT, re.S)
+    example = [json.loads(line) for line in block.splitlines()]
+    for line in (*written, *example):
+        assert list(line) == first_column(f"#### Command {line['line']} line")
+    stable = ("line", "seq", "command", "argv", "ok", "delivery", "error", "input", "target", "gate")
+    assert [{k: v for k, v in line.items() if k in stable} for line in written] == [
+        {k: v for k, v in line.items() if k in stable} for line in example
+    ]

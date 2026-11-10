@@ -55,6 +55,7 @@ class Invocation:
     serial: Serial | None
     command: Command
     policies: tuple[Path, ...] = ()
+    argv: tuple[str, ...] = ()
 
 
 class Parser(argparse.ArgumentParser):
@@ -273,4 +274,4 @@ def parse_args(argv: Sequence[str]) -> Invocation:
             command = input_command(parsed)
     serial = Serial(parsed.device) if parsed.device else None
     name = parsed.command if parsed.command != "clipboard" else f"clipboard {parsed.action}"
-    return Invocation(name, serial, command, tuple(getattr(parsed, "policy", ())))
+    return Invocation(name, serial, command, tuple(getattr(parsed, "policy", ())), tuple(argv))
