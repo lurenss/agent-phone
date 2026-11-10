@@ -3,8 +3,9 @@ out. It is made from the full wire object, so it can say nothing the full form d
 
 A key is left out when it holds its usual value, and a missing key means that value: `permission_mode`
 `ask`, `window` `application`, `mode` `compact`, `keyboard` and `dialog` false, `truncated` 0, no
-toast, no interruption, no window besides the system bars, a `clear` gate, nothing verified. Tree
-lines lose their bounds. What was sent and at what is left out: the caller named it.
+toast, no interruption, a `clear` gate, nothing verified. Tree lines lose their bounds. What was
+sent and at what is left out: the caller named it. So are the system windows of `others` (the bars,
+the notification shade, a heads-up notification), which the full form lists.
 """
 
 from __future__ import annotations

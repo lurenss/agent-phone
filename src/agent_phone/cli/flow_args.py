@@ -35,7 +35,9 @@ def param(text: str) -> tuple[str, str]:
     return name, value
 
 
-def add_flow(commands: argparse._SubParsersAction, after: argparse.ArgumentParser) -> None:
+def add_flow(
+    commands: argparse._SubParsersAction, after: argparse.ArgumentParser, form: argparse.ArgumentParser
+) -> None:
     flow = commands.add_parser("flow", help="replay a job that was written once as a file of steps")
     actions = flow.add_subparsers(dest="action", metavar="action", required=True, parser_class=type(after))
     run = actions.add_parser(
@@ -73,6 +75,7 @@ def add_flow(commands: argparse._SubParsersAction, after: argparse.ArgumentParse
     )
     record = actions.add_parser(
         "record",
+        parents=[form],
         help="draft a flow file from the trace of what was done by hand",
         description="Read TRACE, a device's trace of one day, and write to --out the draft of a flow "
         "with one step for each input and wait in it that was ok. A target that was named by ref "

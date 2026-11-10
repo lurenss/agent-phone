@@ -194,6 +194,8 @@ def parse_step(index: int, argv: tuple[str, ...], shown: Sequence[str] | None = 
         )
     if invocation.serial is not None:
         raise Refusal(ErrorCode.INVALID_ARGS, f"{where} names its own device. Give -d once, on the batch.")
+    if invocation.lean:
+        raise Refusal(ErrorCode.INVALID_ARGS, f"{where} asks for --lean. Give it once, on the whole call.")
     return Step(index, argv, invocation.name, command, invocation.policies, invocation.after)
 
 

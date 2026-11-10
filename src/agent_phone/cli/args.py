@@ -84,20 +84,23 @@ def positive_number(text: str) -> int:
 
 
 def build() -> Parser:
-    """`-d` is accepted before the command and after it, because callers put it in both places."""
+    """`-d` and `--lean` are accepted before the command and after it, because callers put them in
+    both places. Every command takes `--lean`, also the ones that take no device."""
     device = dict(metavar="SERIAL", help="the adb serial; needed when several devices are ready")
-    after = Parser(add_help=False)
-    after.add_argument("-d", "--device", default=argparse.SUPPRESS, **device)
-    after.add_argument(
-        "--lean",
+    lean = dict(
         action="store_true",
         help="print the short form: tree lines without bounds, and no key that holds its usual value",
     )
+    form = Parser(add_help=False)
+    form.add_argument("--lean", default=argparse.SUPPRESS, **lean)
+    after = Parser(add_help=False, parents=[form])
+    after.add_argument("-d", "--device", default=argparse.SUPPRESS, **device)
     parser = Parser(
         prog="agent-phone",
         description="Drive an Android phone over adb. Every command prints one JSON object.",
     )
     parser.add_argument("-d", "--device", **device)
+    parser.add_argument("--lean", **lean)
     commands = parser.add_subparsers(dest="command", metavar="command", required=True, parser_class=Parser)
     commands.add_parser("devices", parents=[after], help="list every device with the facts read from it")
     add_snapshot(commands, after)
@@ -112,19 +115,19 @@ def build() -> Parser:
     add_wait(commands, after)
     add_inputs(commands, after)
     add_batch(commands, after)
-    add_flow(commands, after)
-    add_skills(commands)
+    add_flow(commands, after, form)
+    add_skills(commands, form)
     return parser
 
 
-def add_skills(commands: argparse._SubParsersAction) -> None:
+def add_skills(commands: argparse._SubParsersAction, form: argparse.ArgumentParser) -> None:
     """They read only the package, so they take no device."""
     skills = commands.add_parser(
         "skills", help="print the usage guides for agents that ship with agent-phone"
     )
     actions = skills.add_subparsers(dest="action", metavar="action", required=True, parser_class=Parser)
-    actions.add_parser("list", help="list the guides, each with its name, alias and summary")
-    get = actions.add_parser("get", help="print one guide; its Markdown is data.content")
+    actions.add_parser("list", parents=[form], help="list the guides, each with its name, alias and summary")
+    get = actions.add_parser("get", parents=[form], help="print one guide; its Markdown is data.content")
     get.add_argument(
         "name",
         nargs="?",

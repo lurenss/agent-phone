@@ -127,3 +127,23 @@ def test_the_documented_lean_example_is_what_the_code_prints_for_its_screens(tmp
     (_, _), (_, lean) = both(["click", "@ID:e1", "--settle"], tmp_path, after_input=[AFTER])
     printed = json.dumps(lean).replace(lean["data"]["after"]["id"], example["data"]["after"]["id"])
     assert json.loads(printed) == example
+
+
+def test_every_command_takes_lean_before_or_after_its_name(tmp_path):
+    from agent_phone.cli.args import parse_args
+
+    code, wire = invoke(["skills", "get", "reference", "--lean"], FakeHub([]))
+    assert code == 0 and set(wire) == {"ok", "data"} and wire["data"]["name"] == "agent-phone-reference"
+    code, wire = invoke(["--lean", "snapshot"], FakeHub([J7], screens=[BEFORE]), tmp_path)
+    assert code == 0 and set(wire) == {"ok", "data"}
+    for argv in (["skills", "list", "--lean"], ["flow", "record", "day.jsonl", "--out", "f.toml", "--lean"]):
+        assert parse_args(argv).lean
+    assert not parse_args(["snapshot"]).lean
+
+
+def test_a_step_takes_no_lean_of_its_own(tmp_path):
+    path = tmp_path / "steps.json"
+    path.write_text(json.dumps([["snapshot", "--lean"]]))
+    hub = FakeHub([J7], screens=[BEFORE])
+    code, wire = invoke(["batch", str(path)], hub, tmp_path)
+    assert code == 2 and wire["error"]["code"] == "INVALID_ARGS" and hub.phones == []

@@ -72,10 +72,10 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
 | `data.verified_by` of an input | It is not null. |
 | `window`, `mode`, `keyboard`, `dialog`, `truncated` of a snapshot | They are not `application`, `compact`, false, false and 0. |
 | `toasts`, `interruptions` of a snapshot | They are not empty. |
-| `others` of a snapshot | A window besides the system bars is there. Only those windows are listed. |
+| `others` of a snapshot | A window that is not a `system` window is there, such as a popup menu. Only those are listed. The bars, the notification shade and a heads-up notification are `system` windows, so run the command without `--lean` to see what covers an `OCCLUDED` target. |
 | The bounds of a line of `tree`, `added`, `gone` or `matches` | Never printed. |
 
-Every other key prints as in the full form. A snapshot inside `error.details`, and each step's envelope of a `batch`, print lean too. The exit code, what is recorded and what is traced do not change.
+Every other key prints as in the full form. A snapshot inside `error.details`, and each step's envelope of a `batch`, print lean too. The exit code, what is recorded and what is traced do not change. Every command takes `--lean`, before or after its name. A step of a batch or of a flow does not: give it once, on the whole call. A call whose arguments do not parse, and one that fails inside agent-phone (`INTERNAL`), print the full form.
 
 ## Delivery
 
