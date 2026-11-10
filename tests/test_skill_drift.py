@@ -41,9 +41,12 @@ EVERY_OPTION = {flag: action for leaf in LEAVES.values() for flag, action in opt
 
 
 def code_pieces(text: str) -> list[str]:
-    """Each line of a fenced block, then each inline code span outside the blocks."""
+    """Each command of each line of a fenced block, where `&&` chains two, then each inline code
+    span outside the blocks."""
     lines = [line for block in FENCE.findall(text) for line in block.splitlines()]
-    return lines + SPAN.findall(FENCE.sub("", text))
+    return [command.strip() for line in lines for command in line.split(" && ")] + SPAN.findall(
+        FENCE.sub("", text)
+    )
 
 
 def full_command(argv: list[str]) -> tuple[str, ...] | None:
@@ -110,6 +113,7 @@ def test_drift_catches_planted_names():
         "`agent-phone get e4`",
         "`agent-phone server reboot --help`",
     ]
+    planted.append("```bash\nagent-phone press back --settle && agent-phone press sideways\n```")
     for text in planted:
         assert drift(text)[0], f"{text!r} names something the parser lacks"
     fine = (

@@ -42,6 +42,20 @@ agent-phone wait --for 'name=Uploaded' --timeout-ms 30000 --lean   # wait for so
 agent-phone find --name Wi-Fi --lean                        # the matching lines only, each with a ref
 ```
 
+## Send two steps in one line when you know both
+
+A turn of yours costs more time than a command. When you can name the next target before you see the next screen, because your task names it or the screen you have shows where it leads, chain the two commands with `&&`:
+
+```bash
+agent-phone launch com.android.settings --settle --lean && agent-phone click 'name=Search settings' --settle --lean
+agent-phone scroll down 'id=recycler_view' --until 'name=About phone' --lean && agent-phone click 'name=About phone' --settle --lean
+agent-phone press back --settle --lean && agent-phone press back --settle --lean
+```
+
+- The second command cannot use a ref, because the first one spends every ref. Name its target by a query that matches one element.
+- The chain stops at the first command that fails, and each command prints its own result.
+- A query that matches nothing waits `--timeout-ms` before it fails. Chain only what you are sure of. When you cannot say what the screen will show, send one input and read `after`.
+
 ## Read the output
 
 ```json
