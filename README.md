@@ -32,7 +32,8 @@ agent-phone find --name Wi-Fi --role button   # every match, with its ref
 agent-phone get @k3x9q:e4 --property bounds   # one property of a ref, read live
 agent-phone is @k3x9q:e4 --property enabled   # one boolean of a ref, read live
 agent-phone server stop                  # free the phone for another tool, such as an old uiautomator dump
-agent-phone skills get phone             # the usage guide for agents, as Markdown in data.content
+agent-phone skills get phone             # the short usage guide for agents, as Markdown in data.content
+agent-phone skills get reference         # the full guide
 agent-phone click @k3x9q:e4 --wait-for 'name*=Brightness'   # tap a ref and verify the tap by its effect
 agent-phone set-text @k3x9q:e2 display   # write a field, then read it back
 agent-phone scroll down @k3x9q:e3        # swipe a list along the way it runs

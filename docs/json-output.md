@@ -150,7 +150,7 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
 
 ### Skills get
 
-`get` prints one guide. With no name it prints `agent-phone`.
+`get` prints one guide. With no name it prints `agent-phone`, the short guide for the usual loop. `agent-phone-reference`, alias `reference`, is the full one.
 
 | Key | Type | Meaning |
 | --- | --- | --- |
