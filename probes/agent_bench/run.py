@@ -131,12 +131,23 @@ def run_agent(folder: Path, checkout: Path, serial: str) -> dict:
         except subprocess.TimeoutExpired:
             pass  # no result line was written, so the run has no report and counts as failed
     wall = time.time() - started
-    return measure(folder, wall) | {"wrong": verify(serial, final_report(folder))}
+    wrong = verify(serial, final_report(folder))
+    return measure(folder, wall) | {"wrong": [*api_error(folder), *wrong]}
 
 
 def events(folder: Path) -> list[dict]:
     lines = (folder / "stream.jsonl").read_text(encoding="utf-8").splitlines()
     return [json.loads(line) for line in lines if line.startswith("{")]
+
+
+def api_error(folder: Path) -> list[str]:
+    """A session that the model API cut off, such as on a usage limit, says nothing about the tool."""
+    result = next((e for e in events(folder) if e.get("type") == "result"), {})
+    return (
+        [f"the agent's session ended on an API error: {result['api_error']}"]
+        if result.get("api_error")
+        else []
+    )
 
 
 def final_report(folder: Path) -> dict | None:
