@@ -28,7 +28,7 @@ agent-phone reads the screen and sends input. Every input names what it acts on 
 ```json
 {"v":1,"ok":true,"command":"snapshot","permission_mode":"ask","device":"emulator-5554","data":{
  "id":"q7m2k","app":"com.android.settings","window":"application","mode":"compact","settled":"settled",
- "keyboard":false,"dialog":false,"others":[],"toasts":[],"truncated":0,
+ "keyboard":false,"dialog":false,"others":[],"toasts":[],"interruptions":[],"truncated":0,
  "tree":[
   "text \"Settings\" [63,33,277,114]",
   "@q7m2k:e1 button \"Search\" [1648,0,1775,147]",
@@ -43,6 +43,7 @@ agent-phone reads the screen and sends input. Every input names what it acts on 
 - A line with no ref is text that has nothing to act on.
 - A line marked `lossy` holds `..`, which may stand for a character the phone could not read. Each character above U+FFFF, such as an emoji, shows as `..`, so 😴 shows as `..` and 👍🏽 as `....`. A literal `..` is marked too. To find the element, query the text as the line shows it, such as `name="Send .."`.
 - `keyboard` and `dialog` say that an overlay is up. `others` lists every other window with its `id`.
+- `interruptions` lists the pop-ups you did not ask for that a policy rule recognises, such as "isn't responding" or a permission prompt. Each has a `kind`, and `dismiss`, the ref of its safe way out, or null. agent-phone never clicks it. Click it yourself when your task allows. When `needs_human` is true, stop and ask your user.
 
 ## Use refs
 

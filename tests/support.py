@@ -51,6 +51,7 @@ def snapshot_of(screen: Screen, id: SnapshotId, device: DeviceIdentity, epoch: i
         dialog=surface.dialog,
         others=surface.others,
         toasts=screen.toasts,
+        interruptions=(),
         lines=view.lines,
         fingerprints=fingerprints(view),
         truncated=0,

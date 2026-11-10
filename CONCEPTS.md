@@ -128,7 +128,11 @@ Snapshots on disk, one immutable JSON file each, under `devices/<serial>/snapsho
 
 ### Policy
 
-The rules that decide what an input commits (`Policy`, `core/policy/model.py`; `rules.py` reads and layers it). Rules are data in TOML files: the package's `default.toml`, a device profile, and the files a caller passes. There are five rule kinds: `commit`, `exempt`, `ignore`, `inherit` and `deny`. `parse_policy` validates a file and `merge` applies the layers in order.
+The rules that decide what an input commits (`Policy`, `core/policy/model.py`; `rules.py` reads and layers it). Rules are data in TOML files: the package's `default.toml`, a device profile, and the files a caller passes. There are six rule kinds: `commit`, `exempt`, `ignore`, `inherit`, `deny` and `interruption`. `parse_policy` validates a file and `merge` applies the layers in order.
+
+### Interruption
+
+A pop-up the agent did not ask for, recognised by an `interruption` rule (`InterruptionRule`; `interruptions_of`, `core/policy/interrupt.py`): a window in which every phrase of the rule's `words` shows. Every snapshot lists the ones on screen with their kind and the ref of the button the rule calls the safe way out. The built-in rules name Android's own prompts and no app. An app's own pop-up, such as a rating request, is a rule in that consumer's policy file. agent-phone never clicks the way out.
 
 ### Effect
 

@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, NewType
 
 from agent_phone.core.device import DeviceIdentity, Package
 from agent_phone.core.outcome import ErrorCode, Refusal
+from agent_phone.core.policy.model import InterruptionKind, RuleId
 from agent_phone.core.query import Query
 from agent_phone.core.screen import WindowKind
 from agent_phone.core.snapshot.surface import OtherWindow
@@ -66,6 +67,18 @@ class SettleState(Enum):
 
 
 @dataclass(frozen=True, slots=True)
+class InterruptionNote:
+    """A pop-up that a policy rule recognised on the read (`policy/interrupt.py`). `dismiss` is the
+    number of the ref of its safe way out, or None when the rule names none or the snapshot did
+    not print it. agent-phone never clicks it."""
+
+    rule: RuleId
+    kind: InterruptionKind
+    needs_human: bool
+    dismiss: int | None
+
+
+@dataclass(frozen=True, slots=True)
 class Snapshot:
     id: SnapshotId
     device: DeviceIdentity
@@ -78,12 +91,25 @@ class Snapshot:
     dialog: bool
     others: tuple[OtherWindow, ...]
     toasts: tuple[str, ...]
+    interruptions: tuple[InterruptionNote, ...]
     lines: tuple[Line, ...]
     fingerprints: Mapping[int, Fingerprint]
     truncated: int
 
     def ref(self, number: int) -> RefToken:
         return RefToken(self.id, number)
+
+    def interruption_data(self) -> list[dict[str, object]]:
+        """The wire form of `interruptions`, for a snapshot payload and for INTERRUPTED."""
+        return [
+            {
+                "rule": note.rule,
+                "kind": note.kind.value,
+                "needs_human": note.needs_human,
+                "dismiss": None if note.dismiss is None else str(self.ref(note.dismiss)),
+            }
+            for note in self.interruptions
+        ]
 
     def pick(self, query: Query, below: Query | None = None) -> RefToken:
         """The one ref line matching `query`, optionally below the first line matching `below`.

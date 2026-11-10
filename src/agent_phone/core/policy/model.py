@@ -1,6 +1,6 @@
 """The policy rule schema: what a rule may contain, as frozen types.
 
-Five rule kinds, one table each in TOML (`rules.parse_policy` reads them, `rules.merge` layers
+Six rule kinds, one table each in TOML (`rules.parse_policy` reads them, `rules.merge` layers
 them):
 
 - `commit`: words, keys or URI schemes that make an input carry an `Effect`.
@@ -10,6 +10,8 @@ them):
   one of these resource-ids (`android:id/button1`), takes the effects of its context, so "OK"
   under "Delete this post?" deletes.
 - `deny`: refused whatever the caller grants.
+- `interruption`: words that name a pop-up the agent did not ask for, and the words of its safe
+  way out. It judges no input: `interrupt.interruptions_of` reads it for every observation.
 """
 
 from __future__ import annotations
@@ -124,7 +126,31 @@ class DenyRule:
     stops: frozenset[Package]
 
 
-Rule = CommitRule | ExemptRule | IgnoreRule | InheritRule | DenyRule
+class InterruptionKind(Enum):
+    PERMISSION = "permission"
+    PURCHASE = "purchase"
+    PASTE = "paste"
+    LOGIN = "login"
+    NOT_RESPONDING = "not_responding"
+    CRASH = "crash"
+    PROMO = "promo"
+
+
+@dataclass(frozen=True, slots=True)
+class InterruptionRule:
+    """Matches a window in which every phrase of `words` shows. `dismiss` names the safe way out:
+    the whole name of a button, in order of preference. `needs_human` marks a prompt that only the
+    user may answer, such as a purchase."""
+
+    origin: Origin
+    scope: Scope
+    kind: InterruptionKind
+    words: tuple[Phrase, ...]
+    dismiss: tuple[Phrase, ...]
+    needs_human: bool
+
+
+Rule = CommitRule | ExemptRule | IgnoreRule | InheritRule | DenyRule | InterruptionRule
 
 
 @dataclass(frozen=True, slots=True)

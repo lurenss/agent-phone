@@ -27,6 +27,7 @@ from agent_phone.core.outcome import Disposition, ErrorCode, Read, Refusal, Refu
 from agent_phone.core.phone import ServerStatus
 from agent_phone.core.policy.engine import ClearReason
 from agent_phone.core.policy.mode import PermissionMode
+from agent_phone.core.policy.model import InterruptionKind
 from agent_phone.core.policy.rules import Effect
 from agent_phone.core.role import Role
 from agent_phone.core.screen import WindowKind
@@ -60,6 +61,7 @@ def json_blocks():
         ("### Roles", Role),
         ("### States", State),
         ("### Window kinds", WindowKind),
+        ("### Interruption kinds", InterruptionKind),
         ("### Settle states", SettleState),
         ("### Get properties", GetProperty),
         ("### Is properties", IsProperty),

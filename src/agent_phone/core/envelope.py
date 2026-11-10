@@ -150,6 +150,7 @@ def snapshot_data(snapshot: Snapshot) -> dict[str, object]:
             for other in snapshot.others
         ],
         "toasts": list(snapshot.toasts),
+        "interruptions": snapshot.interruption_data(),
         "truncated": snapshot.truncated,
         "tree": [render_line(line, snapshot.id) for line in snapshot.lines],
     }
