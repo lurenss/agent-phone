@@ -11,7 +11,7 @@ from typing import NoReturn
 
 from agent_phone.cli.batch_args import BatchCommand, add_batch, batch_command
 from agent_phone.cli.commands import InputCommand
-from agent_phone.cli.flow_args import FlowRunCommand, add_flow, flow_command
+from agent_phone.cli.flow_args import FlowRecordCommand, FlowRunCommand, add_flow, flow_command
 from agent_phone.cli.input_args import INPUTS, add_inputs, input_command
 from agent_phone.cli.wait_args import add_wait, wait_command
 from agent_phone.core.commands.devices import DevicesCommand
@@ -42,6 +42,7 @@ Command = (
     | WaitCommand
     | BatchCommand
     | FlowRunCommand
+    | FlowRecordCommand
     | SkillsListCommand
     | SkillsGetCommand
     | InputCommand

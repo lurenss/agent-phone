@@ -250,6 +250,18 @@ run = ["set-text", "name=Search settings", "{query}"]
 - The run stops at the first step that fails or whose `expect` does not show. `error.details.step` is its index, and `error` is that step's own error, so a wait that timed out carries the screen in `details.after`. Go on by hand from there.
 - `retry` is `unsafe` when any step sent input. Look at the screen before you run the flow again, because it starts at its first step.
 
+Draft a flow from what you just did by hand:
+
+```bash
+agent-phone flow record ~/.agent-phone/traces/<serial>/2026-11-10.jsonl --out settings-search.toml
+```
+
+- Every command that reads or drives the phone leaves a begin and an end line in `<state root>/traces/<serial>/<UTC date>.jsonl`, readable only by you. `flow record` turns the inputs and waits in it that were ok into steps. It leaves out your snapshots and the commands that failed.
+- A target you named by ref becomes a query on its role and name. Text you typed becomes a parameter, `{text}`, so the draft never holds it.
+- `data.refs` lists the steps that still name a ref, because the element had no name. Name each by a query before you run the draft.
+- `data.skipped` lists the `seq` of each command the draft left out because its traced words no longer parse. Add those steps by hand.
+- A draft is a start. Read it, add `expect` where a step needs a screen, and try it with `--dry-run`.
+
 ## Retry only what did not reach the phone
 
 Every error carries `delivery` and `retry`.

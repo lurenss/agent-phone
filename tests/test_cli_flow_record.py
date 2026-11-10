@@ -2,6 +2,7 @@
 device's trace of the day and written as the draft of a flow that replays them with no agent."""
 
 import json
+import stat
 import tomllib
 
 import pytest
@@ -10,8 +11,6 @@ from support import fixture_screen, node, screen_of, search_field
 
 from agent_phone.core.device import Connected
 from agent_phone.core.phone import Launch, SetText, Tap
-
-pytestmark = pytest.mark.xfail(strict=True, reason="P3.7: flow record is not built yet")
 
 J7 = Connected(J7_SERIAL, "SM_J730F", ready=True)
 HOME = screen_of(
@@ -38,11 +37,13 @@ def ref_of(wire, words):
 
 
 def by_hand(root, typed="battery"):
-    """What an agent does without a flow: look, launch, look again, type into the field by its ref."""
-    hub = FakeHub([J7], screens=[HOME], after_each=[search_field(), search_field(typed)])
-    invoke(["snapshot"], hub, root)
-    invoke(["-d", J7_SERIAL, "launch", "com.android.settings"], hub, root)
-    _, looked = invoke(["snapshot"], hub, root)
+    """What an agent does without a flow: look, launch, look again, type into the field by its ref.
+    Each call is a process of its own, so each opens the phone on the screen the last one left."""
+    home, field = FakeHub([J7], screens=[HOME]), FakeHub([J7], screens=[search_field()])
+    invoke(["snapshot"], home, root)
+    invoke(["-d", J7_SERIAL, "launch", "com.android.settings"], home, root)
+    _, looked = invoke(["snapshot"], field, root)
+    hub = FakeHub([J7], screens=[search_field()], after_input=[search_field(typed)])
     code, _ = invoke(["set-text", ref_of(looked, "Search settings"), typed], hub, root)
     assert code == 0
     return hub
@@ -67,7 +68,8 @@ def test_a_recorded_settings_flow_replays_on_the_fake_phone(tmp_path):
     by_hand(tmp_path)
     code, wire, out = record(tmp_path)
     assert code == 0 and wire["ok"] is True and wire["command"] == "flow record" and wire["device"] is None
-    assert wire["data"] == {"out": str(out), "steps": 2, "params": ["text"], "refs": []}
+    assert wire["data"] == {"out": str(out), "steps": 2, "params": ["text"], "refs": [], "skipped": []}
+    assert stat.S_IMODE(out.stat().st_mode) == 0o600, "a draft holds names from the screen"
     draft = tomllib.loads(out.read_text())
     assert draft["flow"] == {"name": "draft", "grants": [], "params": ["text"]}
     assert [step["run"] for step in draft["step"]] == [
@@ -88,6 +90,45 @@ def test_typed_text_becomes_a_parameter_and_is_never_written(tmp_path):
     assert code == 0 and wire["data"]["params"] == ["text", "text2"]
     assert "hunter2" not in out.read_text() and "hunter2" not in json.dumps(wire)
     assert tomllib.loads(out.read_text())["step"][2]["run"] == ["clipboard", "set", "{text2}"]
+
+
+def test_typed_text_that_starts_with_a_dash_becomes_a_parameter_too(tmp_path):
+    field = FakeHub([J7], screens=[search_field()], after_input=[search_field("-hunter2")])
+    invoke(["snapshot"], field, tmp_path)
+    assert invoke(["set-text", "name=Search settings", "--", "-hunter2"], field, tmp_path)[0] == 0
+    code, wire, out = record(tmp_path)
+    assert code == 0 and wire["data"]["params"] == ["text"] and "hunter2" not in out.read_text()
+    assert "hunter2" not in trace(tmp_path).read_text()
+    replay = FakeHub([J7], screens=[search_field()], after_input=[search_field("-other")])
+    code, _ = invoke(["flow", "run", str(out), "--param", "text=-other"], replay, tmp_path / "replay")
+    assert code == 0 and sent(replay)[0].text == "-other"
+
+
+def test_a_line_that_a_short_text_changed_is_left_out_and_named(tmp_path):
+    field = FakeHub([J7], screens=[search_field()], after_input=[search_field("e")])
+    _, looked = invoke(["snapshot"], field, tmp_path)
+    assert invoke(["set-text", ref_of(looked, "Search settings"), "e"], field, tmp_path)[0] == 0
+    invoke(["snapshot"], field, tmp_path)
+    assert invoke(["press", "back"], field, tmp_path)[0] == 0
+    code, wire, out = record(tmp_path)
+    assert code == 0 and (wire["data"]["steps"], wire["data"]["skipped"]) == (1, [1])
+    assert [step["run"] for step in tomllib.loads(out.read_text())["step"]] == [["press", "back"]]
+
+
+def test_a_name_with_a_delete_character_still_loads(tmp_path):
+    odd = screen_of(
+        node(
+            "android.widget.FrameLayout",
+            node("android.widget.Button", text="Odd\x7fname", clickable=True, bounds="[0,200][200,400]"),
+            package="com.android.settings",
+            bounds="[0,0][1080,1920]",
+        )
+    )
+    hub = FakeHub([J7], screens=[odd])
+    _, looked = invoke(["snapshot"], hub, tmp_path)
+    assert invoke(["click", ref_of(looked, "button")], hub, tmp_path)[0] == 0
+    _, wire, out = record(tmp_path)
+    assert wire["data"]["refs"] == [] and "\x7f" in tomllib.loads(out.read_text())["step"][0]["run"][1]
 
 
 def test_reads_and_commands_that_failed_are_left_out_and_a_wait_stays(tmp_path):
@@ -130,11 +171,12 @@ def test_a_ref_whose_target_has_no_name_stays_a_ref_and_the_envelope_points_at_i
     hub = FakeHub([J7], screens=[NAMELESS], after_each=[NAMELESS])
     _, looked = invoke(["snapshot"], hub, tmp_path)
     ref = ref_of(looked, "button")
-    assert invoke(["click", ref], hub, tmp_path)[0] == 0
+    click = ["click", ref, "--commit", "unlabeled"]
+    assert invoke(click, hub, tmp_path)[0] == 0
     code, wire, out = record(tmp_path)
     assert code == 0 and wire["data"]["refs"] == [0]
-    assert tomllib.loads(out.read_text())["step"][0]["run"] == ["click", ref]
-    code, wire = invoke(["flow", "run", str(out)], hub, tmp_path / "replay")
+    assert tomllib.loads(out.read_text())["step"][0]["run"] == click
+    code, wire = invoke(["flow", "run", str(out), "--commit", "unlabeled"], hub, tmp_path / "replay")
     assert code == 2 and wire["error"]["code"] == "INVALID_ARGS", "the draft does not run until it is edited"
 
 

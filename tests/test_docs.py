@@ -250,6 +250,22 @@ def test_the_example_flow_is_what_the_code_prints_for_the_example_file(tmp_path)
     assert code == 0 and wire == example
 
 
+def test_the_example_flow_record_is_what_the_code_prints(tmp_path):
+    example = next(block for block in json_blocks() if block["command"] == "flow record")
+    assert list(example["data"]) == first_column("### Flow record")
+    j7 = Connected(Serial("0a1b2c3d4e5f6a7b"), "SM_J730F", True)
+    hub = FakeHub([j7], screens=[search_field()], after_input=[search_field("battery")])
+    invoke(["snapshot"], hub, tmp_path)
+    invoke(["launch", "com.android.settings"], hub, tmp_path)
+    invoke(["snapshot"], hub, tmp_path)
+    invoke(["set-text", "name=Search settings", "battery"], hub, tmp_path)
+    [trace] = (tmp_path / "traces" / "0a1b2c3d4e5f6a7b").iterdir()
+    out = tmp_path / "settings-search.toml"
+    code, wire = invoke(["flow", "record", str(trace), "--out", str(out)], hub, tmp_path)
+    wire["data"]["out"] = out.name
+    assert code == 0 and wire == example
+
+
 def run_batch(tmp_path, steps, serial="0a1b2c3d4e5f6a7b"):
     """The envelope and the trace lines of a batch on the Settings fixture, after one snapshot."""
     hub = FakeHub([Connected(Serial(serial), "SM_J730F", True)], screens=[fixture_screen("settings-home")])

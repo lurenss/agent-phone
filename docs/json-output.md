@@ -449,9 +449,34 @@ run = ["set-text", "name=Search settings", "{query}"]
 - The file's rules above are checked before a device is opened, and a file that breaks one is `INVALID_ARGS`. So is an unknown key in the file.
 - Text that a parameter typed is written to no trace line: a begin line of a flow has the words of the file, with `{name}` in them, and the keys `flow` and `step` after `started_utc`. Typed text can still show where the screen shows it. A snapshot prints what a field holds unless it is a password field, so the `details.after` of a later step that fails can show it, as a snapshot after `set-text` does. A parameter inside a query names something on the screen: the end line holds the query and the name it resolved to, and an error message can quote the query. So put a secret only where it is typed, and only into a password field.
 
+### Flow record
+
+`agent-phone flow record TRACE --out FILE` writes the draft of a flow file from a device's [trace](#command-trace) of one day, so a job an agent did by hand can be replayed. It reads that one file and opens no device, so `device` is null. A draft never replaces a file that exists, and it has mode 0600, because it holds names from the screen.
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `out` | string | The path of the draft. |
+| `steps` | int | How many steps the draft has. |
+| `params` | array of strings | The parameters the draft declares, one for each command that typed text: `text`, `text2` and so on. |
+| `refs` | array of ints | The steps that still name a ref, because the element had no name. The draft does not load until each is named by a query. |
+| `skipped` | array of ints | The `seq` of each command that was ok and is not in the draft, because its traced words do not parse. A trace hides typed text wherever it stands, so a text of one or two characters can change another word of its line. |
+
+- Each command in the trace that sent input or waited, and was ok, is a step, with the words that were typed. `snapshot`, `find`, `get`, `is`, `clipboard get` and `screenshot`, a command that failed, a command with no end line, and the lines of a flow's own run are left out.
+- A target that was named by ref becomes a query on the role and the name the ref resolved to, such as `role=button name="Display"`.
+- Typed text is `<N chars>` in a trace, and becomes `{text}` in the step. So no draft holds text that was typed, and `flow run` asks for it with `--param`.
+- The effects that the commands granted with `--commit` become the draft's `grants`. A commit that `dangerously-skip` let through had no `--commit`, so the draft declares no grant for it. Its dry run then fails at that step with `COMMIT_REFUSED`, which names the `--commit` to add.
+- A file that is not such a trace, a trace with nothing to replay, and an `--out` that exists are `INVALID_ARGS`.
+
+```json
+{"v":1,"ok":true,"command":"flow record","permission_mode":"ask","device":null,
+ "data":{"out":"settings-search.toml","steps":2,"params":["text"],"refs":[],"skipped":[]}}
+```
+
+A draft is a start. It has no `expect`, and a query on a role and a name can match two elements on another day. Read it, and try it with `--dry-run`.
+
 ## Command trace
 
-Every command that reads or drives the phone, run by itself, appends two lines to `<state root>/traces/<serial>/<UTC date>.jsonl`: a begin line before it runs and an end line after it. The file has mode 0600 in a folder of mode 0700, like a batch's trace. A begin line with no end line is a command that died on the way. The end line is read from the command's envelope, so the two agree. `devices`, `skills` and `server` write no line, and a batch writes its own file.
+Every command that reads or drives the phone, run by itself, appends two lines to `<state root>/traces/<serial>/<UTC date>.jsonl`: a begin line before it runs and an end line after it. The file has mode 0600 in a folder of mode 0700, like a batch's trace. A begin line with no end line is a command that died on the way. The end line is read from the command's envelope, so the two agree. `devices`, `skills` and `server` write no line, and a batch writes its own file. [`flow record`](#flow-record) drafts a flow from these lines.
 
 #### Command begin line
 

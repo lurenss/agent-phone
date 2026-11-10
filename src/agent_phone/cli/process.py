@@ -19,7 +19,8 @@ from agent_phone.cli.batch_args import BatchCommand
 from agent_phone.cli.commands import READS, DriverCommand
 from agent_phone.cli.driver import Driver, PhoneError, device_lock, open_phone
 from agent_phone.cli.flow import FlowResult, run_flow_file
-from agent_phone.cli.flow_args import FlowRunCommand
+from agent_phone.cli.flow_args import FlowRecordCommand, FlowRunCommand
+from agent_phone.cli.flow_record import FlowDraft, record_flow
 from agent_phone.cli.policy import load_profiles
 from agent_phone.cli.settings import Settings
 from agent_phone.cli.trace import Trace, redacted, without_device
@@ -57,7 +58,7 @@ def run(
     """Run one command line against `hub` and print its envelope to `out`. `stdin` is where a
     batch reads its steps when it is given no file."""
     name, device = "", None
-    outcome: Outcome | BatchResult | FlowResult
+    outcome: Outcome | BatchResult | FlowResult | FlowDraft
     try:
         invocation = parse_args(argv)
         name = invocation.name
@@ -74,7 +75,7 @@ def run(
         floor = floor_envelope(name, device, error, unrefunded=unrefunded(), mode=settings.permission_mode)
         out.write(encode(floor) + "\n")
         return 1
-    if isinstance(outcome, BatchResult | FlowResult):
+    if isinstance(outcome, BatchResult | FlowResult | FlowDraft):
         out.write(encode(outcome.wire()) + "\n")
         return outcome.exit_code
     out.write(encode(to_wire(name, device, outcome, mode=settings.permission_mode)) + "\n")
@@ -83,7 +84,7 @@ def run(
 
 def execute(
     invocation: Invocation, hub: PhoneHub, settings: Settings, clock: Clock, stdin: TextIO
-) -> tuple[Outcome | BatchResult | FlowResult, Serial | None]:
+) -> tuple[Outcome | BatchResult | FlowResult | FlowDraft, Serial | None]:
     """The outcome and the serial the command ran against, None when it chose no device."""
     match invocation.command:
         case DevicesCommand():
@@ -113,6 +114,8 @@ def execute(
         case FlowRunCommand() as command:
             flow = run_flow_file(command, invocation.serial, hub, settings, clock)
             return flow, flow.device
+        case FlowRecordCommand() as command:
+            return record_flow(command, settings.permission_mode), None
         case ServerCommand() as command:
             serial = select_device(hub.connected(), invocation.serial, None)
             try:

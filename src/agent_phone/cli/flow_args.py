@@ -22,6 +22,12 @@ class FlowRunCommand:
     dry_run: bool
 
 
+@dataclass(frozen=True, slots=True)
+class FlowRecordCommand:
+    trace: Path
+    out: Path
+
+
 def param(text: str) -> tuple[str, str]:
     name, equals, value = text.partition("=")
     if not equals or not name.isidentifier():
@@ -65,9 +71,20 @@ def add_flow(commands: argparse._SubParsersAction, after: argparse.ArgumentParse
         help="grant nothing: run the steps before the first one that would commit, "
         "and send nothing of that one",
     )
+    record = actions.add_parser(
+        "record",
+        help="draft a flow file from the trace of what was done by hand",
+        description="Read TRACE, a device's trace of one day, and write to --out the draft of a flow "
+        "with one step for each input and wait in it that was ok. A target that was named by ref "
+        "becomes a query on its role and name, and typed text becomes a parameter. It opens no device.",
+    )
+    record.add_argument("trace", type=Path, metavar="TRACE", help="<state root>/traces/<serial>/<date>.jsonl")
+    record.add_argument("--out", type=Path, required=True, metavar="FILE", help="the flow file to write")
 
 
-def flow_command(parsed: argparse.Namespace) -> FlowRunCommand:
+def flow_command(parsed: argparse.Namespace) -> FlowRunCommand | FlowRecordCommand:
+    if parsed.action == "record":
+        return FlowRecordCommand(parsed.trace, parsed.out)
     return FlowRunCommand(
         parsed.file, tuple(parsed.param), frozenset(Effect(e) for e in parsed.commit), parsed.dry_run
     )
