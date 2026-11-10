@@ -5,8 +5,11 @@ and appends one line to the call log (start time, arguments, seconds, bytes prin
     AP_BENCH_SERIAL=emulator-5566 AP_BENCH_BIN=<checkout>/.venv/bin/agent-phone \\
         AP_BENCH_LOG=<run folder>/calls.jsonl python3 ap.py <agent-phone arguments>
 
-It runs only against an emulator serial, and it refuses `-d`, `devices` and `server`: `devices`
-reads facts from every phone adb lists, and a benchmark never reaches a phone with live accounts.
+It runs only against an emulator serial. It refuses `devices`, `server` and every word that starts
+with `-d` or `--d`: the CLI takes `-d` again after the command, in any spelling argparse accepts
+(`-dSERIAL`, `--device=SERIAL`, `--dev SERIAL`), and the later one wins, so one such word would
+point the call at another phone. `devices` reads facts from every phone adb lists. A benchmark
+never reaches a phone with live accounts.
 """
 
 import json
@@ -17,7 +20,8 @@ import sys
 import time
 
 EMULATOR = re.compile(r"emulator-\d+")
-REFUSED = {"devices", "server", "-d", "--device"}
+REFUSED_COMMANDS = {"devices", "server"}
+DEVICE_WORD = re.compile(r"-d|--d")
 ARG_LOG_CHARS = 120
 
 
@@ -27,7 +31,7 @@ def main(argv: list[str]) -> int:
     )
     if not EMULATOR.fullmatch(serial) or not exe or not log:
         sys.exit("ap.py: set AP_BENCH_SERIAL to an emulator serial, AP_BENCH_BIN and AP_BENCH_LOG")
-    refused = sorted(REFUSED.intersection(argv))
+    refused = sorted({word for word in argv if word in REFUSED_COMMANDS or DEVICE_WORD.match(word)})
     started = time.time()
     if refused:
         out = json.dumps({"ok": False, "error": {"code": "BENCH_REFUSED", "message": f"The benchmark "
@@ -49,12 +53,20 @@ def main(argv: list[str]) -> int:
         "s": round(time.time() - started, 3),
         "out_bytes": len(out.encode()) + len(err.encode()),
         "exit": code,
+        "code": error_code(out),
     }
     with open(log, "a", encoding="utf-8") as calls:
         calls.write(json.dumps(line, ensure_ascii=False) + "\n")
     sys.stdout.write(out)
     sys.stderr.write(err)
     return code
+
+
+def error_code(out: str) -> str | None:
+    try:
+        return json.loads(out)["error"]["code"]
+    except (ValueError, KeyError, TypeError):
+        return None
 
 
 if __name__ == "__main__":

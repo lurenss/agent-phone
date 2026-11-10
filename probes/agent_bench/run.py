@@ -22,6 +22,8 @@ Metrics: `wall_s` the agent's whole session, `calls` wrapper calls, `tool_s` sec
 agent-phone, `out_bytes` bytes it printed, `turns` model turns, `tokens` every token the session
 processed (input, cache writes, cache reads and output over all turns), `context` the tokens of the
 last turn's prompt, `cost_usd` the session's list price, `timeouts` calls that ended in TIMEOUT.
+In a log from before the wrapper wrote each call's error code, they are the failed calls that took
+more than 4.5 s.
 """
 
 from __future__ import annotations
@@ -83,8 +85,8 @@ def verify(serial: str, report: dict | None) -> list[str]:
         wrong.append(f"the agent reported {str(report.get('result'))[:120]!r}")
     if str(report.get("android_version")) != adb(serial, "shell", "getprop", "ro.build.version.release"):
         wrong.append("the reported Android version is wrong")
-    address = str(report.get("ip_address"))
-    if not address or address not in adb(serial, "shell", "ip", "-4", "addr"):
+    addresses = set(re.findall(r"inet (\d+\.\d+\.\d+\.\d+)", adb(serial, "shell", "ip", "-4", "addr")))
+    if str(report.get("ip_address")) not in addresses - {"127.0.0.1"}:
         wrong.append("the reported IP address is wrong")
     return wrong
 
@@ -121,10 +123,13 @@ def run_agent(folder: Path, checkout: Path, serial: str) -> dict:
     ]
     started = time.time()
     with (folder / "stream.jsonl").open("w", encoding="utf-8") as stream:
-        subprocess.run(
-            command, stdin=subprocess.DEVNULL, stdout=stream, stderr=subprocess.STDOUT, cwd=cwd, env=env,
-            timeout=AGENT_TIMEOUT_S, check=False,
-        )  # fmt: skip
+        try:
+            subprocess.run(
+                command, stdin=subprocess.DEVNULL, stdout=stream, stderr=subprocess.STDOUT, cwd=cwd, env=env,
+                timeout=AGENT_TIMEOUT_S, check=False,
+            )  # fmt: skip
+        except subprocess.TimeoutExpired:
+            pass  # no result line was written, so the run has no report and counts as failed
     wall = time.time() - started
     return measure(folder, wall) | {"wrong": verify(serial, final_report(folder))}
 
@@ -162,10 +167,16 @@ def measure(folder: Path, wall: float) -> dict:
         "output_tokens": usage.get("output_tokens"),
         "context": sum(turns[-1].get(side, 0) for side in sides) if turns else None,
         "cost_usd": round(result.get("total_cost_usd", 0), 4),
-        "timeouts": sum(1 for c in calls if c["exit"] == 1 and c["s"] > 4.5),
+        "timeouts": sum(1 for c in calls if timed_out(c)),
         "failed_calls": sum(1 for c in calls if c["exit"] != 0),
         "denied": denied,
     }
+
+
+def timed_out(call: dict) -> bool:
+    if "code" in call:
+        return call["code"] == "TIMEOUT"
+    return call["exit"] == 1 and call["s"] > 4.5
 
 
 def run(args: argparse.Namespace) -> int:
