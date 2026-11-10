@@ -1,0 +1,16 @@
+# Open Settings and type into its search field: `agent-phone flow run` replays it in one call.
+#
+#     agent-phone flow run examples/flows/settings-search.toml --param query=battery
+
+[flow]
+name = "settings-search"
+app = "com.android.settings"
+grants = []                       # the cap: a step whose --commit names another effect fails at load
+params = ["query"]
+
+[[step]]
+run = ["launch", "com.android.settings"]
+
+[[step]]
+expect = ["name=Search settings"]                       # must show before the step acts
+run = ["set-text", "name=Search settings", "{query}"]   # a query, never a ref or a point

@@ -23,10 +23,16 @@ SKILLS = (
     Skill(
         "agent-phone",
         "phone",
-        "The usage guide: devices, snapshots and refs, skeleton and drill-down, settle, surfaces, "
+        "The short usage guide: the loop of look, act with --settle and look again, the output, "
+        "targets, waits, the commit gate and what to do on each error. Load it first.",
+    ),
+    Skill(
+        "agent-phone-reference",
+        "reference",
+        "The full reference: devices, snapshots and refs, skeleton and drill-down, settle, surfaces, "
         "find, get and is, taps, text, scrolls and keys, the commit gate, launch, stop, links, "
-        "rotation, the clipboard and screenshots, errors and retry, and the on-device server. "
-        "Load it first.",
+        "rotation, the clipboard and screenshots, batch and flows, errors and retry, and the "
+        "on-device server. Load it when the short guide does not answer.",
     ),
 )
 

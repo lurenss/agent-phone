@@ -47,7 +47,18 @@ SCREENSHOT_QUALITY = 90
 STEP_MS = 5
 """UiDevice.swipe moves one step about every 5 ms."""
 KEY_CODES = {KeyName.BACK: 4, KeyName.HOME: 3, KeyName.RECENTS: 187, KeyName.ENTER: 66}
-CAPABILITIES = frozenset({Capability.POINT_INPUT, Capability.CLIPBOARD, Capability.SCREENSHOT})
+CAPABILITIES = frozenset(
+    {
+        Capability.POINT_INPUT,
+        Capability.KEY_BACK,
+        Capability.KEY_RECENTS,
+        Capability.INTENT_LINKS,
+        Capability.ROTATE,
+        Capability.POWER,
+        Capability.CLIPBOARD,
+        Capability.SCREENSHOT,
+    }
+)
 DUMP_METHOD = "dumpWindowHierarchy"
 MAX_DEPTH = 50
 ALREADY_REGISTERED = "already registered"
@@ -192,7 +203,7 @@ class U2Hub:
         return parse_devices(result.stdout)
 
     def inspect(self, serial: Serial) -> DeviceInfo:
-        return Shell(serial, self._adb).facts()
+        return replace(Shell(serial, self._adb).facts(), capabilities=CAPABILITIES)
 
     def server(self, serial: Serial) -> Server:
         return Server(serial, self._adb, self._idle_limit_s, self._clock)

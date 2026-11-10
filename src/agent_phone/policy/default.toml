@@ -105,3 +105,90 @@ words = ["ok", "okay", "yes", "done", "continue", "accept", "agree", "allow", "a
          "disattiva", "attiva", "interrompi", "disconnetti", "rimuovi"]
 node_ids = ["android:id/button1"]
 reason = "A neutral button, or a verb that takes its object from the question, does what its dialog says. android:id/button1 is the positive button of a platform dialog, whatever it is called."
+
+# Interruptions: pop-ups the agent did not ask for. A rule matches a window in which every
+# phrase of `words` shows. `dismiss` is the whole name of the button that is the safe way out.
+# agent-phone names both in every observation and never clicks. The words are those of
+# Android's own dialogs, one rule per language, because all of a rule's words must show.
+
+[[interruption]]
+id = "default.not-responding.en"
+kind = "not_responding"
+languages = ["en"]
+words = ["isn't responding", "close app", "wait"]
+dismiss = ["Wait"]
+reason = "The system says an app does not respond. Wait keeps the app and its state."
+
+[[interruption]]
+id = "default.not-responding.it"
+kind = "not_responding"
+languages = ["it"]
+words = ["non risponde", "chiudi app", "attendi"]
+dismiss = ["Attendi"]
+reason = "The system says an app does not respond. Attendi keeps the app and its state."
+
+[[interruption]]
+id = "default.permission.en"
+kind = "permission"
+languages = ["en"]
+words = ["^allow", "don't allow"]
+dismiss = ["Don't allow"]
+reason = "A prompt asks for a permission. The decline gives nothing."
+
+[[interruption]]
+id = "default.permission.deny.en"
+kind = "permission"
+languages = ["en"]
+words = ["^allow", "^deny"]
+dismiss = ["Deny"]
+reason = "A prompt asks for a permission, with the buttons older Android versions show. The decline gives nothing."
+
+[[interruption]]
+id = "default.permission.it"
+kind = "permission"
+languages = ["it"]
+words = ["^consentire", "non consentire"]
+dismiss = ["Non consentire"]
+reason = "A prompt asks for a permission. The decline gives nothing."
+
+[[interruption]]
+id = "default.permission.deny.it"
+kind = "permission"
+languages = ["it"]
+words = ["^consenti", "^rifiuta"]
+dismiss = ["Rifiuta"]
+reason = "A prompt asks for a permission, with the buttons older Android versions show. The decline gives nothing."
+
+[[interruption]]
+id = "default.paste.en"
+kind = "paste"
+languages = ["en"]
+words = ["paste", "^allow"]
+dismiss = ["Don't allow paste", "Don't allow", "Deny"]
+needs_human = true
+reason = "A prompt asks to read the clipboard, which can hold a password. Only the user decides."
+
+[[interruption]]
+id = "default.paste.it"
+kind = "paste"
+languages = ["it"]
+words = ["incollare", "^consenti"]
+dismiss = ["Non consentire Incolla", "Non consentire", "Rifiuta"]
+needs_human = true
+reason = "A prompt asks to read the clipboard, which can hold a password. Only the user decides."
+
+[[interruption]]
+id = "default.purchase.en"
+kind = "purchase"
+languages = ["en"]
+words = ["1-tap buy"]
+needs_human = true
+reason = "A purchase sheet is one tap from spending money. Only the user buys."
+
+[[interruption]]
+id = "default.purchase.it"
+kind = "purchase"
+languages = ["it"]
+words = ["acquista con 1 tocco"]
+needs_human = true
+reason = "A purchase sheet is one tap from spending money. Only the user buys."

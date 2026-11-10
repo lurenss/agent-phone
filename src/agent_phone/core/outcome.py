@@ -46,6 +46,7 @@ class ErrorCode(Enum):
     NOT_ACTIONABLE = "NOT_ACTIONABLE"
     UNSTABLE = "UNSTABLE"
     OCCLUDED = "OCCLUDED"
+    INTERRUPTED = "INTERRUPTED"
     COMMIT_REFUSED = "COMMIT_REFUSED"
     DENIED = "DENIED"
     LOCALE_UNSUPPORTED = "LOCALE_UNSUPPORTED"
@@ -109,13 +110,20 @@ class Refused:
 class Acted:
     """`error` is set when the input went out but the command still failed: the transport lost
     the answer (TRANSPORT), a `--wait-for` timed out (TIMEOUT), or a read-back contradicted the
-    request (ACTION_FAILED). `after` is the observation recorded after the input, when one was."""
+    request (ACTION_FAILED). `after` is the observation recorded after the input, when one was.
+    `before` is the snapshot the input stood on: the one its ref names, or the device's latest.
+    `details` are the error's, such as the interruptions of a refusal that came after an input.
+    `inputs` counts the inputs this outcome stands for: one, or the swipes of a scroll that
+    repeats, of which `report` and `sent` describe the last and the weakest."""
 
     sent: SentState
     report: ActionReport
     after: Snapshot | None
     error: ErrorCode | None = None
     message: str = ""
+    before: Snapshot | None = None
+    details: Mapping[str, object] = field(default_factory=dict)
+    inputs: int = 1
 
     @property
     def disposition(self) -> Disposition:

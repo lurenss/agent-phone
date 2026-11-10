@@ -11,6 +11,7 @@ from typing import NoReturn
 
 from agent_phone.cli.batch_args import BatchCommand, add_batch, batch_command
 from agent_phone.cli.commands import InputCommand
+from agent_phone.cli.flow_args import FlowRecordCommand, FlowRunCommand, add_flow, flow_command
 from agent_phone.cli.input_args import INPUTS, add_inputs, input_command
 from agent_phone.cli.wait_args import add_wait, wait_command
 from agent_phone.core.commands.devices import DevicesCommand
@@ -22,6 +23,7 @@ from agent_phone.core.commands.skills import SKILLS, SkillsGetCommand, SkillsLis
 from agent_phone.core.commands.snapshot import SnapshotCommand
 from agent_phone.core.commands.wait import WaitCommand
 from agent_phone.core.device import Serial
+from agent_phone.core.envelope import After
 from agent_phone.core.outcome import ErrorCode, Refusal
 from agent_phone.core.query import Match, Query
 from agent_phone.core.role import Role
@@ -40,6 +42,8 @@ Command = (
     | IsCommand
     | WaitCommand
     | BatchCommand
+    | FlowRunCommand
+    | FlowRecordCommand
     | SkillsListCommand
     | SkillsGetCommand
     | InputCommand
@@ -49,12 +53,16 @@ SKILL_NAMES = {name: skill for skill in SKILLS for name in (skill.name, skill.al
 
 @dataclass(frozen=True, slots=True)
 class Invocation:
-    """`policies` are the caller's policy files, which only input commands take."""
+    """`policies` are the caller's policy files and `after` is the form of the `after` snapshot.
+    Only input commands take them."""
 
     name: str
     serial: Serial | None
     command: Command
     policies: tuple[Path, ...] = ()
+    after: After = After.TREE
+    argv: tuple[str, ...] = ()
+    lean: bool = False
 
 
 class Parser(argparse.ArgumentParser):
@@ -76,15 +84,23 @@ def positive_number(text: str) -> int:
 
 
 def build() -> Parser:
-    """`-d` is accepted before the command and after it, because callers put it in both places."""
+    """`-d` and `--lean` are accepted before the command and after it, because callers put them in
+    both places. Every command takes `--lean`, also the ones that take no device."""
     device = dict(metavar="SERIAL", help="the adb serial; needed when several devices are ready")
-    after = Parser(add_help=False)
+    lean = dict(
+        action="store_true",
+        help="print the short form: tree lines without bounds, and no key that holds its usual value",
+    )
+    form = Parser(add_help=False)
+    form.add_argument("--lean", default=argparse.SUPPRESS, **lean)
+    after = Parser(add_help=False, parents=[form])
     after.add_argument("-d", "--device", default=argparse.SUPPRESS, **device)
     parser = Parser(
         prog="agent-phone",
         description="Drive an Android phone over adb. Every command prints one JSON object.",
     )
     parser.add_argument("-d", "--device", **device)
+    parser.add_argument("--lean", **lean)
     commands = parser.add_subparsers(dest="command", metavar="command", required=True, parser_class=Parser)
     commands.add_parser("devices", parents=[after], help="list every device with the facts read from it")
     add_snapshot(commands, after)
@@ -99,18 +115,19 @@ def build() -> Parser:
     add_wait(commands, after)
     add_inputs(commands, after)
     add_batch(commands, after)
-    add_skills(commands)
+    add_flow(commands, after, form)
+    add_skills(commands, form)
     return parser
 
 
-def add_skills(commands: argparse._SubParsersAction) -> None:
+def add_skills(commands: argparse._SubParsersAction, form: argparse.ArgumentParser) -> None:
     """They read only the package, so they take no device."""
     skills = commands.add_parser(
         "skills", help="print the usage guides for agents that ship with agent-phone"
     )
     actions = skills.add_subparsers(dest="action", metavar="action", required=True, parser_class=Parser)
-    actions.add_parser("list", help="list the guides, each with its name, alias and summary")
-    get = actions.add_parser("get", help="print one guide; its Markdown is data.content")
+    actions.add_parser("list", parents=[form], help="list the guides, each with its name, alias and summary")
+    get = actions.add_parser("get", parents=[form], help="print one guide; its Markdown is data.content")
     get.add_argument(
         "name",
         nargs="?",
@@ -263,6 +280,8 @@ def parse_args(argv: Sequence[str]) -> Invocation:
             command = wait_command(parsed)
         case "batch":
             command = batch_command(parsed)
+        case "flow":
+            command = flow_command(parsed)
         case "server":
             command = ServerCommand(ServerAction(parsed.action))
         case "skills" if parsed.action == "list":
@@ -272,5 +291,7 @@ def parse_args(argv: Sequence[str]) -> Invocation:
         case name if name in INPUTS:
             command = input_command(parsed)
     serial = Serial(parsed.device) if parsed.device else None
-    name = parsed.command if parsed.command != "clipboard" else f"clipboard {parsed.action}"
-    return Invocation(name, serial, command, tuple(getattr(parsed, "policy", ())))
+    name = f"{parsed.command} {parsed.action}" if parsed.command in ("clipboard", "flow") else parsed.command
+    after = After(getattr(parsed, "after", After.TREE.value))
+    policies = tuple(getattr(parsed, "policy", ()))
+    return Invocation(name, serial, command, policies, after, tuple(argv), getattr(parsed, "lean", False))

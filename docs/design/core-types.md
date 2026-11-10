@@ -159,7 +159,7 @@ The second test is the plan's "every tap must target an element the consumer dec
 - `Snapshot` (`core/snapshot/snapshot.py`) is the printed lines plus the fingerprints, the `DeviceIdentity` (serial and boot id) and the ledger epoch it was taken at. The same frozen value is printed, persisted and read back. Nothing is recomputed or synced.
 - `Fingerprint` (`core/refs/fingerprint.py`) is a whole-value `Key`: package, window kind, role, class, resource-id, stable name, and the stable labels of the collection row. When two surface nodes share a key, a `Twin` stores the ordinal and the bounds of the whole twin set, and position counts as identity only while that set is geometrically unchanged. The same rule covers nameless icons and Compose `View`s, which resolve only on an unchanged screen.
 - `Ledger` (`core/act/ledger.py`) is one epoch counter per device. It is the only constructor of `Permit`.
-- `Policy` (`core/policy/model.py`, read and layered by `rules.py`) is a tuple of rules of five kinds (`commit`, `exempt`, `ignore`, `inherit`, `deny`), parsed from TOML at the boundary. `Verdict` is `Clear | Commits(effects) | Denied(rule)`, and `Grant` is the set of `Effect`s the caller allowed for one input. `PermissionMode` (`core/policy/mode.py`) says whether a `Commits` verdict needs a grant at all.
+- `Policy` (`core/policy/model.py`, read and layered by `rules.py`) is a tuple of rules of six kinds (`commit`, `exempt`, `ignore`, `inherit`, `deny`, `interruption`), parsed from TOML at the boundary. An `interruption` rule judges no input: `interruptions_of` (`core/policy/interrupt.py`) reads it on every recorded observation, and the `Snapshot` keeps each match as an `InterruptionNote` whose way out is a ref number, never a `NodeId`. `Verdict` is `Clear | Commits(effects) | Denied(rule)`, and `Grant` is the set of `Effect`s the caller allowed for one input. `PermissionMode` (`core/policy/mode.py`) says whether a `Commits` verdict needs a grant at all.
 - `Outcome` (`core/outcome.py`) is `Refused | Acted | Read`. `Acted.sent` is a `SentState`, which has no not-delivered member.
 
 ### Flow
@@ -204,8 +204,8 @@ agent_phone/core/
   outcome.py envelope.py phone.py context.py
   snapshot/  surface.py view.py budget.py snapshot.py capture.py
   refs/      fingerprint.py resolve.py store.py   (store.py also holds the device lock)
-  policy/    model.py rules.py reads.py engine.py
-  act/       intent.py hit.py axis.py site.py ledger.py act.py
+  policy/    model.py rules.py reads.py verdict.py engine.py interrupt.py
+  act/       intent.py hit.py axis.py site.py ledger.py interrupted.py act.py
   wait/      clock.py predicate.py observe.py until.py
   commands/  snapshot.py click.py set_text.py press.py stop.py wait.py screenshot.py devices.py server.py
 agent_phone/adapters/uiautomator2/  phone.py parse.py rpc.py delivery.py address.py shell.py adb.py server.py
@@ -365,4 +365,4 @@ The backend now says where its reading or its input falls short, so core does no
 - **`Flag.LOSSY` marks text the backend could not carry.** The uiautomator2 dumper writes `.` for each UTF-16 surrogate, so an emoji reads as `..` (A9-1). The parser sets the flag on a node whose text, content-desc or hint holds `..`. A literal `..` is marked too, because the dump cannot tell the two apart. The flag is a node fact like `EDITABLE`, which the parser also infers, and it is not part of a fingerprint, so a field keeps its ref while its text changes.
 - **`State.LOSSY` puts the flag on the line.** `states_of` reads the nodes whose labels the line shows (`labels.shown_nodes`), so a button named by a damaged child says `lossy` too. `get states` reads the same function.
 - **set-text compares a lossy read in the form it shows.** `labels.holds_text` writes each character above U+FFFF of the sent text as `..` when the field is lossy. When no `--wait-for` proved the input first, `verified_by` says the proof came from a lossy read. An exact read through `objInfo` (A9-2) is left for later.
-- **`Capability.POINT_INPUT` names input at a point.** `act()` refuses a tap, a long press or a swipe with `NOT_SUPPORTED` before the spend when the backend lacks it. A point target is still refused by resolution on every backend, because none is supported yet.
+- **One table says what each input needs.** `required(action)` in `core/act/capability.py` has a case for every `InputAction` member and no default, as `reads_of` has. `act()` refuses an input whose `Capability` the backend lacks with `NOT_SUPPORTED`: before any read for an input with no target, such as a key or a link, and after the plan for a click, a fill or a scroll, always before the spend. `Capability.POINT_INPUT` names input at a point: a tap, a long press or a swipe. A point target is still refused by resolution on every backend, because none is supported yet.

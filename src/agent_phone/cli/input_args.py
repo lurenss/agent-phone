@@ -16,17 +16,18 @@ from agent_phone.core.commands.launch import LaunchCommand
 from agent_phone.core.commands.open_url import OpenUrlCommand
 from agent_phone.core.commands.press import PressCommand
 from agent_phone.core.commands.rotate import RotateCommand
-from agent_phone.core.commands.scroll import ScrollCommand
+from agent_phone.core.commands.scroll import ScrollCommand, check_until
 from agent_phone.core.commands.set_text import SetTextCommand
 from agent_phone.core.commands.stop import StopCommand
 from agent_phone.core.device import Package
+from agent_phone.core.envelope import After
 from agent_phone.core.phone import NAME, KeyName, Orientation
 from agent_phone.core.policy.rules import Effect
 from agent_phone.core.query import Match, Query
 from agent_phone.core.refs.resolve import QueryTarget, RefTarget, Target
 from agent_phone.core.role import Role
 from agent_phone.core.snapshot.snapshot import RefToken
-from agent_phone.core.wait.predicate import Gone, Predicate, Present
+from agent_phone.core.wait.predicate import Gone, Predicate, Present, Settled
 
 INPUTS = (
     "click",
@@ -123,6 +124,13 @@ def add_inputs(commands: argparse._SubParsersAction, after: argparse.ArgumentPar
     scroll = command(commands, after, "scroll", "swipe a list; down shows what is below")
     scroll.add_argument("direction", choices=[d.value for d in Direction])
     scroll.add_argument("target", nargs="?", **target)
+    scroll.add_argument(
+        "--until",
+        type=query_text,
+        metavar="QUERY",
+        help="swipe again until a line that matches shows, up to 10 swipes or the end of the list, and "
+        "print the settled screen; the list is named by a query or left out, never by a ref",
+    )
     press = command(commands, after, "press", "press a key; enter needs --commit send", commit=True)
     press.add_argument("key", choices=[k.value for k in KeyName])
     for name, about in (("launch", "start an app's launcher screen"), ("stop", "force-stop an app")):
@@ -161,7 +169,8 @@ def command(
     about: str,
     commit: bool = False,
 ) -> argparse.ArgumentParser:
-    """The flags every input shares: what to wait for after it, how long, and which policy files."""
+    """The flags every input shares: what to wait for after it, how long, which policy files, and
+    how the `after` snapshot prints."""
     parser = commands.add_parser(name, parents=[after], help=about)
     if commit:
         parser.add_argument(
@@ -189,18 +198,43 @@ def command(
         help="wait until it goes",
     )
     parser.add_argument(
+        "--settle",
+        action="store_true",
+        help="wait until the screen stops changing, and print it as the result's after snapshot, with "
+        "refs for the next input; use it when you cannot say what the input will show",
+    )
+    parser.add_argument(
         "--timeout-ms",
         type=positive,
         default=INPUT_TIMEOUT_MS,
         metavar="N",
-        help=f"how long to wait for the target and then for --wait-for (default {INPUT_TIMEOUT_MS})",
+        help="how long to wait for the target, and then for --wait-for and --settle "
+        f"(default {INPUT_TIMEOUT_MS})",
     )
     parser.add_argument("--policy", action="append", type=Path, default=[], metavar="FILE", help=POLICY_HELP)
+    parser.add_argument(
+        "--after",
+        choices=[form.value for form in After],
+        default=After.TREE.value,
+        help="how the result's after snapshot prints: its tree (default), or with diff only the "
+        "lines that the snapshot the input stood on did not print, and the ones it alone printed",
+    )
     return parser
 
 
 def waits(parsed: argparse.Namespace) -> tuple[Predicate, ...]:
-    return (*(Present(q) for q in parsed.wait_for), *(Gone(q) for q in parsed.wait_for_gone))
+    return (
+        *(Present(q) for q in parsed.wait_for),
+        *(Gone(q) for q in parsed.wait_for_gone),
+        *((Settled(),) if parsed.settle else ()),
+    )
+
+
+def until(parsed: argparse.Namespace) -> Query | None:
+    """Raise INVALID_ARGS for an `--until` that cannot work, before any device is opened."""
+    if parsed.until is not None:
+        check_until(parsed.target, waits(parsed))
+    return parsed.until
 
 
 def input_command(parsed: argparse.Namespace) -> InputCommand:
@@ -219,7 +253,7 @@ def input_command(parsed: argparse.Namespace) -> InputCommand:
         case "set-text":
             return SetTextCommand(parsed.target, parsed.text, **timing)
         case "scroll":
-            return ScrollCommand(Direction(parsed.direction), parsed.target, **timing)
+            return ScrollCommand(Direction(parsed.direction), parsed.target, **timing, until=until(parsed))
         case "press":
             return PressCommand(KeyName(parsed.key), granted, **timing)
         case "launch":

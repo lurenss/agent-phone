@@ -41,9 +41,12 @@ EVERY_OPTION = {flag: action for leaf in LEAVES.values() for flag, action in opt
 
 
 def code_pieces(text: str) -> list[str]:
-    """Each line of a fenced block, then each inline code span outside the blocks."""
+    """Each command of each line of a fenced block, where `&&` chains two, then each inline code
+    span outside the blocks."""
     lines = [line for block in FENCE.findall(text) for line in block.splitlines()]
-    return lines + SPAN.findall(FENCE.sub("", text))
+    return [command.strip() for line in lines for command in line.split(" && ")] + SPAN.findall(
+        FENCE.sub("", text)
+    )
 
 
 def full_command(argv: list[str]) -> tuple[str, ...] | None:
@@ -110,6 +113,7 @@ def test_drift_catches_planted_names():
         "`agent-phone get e4`",
         "`agent-phone server reboot --help`",
     ]
+    planted.append("```bash\nagent-phone press back --settle && agent-phone press sideways\n```")
     for text in planted:
         assert drift(text)[0], f"{text!r} names something the parser lacks"
     fine = (
@@ -125,8 +129,11 @@ def test_coverage_catches_a_command_the_text_never_shows():
     assert ("server", "status") in set(LEAVES) - shown
 
 
-def test_the_guide_names_only_what_the_parser_has_and_shows_every_command():
-    unknown, shown = drift((SKILLS_ROOT / "agent-phone" / "SKILL.md").read_text(encoding="utf-8"))
-    assert unknown == [], f"the guide names commands or flags the parser lacks: {unknown}"
+def test_each_guide_names_only_what_the_parser_has_and_together_they_show_every_command():
+    shown: set[tuple[str, ...]] = set()
+    for guide in sorted(SKILLS_ROOT.glob("*/SKILL.md")):
+        unknown, calls = drift(guide.read_text(encoding="utf-8"))
+        assert unknown == [], f"{guide.parent.name} names commands or flags the parser lacks: {unknown}"
+        shown |= calls
     missing = sorted(" ".join(path) for path in set(LEAVES) - shown)
-    assert missing == [], f"the guide never shows these commands as an agent-phone call: {missing}"
+    assert missing == [], f"no guide shows these commands as an agent-phone call: {missing}"

@@ -51,6 +51,7 @@ def snapshot_of(screen: Screen, id: SnapshotId, device: DeviceIdentity, epoch: i
         dialog=surface.dialog,
         others=surface.others,
         toasts=screen.toasts,
+        interruptions=(),
         lines=view.lines,
         fingerprints=fingerprints(view),
         truncated=0,
@@ -108,6 +109,24 @@ def checkbox_row(label: str) -> Screen:
                 resource_id="com.android.settings:id/pref_row",
                 clickable=True,
                 bounds="[0,500][1080,600]",
+            ),
+            package="com.android.settings",
+            bounds="[0,0][1080,1920]",
+        )
+    )
+
+
+def search_field(typed: str = "") -> Screen:
+    """A Settings page with one text field named "Search settings" that holds `typed`."""
+    return screen_of(
+        node(
+            "android.widget.FrameLayout",
+            node(
+                "android.widget.EditText",
+                text=typed,
+                content_desc="Search settings",
+                clickable=True,
+                bounds="[0,200][1080,300]",
             ),
             package="com.android.settings",
             bounds="[0,0][1080,1920]",

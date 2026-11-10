@@ -18,7 +18,7 @@ from agent_phone.core.act import ledger
 from agent_phone.core.device import BootId, Capability, Connected, DeviceIdentity, DeviceInfo, Package, Serial
 from agent_phone.core.geometry import Size
 from agent_phone.core.outcome import ErrorCode, Refusal
-from agent_phone.core.phone import Ack, Delivery, Permit, Sent, ServerStatus, SetClipboard
+from agent_phone.core.phone import Ack, Delivery, NotSent, Permit, Sent, ServerStatus, SetClipboard
 from agent_phone.core.screen import Screen
 from agent_phone.core.wait.clock import Clock
 
@@ -33,7 +33,16 @@ def info_for(
     boot: BootId = J7_BOOT,
     locale: str = "en-US",
     capabilities: frozenset[Capability] = frozenset(
-        {Capability.POINT_INPUT, Capability.CLIPBOARD, Capability.SCREENSHOT}
+        {
+            Capability.POINT_INPUT,
+            Capability.KEY_BACK,
+            Capability.KEY_RECENTS,
+            Capability.INTENT_LINKS,
+            Capability.ROTATE,
+            Capability.POWER,
+            Capability.CLIPBOARD,
+            Capability.SCREENSHOT,
+        }
     ),
 ) -> DeviceInfo:
     return DeviceInfo(
@@ -73,8 +82,9 @@ class FakeServer:
 class FakePhone:
     """A device that shows the screens it is given, one per read, the last one forever. A screen
     that is a Refusal is raised instead, like a backend that cannot read. Each input it receives
-    is kept in `permits`. A delivered input switches to the `after_input` screens, when given. With
-    `after_each`, the nth delivered input switches to its nth screen, and the last one stays."""
+    for its own device is kept in `permits`, and a permit for another device is refused. A
+    delivered input switches to the `after_input` screens, when given. With `after_each`, the nth
+    delivered input switches to its nth screen, and the last one stays."""
 
     def __init__(
         self,
@@ -114,6 +124,8 @@ class FakePhone:
         raise AssertionError("no command asks for device state yet")
 
     def inject(self, permit: Permit) -> Delivery:
+        if permit.device != self._info.identity:
+            return NotSent(ErrorCode.WRONG_DEVICE, f"The permit was made for {permit.device.serial}.")
         self.permits.append(permit)
         if isinstance(self._delivery, Sent):
             if self._after_input:

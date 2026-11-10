@@ -2,6 +2,8 @@
 
     resolve -> actionable and stable -> plan -> judge -> spend -> inject -> verify
 
+An input the backend cannot do (`act/capability.py`) is refused as soon as its action is known:
+before any read for an input with no target, after the plan for a click, a fill or a scroll.
 Everything before `spend` raises `Refusal` and leaves the device untouched. Everything from
 `inject` on is caught and reported as `Acted` with the disposition the delivery earned, because
 from that point on "nothing happened" can no longer be claimed. A backend that raises inside
@@ -10,14 +12,15 @@ from that point on "nothing happened" can no longer be claimed. A backend that r
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from agent_phone.core.act.axis import refuse_wrong_axis
+from agent_phone.core.act.capability import refuse_unsupported
 from agent_phone.core.act.hit import plan_point, require_active, swipe_across, visible_area
 from agent_phone.core.act.intent import ActionReport, Click, Fill, Request, Scroll, TargetReport
+from agent_phone.core.act.interrupted import refuse_interrupted
 from agent_phone.core.act.site import element_site, focus_site
 from agent_phone.core.context import Context
-from agent_phone.core.device import Capability
 from agent_phone.core.labels import display_name, holds_text, typed_text
 from agent_phone.core.outcome import Acted, ErrorCode, Outcome, Refusal, Refused, SentState
 from agent_phone.core.phone import (
@@ -30,7 +33,6 @@ from agent_phone.core.phone import (
     NotSent,
     Sent,
     SetText,
-    Swipe,
     Tap,
 )
 from agent_phone.core.policy.engine import Site, Verdict, classify
@@ -59,23 +61,23 @@ class NotYet(Refusal):
 @dataclass(frozen=True, slots=True)
 class Planned:
     """The input act() will judge, the site the engine reads for it, and the read it was planned
-    on. `site` holds the screen around the element the input lands on (`act/site.py`)."""
+    on. `site` holds the screen around the element the input lands on (`act/site.py`). `observed`
+    is the snapshot that passed check 1."""
 
     action: InputAction
     site: Site | None
     target: TargetReport | None
     before: Screen | None
     resolved: Resolved | None
+    observed: Snapshot
 
 
 def act(ctx: Context, request: Request) -> Outcome:
     try:
+        if not isinstance(request.intent, Click | Fill | Scroll):
+            refuse_unsupported(request.intent, ctx.info.capabilities)
         planned = _settle_target(ctx, request)
-        if (
-            isinstance(planned.action, Tap | LongPress | Swipe)
-            and Capability.POINT_INPUT not in ctx.info.capabilities
-        ):
-            raise Refusal(ErrorCode.NOT_SUPPORTED, "This backend cannot touch a point on the screen.")
+        refuse_unsupported(planned.action, ctx.info.capabilities)
         refuse_held_effects(request, planned.before)
         verdict = classify(ctx.policy, planned.action, planned.site, ctx.info.locale)
         admit(verdict, request.grant, ctx.mode)
@@ -96,7 +98,7 @@ def act(ctx: Context, request: Request) -> Outcome:
     if isinstance(delivery, NotSent):
         ctx.ledger.refund(permit)
         return Refused(delivery.code, delivery.detail)
-    return _after_send(ctx, request, delivery, planned, verdict)
+    return replace(_after_send(ctx, request, delivery, planned, verdict), before=planned.observed)
 
 
 def refuse_held_effects(request: Request, before: Screen | None) -> None:
@@ -127,7 +129,9 @@ def _settle_target(ctx: Context, request: Request) -> Planned:
 
     Transient refusals (`NotYet`: hidden or disabled, UNSTABLE, OCCLUDED, NOT_FOUND for a
     query) are read again until the deadline. Terminal ones (WRONG_DEVICE, STALE_REF,
-    OBSERVE_FIRST, AMBIGUOUS_TARGET, an element that cannot take this input) fail at once.
+    OBSERVE_FIRST, AMBIGUOUS_TARGET, an element that cannot take this input) fail at once. So does
+    INTERRUPTED: an OCCLUDED or NOT_FOUND read whose focused window is a pop-up the policy recognises
+    (`act/interrupted.py`).
     """
     target = target_of(request)
     observed = observed_snapshot(target, ctx.store, ctx.info.identity, ctx.ledger.epoch())
@@ -138,15 +142,19 @@ def _settle_target(ctx: Context, request: Request) -> Planned:
         before = ctx.phone.read() if enter or any(is_effect(p) for p in request.wait_for) else None
         if enter and before is not None:
             site = focus_site(before, site)
-        return Planned(intent, site, None, before, None)
+        return Planned(intent, site, None, before, None, observed)
     last: list[NotYet] = []
     previous: list[Node] = []
 
     def attempt() -> Planned | None:
         screen = ctx.phone.read()
+        window = None
         try:
-            return _plan(screen, intent, _find(target, observed, screen), observed, previous)
+            resolved = _find(target, observed, screen)
+            window = screen.node(resolved.node).window
+            return _plan(screen, intent, resolved, observed, previous)
         except NotYet as refusal:
+            refuse_interrupted(ctx, screen, window, refusal)
             last[:] = [refusal]
             return None
 
@@ -226,7 +234,7 @@ def _plan(
     except Refusal as refusal:
         raise NotYet(refusal.code, refusal.message, refusal.details) from refusal
     report = TargetReport(ref, role, display_name(screen, node, role), point)
-    return Planned(action, element_site(screen, node), report, screen, resolved)
+    return Planned(action, element_site(screen, node), report, screen, resolved, observed)
 
 
 def ready(intent: Click | Fill | Scroll, node: Node, screen: Screen) -> None:
@@ -268,7 +276,9 @@ def _after_send(ctx: Context, request: Request, delivery: Sent, planned: Planned
     """Never raises. Any exception here becomes `Acted(error=INTERNAL)` with the sent state.
 
     Verification: an effect predicate in `wait_for` that holds after the input makes the action
-    VERIFIED. It was false on the read the input was planned on, or act() refused. Fill reads the
+    VERIFIED. It was false on the read the input was planned on, or act() refused. A `Settled` in
+    `wait_for` proves nothing and fails nothing: a screen that is still changing at the deadline
+    is returned with `settled` UNSETTLED, and only an effect that showed on no read is TIMEOUT. Fill reads the
     field back on its own (not for secrets). A contradicted read-back is ACTION_FAILED, still
     delivered. The observation the wait ends on is recorded as a snapshot at the new epoch and
     returned in `after`, so the caller has fresh refs without another call.
@@ -282,7 +292,8 @@ def _after_send(ctx: Context, request: Request, delivery: Sent, planned: Planned
             return Acted(sent, report, None)
         seen = observe(ctx, request.wait_for, ctx.clock.now() + request.timeout_ms / 1000)
         after = record(ctx, seen.screen, seen.settled)
-        if not seen.held:
+        effects = [p for p in request.wait_for if is_effect(p)]
+        if not seen.held and not seen.shown:
             wanted = " and ".join(describe(p) for p in request.wait_for)
             return Acted(
                 sent,
@@ -291,7 +302,6 @@ def _after_send(ctx: Context, request: Request, delivery: Sent, planned: Planned
                 ErrorCode.TIMEOUT,
                 f"{wanted} did not hold within {request.timeout_ms} ms.",
             )
-        effects = [p for p in request.wait_for if is_effect(p)]
         state = sent
         if effects:
             state = sent if sent is SentState.UNCERTAIN else SentState.VERIFIED

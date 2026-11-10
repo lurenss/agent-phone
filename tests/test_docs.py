@@ -3,16 +3,18 @@ an enum without the doc, or when the doc's example stops matching what the code 
 
 import json
 import re
+import tomllib
 
 import pytest
 from fakes import FakeHub, invoke
-from support import GOLDEN, ROOT, fixture_screen, node, screen_of, snapshot_of
+from support import GOLDEN, ROOT, fixture_screen, node, screen_of, search_field, snapshot_of
 
 from agent_phone.cli.settings import Settings
 from agent_phone.core.commands.get import GetProperty
 from agent_phone.core.commands.is_ import IsProperty
 from agent_phone.core.device import (
     BootId,
+    Capability,
     Connected,
     DeviceIdentity,
     DeviceInfo,
@@ -27,6 +29,7 @@ from agent_phone.core.outcome import Disposition, ErrorCode, Read, Refusal, Refu
 from agent_phone.core.phone import ServerStatus
 from agent_phone.core.policy.engine import ClearReason
 from agent_phone.core.policy.mode import PermissionMode
+from agent_phone.core.policy.model import InterruptionKind
 from agent_phone.core.policy.rules import Effect
 from agent_phone.core.role import Role
 from agent_phone.core.screen import WindowKind
@@ -49,7 +52,9 @@ def first_column(heading):
 
 
 def json_blocks():
-    return [json.loads(block) for block in re.findall(r"```json\n(.*?)```", CONTRACT, re.S)]
+    """The full envelopes. The lean example has no `command`, and `test_lean.py` checks it."""
+    blocks = [json.loads(block) for block in re.findall(r"```json\n(.*?)```", CONTRACT, re.S)]
+    return [block for block in blocks if "command" in block]
 
 
 @pytest.mark.parametrize(
@@ -60,6 +65,7 @@ def json_blocks():
         ("### Roles", Role),
         ("### States", State),
         ("### Window kinds", WindowKind),
+        ("### Interruption kinds", InterruptionKind),
         ("### Settle states", SettleState),
         ("### Get properties", GetProperty),
         ("### Is properties", IsProperty),
@@ -97,7 +103,7 @@ def test_the_example_device_list_is_what_the_code_prints():
         listed["density"],
         listed["locale"],
         Package(listed["ime"]),
-        frozenset(),
+        frozenset(Capability(name) for name in listed["capabilities"]),
     )
     rows = (
         Listed(Connected(info.identity.serial, "SM_J730F", True), info, None, None),
@@ -230,6 +236,41 @@ def test_the_example_wait_timeout_is_what_the_code_prints_for_its_fixture(tmp_pa
     assert code == 1 and json.loads(printed) == example
 
 
+def test_the_example_flow_is_what_the_code_prints_for_the_example_file(tmp_path):
+    example = next(block for block in json_blocks() if block["command"] == "flow run")
+    assert list(example["data"]) == first_column("## Flow payload")
+    [written] = re.findall(r"```toml\n(.*?)```", CONTRACT, re.S)
+    shipped = (ROOT / "examples" / "flows" / "settings-search.toml").read_text()
+    assert tomllib.loads(written) == tomllib.loads(shipped)
+    file_keys = [f"flow.{key}" for key in tomllib.loads(written)["flow"]] + ["step.run", "step.expect"]
+    assert first_column("### Flow file") == file_keys
+    file = tmp_path / "flow.toml"
+    file.write_text(written)
+    j7 = Connected(Serial(example["device"]), "SM_J730F", True)
+    hub = FakeHub(
+        [j7], screens=[fixture_screen("settings-home")], after_each=[search_field(), search_field("battery")]
+    )
+    code, wire = invoke(["flow", "run", str(file), "--param", "query=battery"], hub, tmp_path)
+    wire["data"]["trace"] = example["data"]["trace"]
+    assert code == 0 and wire == example
+
+
+def test_the_example_flow_record_is_what_the_code_prints(tmp_path):
+    example = next(block for block in json_blocks() if block["command"] == "flow record")
+    assert list(example["data"]) == first_column("### Flow record")
+    j7 = Connected(Serial("0a1b2c3d4e5f6a7b"), "SM_J730F", True)
+    hub = FakeHub([j7], screens=[search_field()], after_input=[search_field("battery")])
+    invoke(["snapshot"], hub, tmp_path)
+    invoke(["launch", "com.android.settings"], hub, tmp_path)
+    invoke(["snapshot"], hub, tmp_path)
+    invoke(["set-text", "name=Search settings", "battery"], hub, tmp_path)
+    [trace] = (tmp_path / "traces" / "0a1b2c3d4e5f6a7b").iterdir()
+    out = tmp_path / "settings-search.toml"
+    code, wire = invoke(["flow", "record", str(trace), "--out", str(out)], hub, tmp_path)
+    wire["data"]["out"] = out.name
+    assert code == 0 and wire == example
+
+
 def run_batch(tmp_path, steps, serial="0a1b2c3d4e5f6a7b"):
     """The envelope and the trace lines of a batch on the Settings fixture, after one snapshot."""
     hub = FakeHub([Connected(Serial(serial), "SM_J730F", True)], screens=[fixture_screen("settings-home")])
@@ -259,7 +300,24 @@ def test_the_trace_tables_list_exactly_the_keys_a_line_carries(tmp_path):
 
 
 def test_the_example_trace_has_the_keys_of_the_tables():
-    [block] = re.findall(r"```jsonl\n(.*?)```", CONTRACT, re.S)
+    block, _ = re.findall(r"```jsonl\n(.*?)```", CONTRACT, re.S)
     *steps, end = [json.loads(line) for line in block.splitlines()]
     assert all(list(step) == first_column("#### Trace step line") for step in steps)
     assert list(end) == first_column("#### Trace end line")
+
+
+def test_the_command_trace_tables_list_exactly_the_keys_a_line_carries(tmp_path):
+    j7 = Connected(Serial("0a1b2c3d4e5f6a7b"), "SM_J730F", True)
+    hub = FakeHub([j7], screens=[search_field()], after_input=[search_field("hunter2")])
+    invoke(["snapshot"], hub, tmp_path)
+    invoke(["set-text", "name=Search settings", "hunter2"], hub, tmp_path)
+    [file] = (tmp_path / "traces" / "0a1b2c3d4e5f6a7b").iterdir()
+    written = [json.loads(line) for line in file.read_text().splitlines()]
+    _, block = re.findall(r"```jsonl\n(.*?)```", CONTRACT, re.S)
+    example = [json.loads(line) for line in block.splitlines()]
+    for line in (*written, *example):
+        assert list(line) == first_column(f"#### Command {line['line']} line")
+    stable = ("line", "seq", "command", "argv", "ok", "delivery", "error", "input", "target", "gate")
+    assert [{k: v for k, v in line.items() if k in stable} for line in written] == [
+        {k: v for k, v in line.items() if k in stable} for line in example
+    ]

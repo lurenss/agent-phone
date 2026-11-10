@@ -53,6 +53,30 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
 | `hint` | string or null | A recovery step for codes whose recovery the message does not make obvious, otherwise null. |
 | `details` | object | Machine-readable facts for the code, such as `reason` for `STALE_REF`, `source`, `table` and `field` for `POLICY_INVALID`, or `after`, a [snapshot](#snapshot-payload), for the `TIMEOUT` of `wait`. |
 
+### Lean form
+
+`--lean` on a command prints the short form of its envelope, for an agent that reads one result per step. It is made from the full envelope, so it says nothing else, and a key it leaves out has its usual value.
+
+```json
+{"ok":true,"delivery":"delivered_unverified","data":{"after":{"id":"v9mme","app":"com.android.settings","settled":"settled","tree":["text \"Brightness\"","@v9mme:e1 button \"Back\""]}}}
+```
+
+| Left out | Unless |
+| --- | --- |
+| `v`, `command`, `device` | Never printed. The caller ran the command and chose the device. |
+| `permission_mode` | It is not `ask`. |
+| `retry` | The envelope is an error. |
+| `error.hint`, `error.details` | They are not null and not empty. |
+| `data.input`, `data.target` of an input | Never printed. The caller named what it sent. |
+| `data.gate` of an input | Its verdict is not `clear`, so the input committed something. |
+| `data.verified_by` of an input | It is not null. |
+| `window`, `mode`, `keyboard`, `dialog`, `truncated` of a snapshot | They are not `application`, `compact`, false, false and 0. |
+| `toasts`, `interruptions` of a snapshot | They are not empty. |
+| `others` of a snapshot | A window that is not a `system` window is there, such as a popup menu. Only those are listed. The bars, the notification shade and a heads-up notification are `system` windows, so run the command without `--lean` to see what covers an `OCCLUDED` target. |
+| The bounds of a line of `tree`, `added`, `gone` or `matches` | Never printed. |
+
+Every other key prints as in the full form. A snapshot inside `error.details`, and each step's envelope of a `batch`, print lean too. The exit code, what is recorded and what is traced do not change. Every command takes `--lean`, before or after its name. A step of a batch or of a flow does not: give it once, on the whole call. A call whose arguments do not parse, and one that fails inside agent-phone (`INTERNAL`), print the full form.
+
 ## Delivery
 
 | Value | Retry | Meaning |
@@ -68,27 +92,28 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
 
 | Code | Meaning |
 | --- | --- |
-| `INVALID_ARGS` | The arguments do not parse. A target that is neither a ref nor a query, such as `e12` or `Display`, is one case. A step of a batch that does not parse, names its own device, or is not a command that uses the phone is another, and so is a batch file that is not a JSON array of non-empty arrays of strings, or a batch with no file on a terminal. A link for `open-url` that holds a line break or any other control character, written out or percent-encoded, is another. So is a value of `AGENT_PHONE_PERMISSION_MODE` that is neither `ask` nor `dangerously-skip`, which stops the process before a device is opened. So is a `--wait-for` or `--wait-for-gone` that already holds on the read the input is planned on: it would hold whether or not the input worked, so it cannot prove anything, and the input is not sent. |
+| `INVALID_ARGS` | The arguments do not parse. A target that is neither a ref nor a query, such as `e12` or `Display`, is one case. A step of a batch or of a [flow](#flow-file) that does not parse, names its own device, or is not a command that uses the phone is another, and so is a flow file that breaks one of its rules, and a batch file that is not a JSON array of non-empty arrays of strings, or a batch with no file on a terminal. A link for `open-url` that holds a line break or any other control character, written out or percent-encoded, is another. So is a value of `AGENT_PHONE_PERMISSION_MODE` that is neither `ask` nor `dangerously-skip`, which stops the process before a device is opened. So is a `--wait-for` or `--wait-for-gone` that already holds on the read the input is planned on: it would hold whether or not the input worked, so it cannot prove anything, and the input is not sent. |
 | `POLICY_INVALID` | A policy file, or the order its layers merge in, is invalid. `details` names the `source`, the `table` and the `field`, or the `rule`. A file that disables a deny rule of the device profile, or of a file the profile names, is one case, and a file whose top-level `languages` names a language the built-in policy does not cover is another. |
 | `NO_DEVICE` | No device is connected and ready, or the requested one is not. |
 | `DEVICE_AMBIGUOUS` | Several devices are ready and neither `-d` nor a ref names one. |
 | `WRONG_DEVICE` | The ref belongs to another device, or `-d` contradicts the device the ref names. |
 | `DEVICE_BUSY` | Another process drives this device (`A3-4`). |
 | `SERVER_UNAVAILABLE` | The on-device server did not answer its health check in time. |
-| `NOT_SUPPORTED` | The backend cannot perform this input. |
+| `NOT_SUPPORTED` | The backend cannot perform this input. For an input that needs a capability the backend lacks, `details.capability` names it, one of the `capabilities` that `devices` prints. The refusal comes before any screen read for an input with no target, such as `press back`, and always before the input spends the refs. |
 | `SNAPSHOT_NOT_FOUND` | No stored snapshot has that id. It was never taken here, it is older than the newest 64 of its device, or it was written in a form this version cannot read. |
 | `STALE_REF` | The ref cannot be trusted. `details.reason` is `spent` (input was sent after its snapshot), `rebooted` (the snapshot is from an earlier boot) or `gone` (its element is no longer on screen). |
 | `OBSERVE_FIRST` | Input was sent after the device's latest snapshot, so a query or an input without a target needs a new snapshot first. |
 | `AMBIGUOUS_TARGET` | More than one live element matches, and nothing was sent. `details.matches` is their number, for a query and for a ref that now matches several elements. Narrow the query, or take a ref from `find`. |
-| `NOT_FOUND` | No element matches the query, the snapshot has no ref with that number, nothing on screen scrolls, or no app handles the link or intent. |
+| `NOT_FOUND` | No element matches the query, the snapshot has no ref with that number, nothing on screen scrolls, no app handles the link or intent, or the line of a `scroll --until` never showed. |
 | `NO_SURFACE` | The window asked for is not on screen. No window has input focus (the screen is off), or `--surface` finds none, or `--window` is not an id of this read. The message lists the windows that are. A wait reads again after an empty dump, so it reports `NO_SURFACE` only at its deadline, and only when none of its reads showed a screen. A `snapshot` without `--settle` reads once and reports it at once. |
 | `NOT_ACTIONABLE` | The element cannot take this input. `details.reason` is `hidden` or `disabled` when it stayed so until the deadline, and `no_tap`, `not_a_field`, `not_scrollable`, `no_area` or `wrong_axis` (a sideways scroll of a list that runs down, a sideways scroll of a pager whose page is a list that covers its whole height, or an up or down scroll of a collection that runs across) when it never can. |
 | `UNSTABLE` | The element moved between two reads. |
 | `OCCLUDED` | No point of the element would reach it: another window covers it, another element takes the touch there, such as a list that scrolls and is drawn above it, two elements overlap in an unknown order, or its window has no input focus. |
+| `INTERRUPTED` | A pop-up that a policy rule recognises is in the way of the target. The target is covered or is not on the active window, and the window with input focus is an [interruption](#interruptions) and is not the target's window. For a target that is not found, that window must also be a dialog. It ends the input's wait on the first such read, where `OCCLUDED` and `NOT_FOUND` come only at the deadline. A ref needs two reads first, as always. Nothing was sent, no ref was spent, and agent-phone dismisses nothing. `details.snapshot` is the id of a snapshot recorded on that read, and `details.interruptions` lists its interruptions, each `dismiss` a ref of that snapshot. |
 | `COMMIT_REFUSED` | The input would commit an effect that `--commit` did not grant, in `ask` mode. `details` lists the `effects`, the `granted` effects and the `evidence`. `dangerously-skip` never raises it. |
 | `DENIED` | A deny rule forbids the input whatever the caller grants, and in either permission mode. `details` names the `rule`, its `source` and the `evidence`. A device profile's protected package is denied this way. A deny rule reads a tap, a set-text, a scroll and Enter, and never back, home or recents. |
 | `LOCALE_UNSUPPORTED` | The device language has no policy rules, so input that commit rules read, a tap or Enter, cannot be judged. |
-| `TIMEOUT` | A wait reached its deadline. For `wait`, nothing was sent, `delivery` is `not_delivered`, and `details.after` is the snapshot of the last screen it read, or null when that screen had no window to describe. For `--wait-for` on an input, the input went out, `delivery` says how far, and `data.after` is that snapshot. A wait that read a screen and then only empty dumps is a `TIMEOUT` with that screen. |
+| `TIMEOUT` | A wait reached its deadline. For `wait`, nothing was sent, `delivery` is `not_delivered`, and `details.after` is the snapshot of the last screen it read, or null when that screen had no window to describe. For `--wait-for` on an input, the input went out, `delivery` says how far, and `data.after` is that snapshot. An input's `--settle` alone never times out (see [After a settle](#after-a-settle)). A wait that read a screen and then only empty dumps is a `TIMEOUT` with that screen. |
 | `TRANSPORT` | adb or the server failed, or the device returned output that does not parse. |
 | `ACTION_FAILED` | The input went out, and reading the screen back contradicts what was asked, such as a field that does not hold the text `set-text` sent. |
 | `INTERNAL` | A defect in agent-phone. |
@@ -109,6 +134,7 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
 | `locale` | string | with facts | The user's language tag, such as `en-US`. |
 | `ime` | string or null | with facts | The package of the default keyboard, or null when none is set. |
 | `boot_id` | string | with facts | The kernel's boot id. It changes at every reboot, and a ref from an earlier boot is `STALE_REF`. |
+| `capabilities` | array | with facts | What the backend can do on this device, sorted: `point_input` (click, scroll), `key_back`, `key_recents`, `intent_links` (an `intent:` link of `open-url`), `rotate`, `power`, `clipboard`, `screenshot`. An input that needs one the list lacks is `NOT_SUPPORTED`. |
 | `problem` | string | when facts failed | Why a ready device has no facts. |
 | `profile` | string or null | always | The `name` of the device profile in `<state root>/profiles/` whose `serial` is this device's, or null when none is. |
 
@@ -116,6 +142,7 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
 {"v":1,"ok":true,"command":"devices","permission_mode":"ask","device":null,"data":{"devices":[
  {"serial":"0a1b2c3d4e5f6a7b","model":"SM-J730F","ready":true,"api":28,"abi":"armeabi-v7a","display":[1080,1920],
   "density":420,"locale":"en-US","ime":"com.sec.android.inputmethod","boot_id":"8d3f6c1e-0b5a-4c2e-9f1d-2a7b3c4d5e6f",
+  "capabilities":["clipboard","intent_links","key_back","key_recents","point_input","power","rotate","screenshot"],
   "profile":null},
  {"serial":"R58M1234567","model":"","ready":false,"profile":null}]}}
 ```
@@ -147,7 +174,7 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
 
 ### Skills get
 
-`get` prints one guide. With no name it prints `agent-phone`.
+`get` prints one guide. With no name it prints `agent-phone`, the short guide for the usual loop. `agent-phone-reference`, alias `reference`, is the full one.
 
 | Key | Type | Meaning |
 | --- | --- | --- |
@@ -222,7 +249,7 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
  "error":{"code":"TIMEOUT","message":"present name=\"Brightness\" did not hold within 200 ms.","hint":null,
   "details":{"after":{
    "id":"q7m2k","app":"com.android.settings","window":"application","mode":"compact","settled":"unchecked",
-   "keyboard":false,"dialog":false,"others":[],"toasts":[],"truncated":0,
+   "keyboard":false,"dialog":false,"others":[],"toasts":[],"interruptions":[],"truncated":0,
    "tree":[
     "text \"Settings\" [63,33,277,114]",
     "@q7m2k:e1 button \"Search\" [1648,0,1775,147]",
@@ -274,6 +301,54 @@ The same tap under `dangerously-skip` goes out with no grant, and the gate says 
   "gate":{"verdict":"commits","effects":["schedule"],"granted":[],"skipped":["schedule"]},"verified_by":null,"after":null}}
 ```
 
+### After a settle
+
+`--settle` on an input reads the screen after the input until every read for 800 ms prints the same lines, or until `--timeout-ms` has passed, and prints that screen as `after`. It is for an input whose effect the caller cannot name before it looks, so no query is guessed.
+
+- `after.settled` is `settled`, or `unsettled` when the deadline came first. `unsettled` is not an error: the result is `ok: true` and `after` is the last screen read. It tells only whether the screen stood still, so a wait that timed out on its effect can still say `settled`.
+- A settled screen proves nothing about the input. `delivery` is `delivered_unverified` and `verified_by` is null, unless a `--wait-for` or a `--wait-for-gone` beside it saw its effect, or a `set-text` read its field back.
+- With a `--wait-for` beside it, the wait ends on the first read where the effect holds and the screen has settled. An effect that showed on any read after the input verifies it, as without the flag, also when it went again or the screen never settled. An effect that showed on no read is `TIMEOUT`.
+- The snapshot is recorded like any `after`, so its refs serve the next input.
+
+### Scroll until a line shows
+
+`agent-phone scroll <direction> [TARGET] --until QUERY` swipes the list again and again until a line that matches the query shows. Each swipe is an input of its own: it is planned on a fresh read, judged by the gate and spent, and the screen settles before the next one. The result is one input payload for all the swipes.
+
+- The list is named by a query, or left out when one element scrolls. A ref is `INVALID_ARGS`, because the first swipe spends it. So is a `--wait-for` or a `--wait-for-gone` beside `--until`. A `--settle` beside it changes nothing. `--timeout-ms` bounds each swipe, not the call.
+- When the line already shows, the call is `INVALID_ARGS` and nothing is sent.
+- `data.input` and `data.target` are the last swipe's, and `data.input.times` counts the swipes when more than one went out. `delivery` is `delivery_uncertain` when any swipe's was. A line that shows proves nothing about a swipe, so it is `delivered_unverified` otherwise.
+- `data.after` is the screen the line showed on. It is the settled screen of the last swipe, or the read after it, with `settled` `unchecked`, when the line loaded after the screen had settled. With `--after diff` it is compared with the snapshot the first swipe stood on.
+- When the line never shows, the result is an error with `code` `NOT_FOUND` and `data.after`. It comes when a swipe did not move the list, when the screen did not settle after a swipe, so that the end of the list cannot be told, or after 10 swipes.
+- A swipe that is refused after another went out is reported with its code and its `details` on the swipes that went out, so `delivery` never says `not_delivered` once the list moved.
+
+### After as a diff
+
+`--after diff` on an input prints `after` as what the screen gained and lost, in place of `tree`. It compares the lines of `after` with the lines of the snapshot the input stood on: the one its ref names, or the device's latest snapshot for a query or an input with no target. Every other key of the [snapshot payload](#snapshot-payload) stays. The same snapshot is recorded either way, so the ref of an added line works for the next input.
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `kept` | int | How many lines both snapshots print. A line is kept when only its ref, its indent or its bounds changed, so a renumbered or scrolled line is not a change. |
+| `added` | array of strings | The lines only `after` prints, as it prints them, with their refs and bounds and without indent. |
+| `gone` | array of strings | The lines only the earlier snapshot printed, without ref and bounds. |
+
+- A kept line has a new ref in the recorded snapshot, and the diff does not print it. Name a kept element by a query, or take a `snapshot`.
+- `after` prints `tree` as usual in three cases. No line was kept, so the input replaced the screen and a diff would list both screens. The earlier snapshot is not in the same mode, such as one taken with `--full`. Or the three keys are not shorter than `tree` in bytes.
+- The comparison is with what the earlier snapshot printed. When that snapshot printed a part of the screen, as a `find` or a `snapshot --root` does, `added` also lists lines that were on screen and that it did not print. A line that the size budget printed with less, such as without its detail, is in `gone` in its old form and in `added` in its new one.
+- Of two equal lines, the one that kept its bounds is the kept one.
+- `--after diff` adds no read and records nothing more. `after` is null wherever it is null without the flag.
+- A diff proves nothing. `delivery` is what it is without the flag.
+
+```json
+{"v":1,"ok":true,"command":"click","permission_mode":"ask","device":"0a1b2c3d4e5f6a7b","delivery":"delivered_verified","retry":"unsafe",
+ "data":{"input":{"kind":"tap","at":[540,350]},
+  "target":{"ref":"@fky1a:e2","role":"button","name":"Display","at":[540,350]},
+  "gate":{"verdict":"clear","reason":"no_commit_words"},"verified_by":"present name=\"Brightness\"",
+  "after":{"id":"v9mme","app":"com.android.settings","window":"application","mode":"compact","settled":"unchecked",
+   "keyboard":false,"dialog":false,"others":[],"toasts":[],"interruptions":[],"truncated":0,"kept":2,
+   "added":["@v9mme:e1 button \"Back\" [0,100,1080,200]","text \"Brightness\" [0,700,1080,800]"],
+   "gone":["button \"Display\""]}}}
+```
+
 ### Input kinds
 
 | Kind | Keys | Input |
@@ -281,7 +356,7 @@ The same tap under `dangerously-skip` goes out with no grant, and the gate says 
 | `tap` | `at` | A touch at a point (`click`). |
 | `long_press` | `at`, `ms` | A touch held for `ms` (`click --long`). |
 | `activate` | none | The accessibility click of a backend that has one. The uiautomator2 backend has none (`A2-11`). |
-| `swipe` | `from`, `to` | A swipe across a list (`scroll`). |
+| `swipe` | `from`, `to`, `times` | A swipe across a list (`scroll`). `times` is there only when a `scroll --until` sent more than one, and counts them. |
 | `set_text` | `secret` | A field's text replaced through the accessibility action (`set-text`). |
 | `key` | `key` | A key: `back`, `home`, `recents` or `enter` (`press`). |
 | `launch` | `package` | An app's launcher screen started. |
@@ -387,6 +462,130 @@ Each batch writes one JSONL file, `<state root>/traces/<serial>/<UTC timestamp>-
 {"line":"end","stopped_at":1,"ms":416}
 ```
 
+## Flow payload
+
+`agent-phone flow run FILE [--param NAME=VALUE]... [--commit EFFECT]... [--dry-run]` replays a job that was written once as a [flow file](#flow-file). It runs the file's steps in one process, under one device lock, as a batch does, and it prints one envelope whatever the number of steps. The steps' own envelopes are not printed, so a replay costs an agent one call and one small object.
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `flow` | string | The flow's `name`. |
+| `steps` | int | How many steps the file has. |
+| `ran` | int | How many steps ran and were ok. |
+| `stopped_at` | int or null | The index of the step the run stopped at, from 0, or null when every step ran. |
+| `dry_run` | bool | Whether `--dry-run` was given. |
+| `commit` | array of strings or null | In a dry run that stopped before a commit, the [effects](#effects) the step at `stopped_at` would commit. Null otherwise. |
+| `trace` | string | The path of the device's [trace](#command-trace) of the day, which has a begin and an end line for every call the run made. |
+
+- `delivery` and `retry` follow the [batch's](#batch-payload) rule over every call the run made. When a step fails, `delivery` is that step's, and `retry` is `unsafe` when an earlier step sent input.
+- The run stops at the first step whose `expect` does not show, and at the first step that is not ok. `ok` is then false, and `error` is that call's own `code`, `message`, `hint` and `details`, such as the snapshot a wait timed out on. `details` also has `step`, the step's index, and `during`: `expect` for the step's expectation, `look` for the snapshot taken for it, `run` for the step itself.
+- A dry run that stops before a commit is ok: `stopped_at` names the step, `commit` its effects, and nothing of that step was sent. The steps before it ran and sent their input. When the step's own `--commit` does not name those effects, a real run would refuse the step, so the dry run fails on it with `COMMIT_REFUSED`. `permission_mode` is `ask` in every dry run, because a dry run judges each step as `ask` does.
+- A failure before the first step, such as a file that is not a flow, a step that does not parse, a parameter that is missing, or a flow whose `grants` the caller's `--commit` does not cover (`COMMIT_REFUSED`), is an ordinary error envelope with `command` `flow run`, `delivery` `not_delivered`, `retry` `safe` and no `data`. No device was opened. A step's `--policy` file that does not parse is `POLICY_INVALID` after the device is opened and before the first step, with nothing sent, as in a batch.
+
+```json
+{"v":1,"ok":true,"command":"flow run","permission_mode":"ask","device":"0a1b2c3d4e5f6a7b","delivery":"delivered_unverified","retry":"unsafe",
+ "data":{"flow":"settings-search","steps":2,"ran":2,"stopped_at":null,"dry_run":false,"commit":null,
+  "trace":"/home/agent/.agent-phone/traces/0a1b2c3d4e5f6a7b/2026-11-10.jsonl"}}
+```
+
+The launch had no `--wait-for`, so it proved nothing, and the run's `delivery` is the weakest of its inputs.
+
+### Flow file
+
+```toml
+[flow]
+name = "settings-search"
+app = "com.android.settings"
+grants = []
+params = ["query"]
+
+[[step]]
+run = ["launch", "com.android.settings"]
+
+[[step]]
+expect = ["name=Search settings"]
+run = ["set-text", "name=Search settings", "{query}"]
+```
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `flow.name` | string | The flow's name. Required. |
+| `flow.app` | string | The package the flow is for. It is for the reader: nothing checks it. |
+| `flow.grants` | array of strings | The [effects](#effects) the flow may commit. Default none. |
+| `flow.params` | array of strings | The names of the flow's parameters. Default none. |
+| `step.run` | array of strings | The arguments of one command, as a [batch](#batch-payload) step has them. Required. |
+| `step.expect` | array of strings | Queries that must all show before the step acts. Default none. |
+
+- The CLI's own parser reads each `run`, so a step means what the same words mean on a command line, and the same gate judges it. A step must be a command that reads or drives the phone, and it may name no device.
+- A target is a query, such as `name=Display`. A step that names a ref or a point is refused, because a ref belongs to one snapshot. So are `get`, `is` and `--root`, which take a ref.
+- `{name}` in a word of `run` or `expect` stands for the parameter `name`. `--param name=value` must give every parameter of `params` once, and no other. A `{name}` that `params` does not list is refused, so a misspelt name is never typed as it stands. A parameter fills a value and never adds a flag: a value that starts with `-` is refused, unless its word stands after a `"--"` word in `run`, where the parser reads every word as text.
+- `grants` is a cap. A step whose `--commit` names an effect outside it is refused. The flow runs only when the caller's `--commit` names every effect in `grants`, except in a dry run and in `dangerously-skip`. The caller's grant reaches no step: a step is judged under its own `--commit`, so an input that commits an effect its step did not grant is `COMMIT_REFUSED`, as in a batch.
+- `--dry-run` runs every step with no grant, judged as `ask` judges. The steps that commit nothing run and send their input. The gate refuses the first step that would commit, and the run stops there.
+- `expect` is waited for as `wait --for` waits, and the read it holds on is the observation the step needs. A step with no `expect` gets one snapshot first when the step before it left no observation, so a flow may start with `launch`.
+- The file's rules above are checked before a device is opened, and a file that breaks one is `INVALID_ARGS`. So is an unknown key in the file.
+- Text that a parameter typed is written to no trace line: a begin line of a flow has the words of the file, with `{name}` in them, and the keys `flow` and `step` after `started_utc`. Typed text can still show where the screen shows it. A snapshot prints what a field holds unless it is a password field, so the `details.after` of a later step that fails can show it, as a snapshot after `set-text` does. A parameter inside a query names something on the screen: the end line holds the query and the name it resolved to, and an error message can quote the query. So put a secret only where it is typed, and only into a password field.
+
+### Flow record
+
+`agent-phone flow record TRACE --out FILE` writes the draft of a flow file from a device's [trace](#command-trace) of one day, so a job an agent did by hand can be replayed. It reads that one file and opens no device, so `device` is null. A draft never replaces a file that exists, and it has mode 0600, because it holds names from the screen.
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `out` | string | The path of the draft. |
+| `steps` | int | How many steps the draft has. |
+| `params` | array of strings | The parameters the draft declares, one for each command that typed text: `text`, `text2` and so on. |
+| `refs` | array of ints | The steps that still name a ref, because the element had no name. The draft does not load until each is named by a query. |
+| `skipped` | array of ints | The `seq` of each command that was ok and is not in the draft, because its traced words do not parse. A trace hides typed text wherever it stands, so a text of one or two characters can change another word of its line. |
+
+- Each command in the trace that sent input or waited, and was ok, is a step, with the words that were typed. `snapshot`, `find`, `get`, `is`, `clipboard get` and `screenshot`, a command that failed, a command with no end line, and the lines of a flow's own run are left out.
+- A target that was named by ref becomes a query on the role and the name the ref resolved to, such as `role=button name="Display"`.
+- Typed text is `<N chars>` in a trace, and becomes `{text}` in the step. So no draft holds text that was typed, and `flow run` asks for it with `--param`.
+- The effects that the commands granted with `--commit` become the draft's `grants`. A commit that `dangerously-skip` let through had no `--commit`, so the draft declares no grant for it. Its dry run then fails at that step with `COMMIT_REFUSED`, which names the `--commit` to add.
+- A file that is not such a trace, a trace with nothing to replay, and an `--out` that exists are `INVALID_ARGS`.
+
+```json
+{"v":1,"ok":true,"command":"flow record","permission_mode":"ask","device":null,
+ "data":{"out":"settings-search.toml","steps":2,"params":["text"],"refs":[],"skipped":[]}}
+```
+
+A draft is a start. It has no `expect`, and a query on a role and a name can match two elements on another day. Read it, and try it with `--dry-run`.
+
+## Command trace
+
+Every command that reads or drives the phone, run by itself, appends two lines to `<state root>/traces/<serial>/<UTC date>.jsonl`: a begin line before it runs and an end line after it. The file has mode 0600 in a folder of mode 0700, like a batch's trace. A begin line with no end line is a command that died on the way. The end line is read from the command's envelope, so the two agree. `devices`, `skills` and `server` write no line, and a batch writes its own file. [`flow record`](#flow-record) drafts a flow from these lines.
+
+#### Command begin line
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `line` | string | `begin`. |
+| `seq` | int | The command's number in the file, from 0. Its end line has the same number. |
+| `command` | string | The command's name, as in its envelope. |
+| `argv` | array of strings | The command's arguments from the command word on, without the flag that named the device. Typed text is replaced by `<N chars>`, as in a [batch's step line](#trace-step-line). Every other word is written as given, so a link given to `open-url` is in the file. |
+| `started_utc` | string | When the command started, in UTC with milliseconds. |
+
+#### Command end line
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `line` | string | `end`. |
+| `seq` | int | The `seq` of the command's begin line. |
+| `permission_mode` | string | The command's `permission_mode`. |
+| `ms` | int | How long the command took. |
+| `ok` | bool | The command's `ok`. |
+| `delivery` | string or null | The command's `delivery`, null for a read that succeeded. |
+| `retry` | string or null | The command's `retry`, null when it has no `delivery`. |
+| `error` | string or null | The command's error code. |
+| `input` | string or null | The kind of the input that went out, from the [input kinds](#input-kinds), or null. |
+| `target` | object or null | As in a [batch's step line](#trace-step-line). |
+| `gate` | object or null | The verdict the input was sent under, as in the [input payload](#input-payload), or null. |
+
+```jsonl
+{"line":"begin","seq":0,"command":"snapshot","argv":["snapshot"],"started_utc":"2026-11-10T09:15:00.211Z"}
+{"line":"end","seq":0,"permission_mode":"ask","ms":212,"ok":true,"delivery":null,"retry":null,"error":null,"input":null,"target":null,"gate":null}
+{"line":"begin","seq":1,"command":"set-text","argv":["set-text","name=Search settings","<7 chars>"],"started_utc":"2026-11-10T09:15:03.870Z"}
+{"line":"end","seq":1,"permission_mode":"ask","ms":655,"ok":true,"delivery":"delivered_verified","retry":"unsafe","error":null,"input":"set_text","target":{"ref":null,"query":"name=\"Search settings\"","role":"field","name":"Search settings"},"gate":{"verdict":"clear","reason":"not_labeled_input"}}
+```
+
 ## Device reads
 
 `clipboard get` prints `{"value": <text or null>}`, null when the clipboard holds no text. `screenshot` saves a JPEG under the state root, in `devices/<serial>/screenshots/`, readable only by the user, and prints `{"value": <path>}`. Neither sends input, so no ref changes.
@@ -406,6 +605,7 @@ Each batch writes one JSONL file, `<state root>/traces/<serial>/<UTC timestamp>-
 | `dialog` | bool | `true` when the described window does not fill the display. A window fills it when none of its edges is inset from the display's edge by more than 8% of the display's width (left and right) or height (top and bottom). A full-screen app lying between the status bar and the navigation bar, or a pixel short of the display, fills it, and a dialog whose margins are all under 8% reads as `false`. |
 | `others` | array | Every other window, in dump order, as `{"id", "app", "window", "bounds", "nodes"}`. `bounds` is `[left, top, right, bottom]`, and `nodes` is the window's node count. |
 | `toasts` | array of strings | Toast texts the backend saw. |
+| `interruptions` | array | The pop-ups on screen that a policy rule recognises, in any window. See [Interruptions](#interruptions). |
 | `truncated` | int | The number of lines that budget fitting removed. |
 | `tree` | array of strings | One string per line, described below. |
 
@@ -416,7 +616,7 @@ The Settings home fixture (`tests/fixtures/dumps/settings-home.xml`), in landsca
 ```json
 {"v":1,"ok":true,"command":"snapshot","permission_mode":"ask","device":"0a1b2c3d4e5f6a7b","data":{
  "id":"q7m2k","app":"com.android.settings","window":"application","mode":"compact","settled":"unchecked",
- "keyboard":false,"dialog":false,"others":[],"toasts":[],"truncated":0,
+ "keyboard":false,"dialog":false,"others":[],"toasts":[],"interruptions":[],"truncated":0,
  "tree":[
   "text \"Settings\" [63,33,277,114]",
   "@q7m2k:e1 button \"Search\" [1648,0,1775,147]",
@@ -427,6 +627,35 @@ The Settings home fixture (`tests/fixtures/dumps/settings-home.xml`), in landsca
   "  @q7m2k:e6 button \"Notifications\" \"Block, Allow, Do not disturb\" [0,653,1920,868]",
   "  @q7m2k:e7 button \"Display\" \"Brightness, Blue light filter, Home scre…\" [0,910,1920,1080]"]}}
 ```
+
+### Interruptions
+
+An interruption is a pop-up the agent did not ask for, such as a dialog that says an app is not responding or a permission prompt. A policy file names them in `[[interruption]]` tables: a `kind`, the `words` that must all show in one window, the `dismiss` names of the button that is the safe way out, and `needs_human`. The built-in rules cover the dialogs for an app that does not respond, a permission, a paste and a purchase, in English and Italian. A consumer's file adds its own app's pop-ups, scoped by `packages`. `--policy` is a flag of input commands, so a file passed that way applies to the input's `INTERRUPTED` and `after`. A file that the device profile names in `policy_files`, or that `open_phone(policies=...)` is given, applies to every command. `find` prints matches only, so its payload has no `interruptions`. A window that several rules match gives one entry for each rule.
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `rule` | string | The id of the rule that matched. |
+| `kind` | string | See [Interruption kinds](#interruption-kinds). |
+| `needs_human` | bool | `true` when only the user may answer the pop-up. Stop and hand over. |
+| `dismiss` | string or null | The ref of the button the rule calls the safe way out. It is null when the rule names none, when the window shows no such button or several, and when this snapshot did not print that button, because it describes another window. |
+
+agent-phone never clicks `dismiss`. The caller clicks it like any other ref, and the gate judges that click.
+
+```json
+{"rule":"default.not-responding.en","kind":"not_responding","needs_human":false,"dismiss":"@t8v1m:e2"}
+```
+
+### Interruption kinds
+
+| Kind | Pop-up |
+| --- | --- |
+| `permission` | A prompt that asks for a permission. |
+| `purchase` | A sheet that is one tap from spending money. |
+| `paste` | A prompt that asks to read the clipboard. |
+| `login` | A prompt to sign in or to enter a passcode. |
+| `not_responding` | The system says an app does not respond. |
+| `crash` | The system says an app stopped. |
+| `promo` | An app's own offer, rating request or announcement. |
 
 ### Tree lines
 

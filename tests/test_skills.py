@@ -29,8 +29,9 @@ def test_get_prints_the_shipped_guide_by_name_alias_or_default(argv):
 def test_list_names_each_guide_with_its_alias_and_summary():
     code, wire = invoke(["skills", "list"], NoDevices())
     assert code == 0 and wire["device"] is None
-    (guide,) = wire["data"]["skills"]
-    assert guide["name"] == "agent-phone" and guide["alias"] == "phone" and guide["summary"]
+    short, reference = wire["data"]["skills"]
+    assert short["name"] == "agent-phone" and short["alias"] == "phone" and short["summary"]
+    assert reference["name"] == "agent-phone-reference" and reference["alias"] == "reference"
 
 
 def test_an_unknown_guide_is_invalid_args_and_names_the_known_ones():
@@ -59,3 +60,11 @@ def test_every_guide_folder_is_served_and_named_after_its_folder():
     for name in on_disk:
         fields = front_matter((SKILLS_ROOT / name / "SKILL.md").read_text(encoding="utf-8"))
         assert fields["name"] == name and fields["description"]
+
+
+def test_the_short_guide_stays_short_and_says_how_to_get_the_reference():
+    reference = (SKILLS_ROOT / "agent-phone-reference" / "SKILL.md").read_text(encoding="utf-8")
+    assert len(GUIDE.encode()) <= 12_000, "an agent reads the short guide on every run and in every turn"
+    assert "`agent-phone skills get reference`" in GUIDE
+    code, wire = invoke(["skills", "get", "reference"], NoDevices())
+    assert code == 0 and wire["data"] == {"name": "agent-phone-reference", "content": reference}

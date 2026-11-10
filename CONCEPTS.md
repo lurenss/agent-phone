@@ -128,7 +128,11 @@ Snapshots on disk, one immutable JSON file each, under `devices/<serial>/snapsho
 
 ### Policy
 
-The rules that decide what an input commits (`Policy`, `core/policy/model.py`; `rules.py` reads and layers it). Rules are data in TOML files: the package's `default.toml`, a device profile, and the files a caller passes. There are five rule kinds: `commit`, `exempt`, `ignore`, `inherit` and `deny`. `parse_policy` validates a file and `merge` applies the layers in order.
+The rules that decide what an input commits (`Policy`, `core/policy/model.py`; `rules.py` reads and layers it). Rules are data in TOML files: the package's `default.toml`, a device profile, and the files a caller passes. There are six rule kinds: `commit`, `exempt`, `ignore`, `inherit`, `deny` and `interruption`. `parse_policy` validates a file and `merge` applies the layers in order.
+
+### Interruption
+
+A pop-up the agent did not ask for, recognised by an `interruption` rule (`InterruptionRule`; `interruptions_of`, `core/policy/interrupt.py`): a window in which every phrase of the rule's `words` shows. Every snapshot lists the ones on screen with their kind and the ref of the button the rule calls the safe way out. The built-in rules name Android's own prompts and no app. An app's own pop-up, such as a rating request, is a rule in that consumer's policy file. agent-phone never clicks the way out.
 
 ### Effect
 
@@ -148,7 +152,7 @@ Where a tap lands and which node takes it (`core/act/hit.py`). The server's clic
 
 ### Auto-wait
 
-What act() does with a target that is not ready yet (`NotYet`, `core/act/act.py`). While the element is hidden, disabled, at another place than on the read before, or covered, act() reads again until the request's deadline and then reports the last refusal. A refusal that waiting cannot clear, such as a spent ref, fails at once.
+What act() does with a target that is not ready yet (`NotYet`, `core/act/act.py`). While the element is hidden, disabled, at another place than on the read before, or covered, act() reads again until the request's deadline and then reports the last refusal. A refusal that waiting cannot clear, such as a spent ref, fails at once. So does a covered or missing target on a read whose focused window is an interruption: that is `INTERRUPTED` (`core/act/interrupted.py`), with nothing sent and the epoch left.
 
 ### Verdict and grant
 
@@ -170,7 +174,7 @@ What a command produced (`Outcome`, `core/outcome.py`): `Refused`, `Acted` or `R
 
 ### Wait condition
 
-One thing a wait checks on a read (`Predicate`, `core/wait/predicate.py`): `Present` and `Gone` match a `Query` against the lines of the active window's compact view, as `find` does, `Foreground` names the package of the focused window, and `Settled` says that every read for 800 ms printed the same lines. `observe` times that window, and each condition is decided from the previous and the current read, and a read with no active window or no line decides neither `Present` nor `Gone`. A dialog hides what lies under it (`A2-7`), so a dialog with no matching line does not decide `Gone`. `wait` and `--wait-for` build the same conditions from the same query syntax.
+One thing a wait checks on a read (`Predicate`, `core/wait/predicate.py`): `Present` and `Gone` match a `Query` against the lines of the active window's compact view, as `find` does, `Foreground` names the package of the focused window, and `Settled` says that every read for 800 ms printed the same lines. `observe` times that window, and each condition is decided from the previous and the current read, and a read with no active window or no line decides neither `Present` nor `Gone`. A dialog hides what lies under it (`A2-7`), so a dialog with no matching line does not decide `Gone`. `wait` and `--wait-for` build the same conditions from the same query syntax, and `--settle` on an input adds a `Settled` to them.
 
 ### Wait
 
@@ -184,7 +188,11 @@ Several steps run in one process (`batch`, `cli/batch.py`). A step is the CLI's 
 
 ### Trace
 
-The record of one batch (`Trace`, `cli/trace.py`): a JSONL file under `traces/<serial>/` in the state root, mode 0600 in a folder of mode 0700, with a line appended as each step ends and a last line for the end. A step's line is read from its envelope: whether it was ok, its delivery and retry, its error code, and for an input its kind, its target and its gate verdict. It holds no snapshot, and the text of `set-text` and `clipboard set` shows as `<N chars>`. *Avoid:* "log" for `decisions.tsv`, which records decisions and not steps.
+The record of what commands did (`Trace`, `cli/trace.py`): JSONL files under `traces/<serial>/` in the state root, mode 0600 in a folder of mode 0700. A batch has its own file, with a line appended as each step ends and a last line for the end. Every other command that reads or drives the phone appends a begin line and an end line to the device's file of the UTC day, so a begin line with no end line is a command that died on the way. A step's line and an end line are read from the command's envelope: whether it was ok, its delivery and retry, its error code, and for an input its kind, its target and its gate verdict. It holds no snapshot, and the text of `set-text` and `clipboard set` shows as `<N chars>`. *Avoid:* "log" for `decisions.tsv`, which records decisions and not steps.
+
+### Flow
+
+A job written once as a file of steps and replayed in one call (`flow run`, `cli/flow.py`, `cli/flow_file.py`). A step is an argv that `parse_args` parses, as a batch step is, with a query for its target and never a ref, and `{name}` where a parameter goes. Its `expect` queries are waited for before it acts. The file's `grants` cap what a step may grant itself, and the flow runs only when the caller's `--commit` names every effect in `grants`. A dry run judges every step with no grant, as `ask` does, and stops before the first one that would commit. The run stops at the first expectation that does not show or step that is not ok, and prints one small envelope that names the step. `flow record` drafts a flow file from the trace of a day (`cli/flow_record.py`): the inputs and waits that were ok, with a query on the role and name each ref resolved to, and a parameter where text was typed. *Avoid:* "routine", "macro" and "script". A flow has no branches, loops or retries, and it is not a second way to send input: each step passes the same `act()` as the same words on a command line.
 
 ## Devices and the server
 
