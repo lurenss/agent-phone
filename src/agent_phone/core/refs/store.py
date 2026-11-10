@@ -36,7 +36,7 @@ from agent_phone.core.wait.clock import Clock
 from agent_phone.core.wait.until import until
 
 RETAINED_PER_DEVICE = 64
-FORMAT = 1
+FORMAT = 2
 LOCK_WAIT_S = 10.0
 
 

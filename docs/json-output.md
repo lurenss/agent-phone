@@ -85,6 +85,7 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
 | `NOT_ACTIONABLE` | The element cannot take this input. `details.reason` is `hidden` or `disabled` when it stayed so until the deadline, and `no_tap`, `not_a_field`, `not_scrollable`, `no_area` or `wrong_axis` (a sideways scroll of a list that runs down, a sideways scroll of a pager whose page is a list that covers its whole height, or an up or down scroll of a collection that runs across) when it never can. |
 | `UNSTABLE` | The element moved between two reads. |
 | `OCCLUDED` | No point of the element would reach it: another window covers it, another element takes the touch there, such as a list that scrolls and is drawn above it, two elements overlap in an unknown order, or its window has no input focus. |
+| `INTERRUPTED` | A pop-up that a policy rule recognises is in the way of the target. The target is covered or is not on the active window, and the window with input focus is an [interruption](#interruptions) and is not the target's window. For a target that is not found, that window must also be a dialog. It ends the input's wait on the first such read, where `OCCLUDED` and `NOT_FOUND` come only at the deadline. A ref needs two reads first, as always. Nothing was sent, no ref was spent, and agent-phone dismisses nothing. `details.snapshot` is the id of a snapshot recorded on that read, and `details.interruptions` lists its interruptions, each `dismiss` a ref of that snapshot. |
 | `COMMIT_REFUSED` | The input would commit an effect that `--commit` did not grant, in `ask` mode. `details` lists the `effects`, the `granted` effects and the `evidence`. `dangerously-skip` never raises it. |
 | `DENIED` | A deny rule forbids the input whatever the caller grants, and in either permission mode. `details` names the `rule`, its `source` and the `evidence`. A device profile's protected package is denied this way. A deny rule reads a tap, a set-text, a scroll and Enter, and never back, home or recents. |
 | `LOCALE_UNSUPPORTED` | The device language has no policy rules, so input that commit rules read, a tap or Enter, cannot be judged. |
@@ -224,7 +225,7 @@ The mode lifts that one condition. A deny rule, a protected package, `LOCALE_UNS
  "error":{"code":"TIMEOUT","message":"present name=\"Brightness\" did not hold within 200 ms.","hint":null,
   "details":{"after":{
    "id":"q7m2k","app":"com.android.settings","window":"application","mode":"compact","settled":"unchecked",
-   "keyboard":false,"dialog":false,"others":[],"toasts":[],"truncated":0,
+   "keyboard":false,"dialog":false,"others":[],"toasts":[],"interruptions":[],"truncated":0,
    "tree":[
     "text \"Settings\" [63,33,277,114]",
     "@q7m2k:e1 button \"Search\" [1648,0,1775,147]",
@@ -436,6 +437,7 @@ Each batch writes one JSONL file, `<state root>/traces/<serial>/<UTC timestamp>-
 | `dialog` | bool | `true` when the described window does not fill the display. A window fills it when none of its edges is inset from the display's edge by more than 8% of the display's width (left and right) or height (top and bottom). A full-screen app lying between the status bar and the navigation bar, or a pixel short of the display, fills it, and a dialog whose margins are all under 8% reads as `false`. |
 | `others` | array | Every other window, in dump order, as `{"id", "app", "window", "bounds", "nodes"}`. `bounds` is `[left, top, right, bottom]`, and `nodes` is the window's node count. |
 | `toasts` | array of strings | Toast texts the backend saw. |
+| `interruptions` | array | The pop-ups on screen that a policy rule recognises, in any window. See [Interruptions](#interruptions). |
 | `truncated` | int | The number of lines that budget fitting removed. |
 | `tree` | array of strings | One string per line, described below. |
 
@@ -446,7 +448,7 @@ The Settings home fixture (`tests/fixtures/dumps/settings-home.xml`), in landsca
 ```json
 {"v":1,"ok":true,"command":"snapshot","permission_mode":"ask","device":"0a1b2c3d4e5f6a7b","data":{
  "id":"q7m2k","app":"com.android.settings","window":"application","mode":"compact","settled":"unchecked",
- "keyboard":false,"dialog":false,"others":[],"toasts":[],"truncated":0,
+ "keyboard":false,"dialog":false,"others":[],"toasts":[],"interruptions":[],"truncated":0,
  "tree":[
   "text \"Settings\" [63,33,277,114]",
   "@q7m2k:e1 button \"Search\" [1648,0,1775,147]",
@@ -457,6 +459,35 @@ The Settings home fixture (`tests/fixtures/dumps/settings-home.xml`), in landsca
   "  @q7m2k:e6 button \"Notifications\" \"Block, Allow, Do not disturb\" [0,653,1920,868]",
   "  @q7m2k:e7 button \"Display\" \"Brightness, Blue light filter, Home scre…\" [0,910,1920,1080]"]}}
 ```
+
+### Interruptions
+
+An interruption is a pop-up the agent did not ask for, such as a dialog that says an app is not responding or a permission prompt. A policy file names them in `[[interruption]]` tables: a `kind`, the `words` that must all show in one window, the `dismiss` names of the button that is the safe way out, and `needs_human`. The built-in rules cover the dialogs for an app that does not respond, a permission, a paste and a purchase, in English and Italian. A consumer's file adds its own app's pop-ups, scoped by `packages`. `--policy` is a flag of input commands, so a file passed that way applies to the input's `INTERRUPTED` and `after`. A file that the device profile names in `policy_files`, or that `open_phone(policies=...)` is given, applies to every command. `find` prints matches only, so its payload has no `interruptions`. A window that several rules match gives one entry for each rule.
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `rule` | string | The id of the rule that matched. |
+| `kind` | string | See [Interruption kinds](#interruption-kinds). |
+| `needs_human` | bool | `true` when only the user may answer the pop-up. Stop and hand over. |
+| `dismiss` | string or null | The ref of the button the rule calls the safe way out. It is null when the rule names none, when the window shows no such button or several, and when this snapshot did not print that button, because it describes another window. |
+
+agent-phone never clicks `dismiss`. The caller clicks it like any other ref, and the gate judges that click.
+
+```json
+{"rule":"default.not-responding.en","kind":"not_responding","needs_human":false,"dismiss":"@t8v1m:e2"}
+```
+
+### Interruption kinds
+
+| Kind | Pop-up |
+| --- | --- |
+| `permission` | A prompt that asks for a permission. |
+| `purchase` | A sheet that is one tap from spending money. |
+| `paste` | A prompt that asks to read the clipboard. |
+| `login` | A prompt to sign in or to enter a passcode. |
+| `not_responding` | The system says an app does not respond. |
+| `crash` | The system says an app stopped. |
+| `promo` | An app's own offer, rating request or announcement. |
 
 ### Tree lines
 

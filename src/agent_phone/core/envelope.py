@@ -50,6 +50,8 @@ HINTS: Mapping[ErrorCode, str] = {
     ErrorCode.OBSERVE_FIRST: "Input was sent since the last snapshot. Take one and look before acting.",
     ErrorCode.WRONG_DEVICE: "The ref belongs to another device. Drop -d, or pass the device it names.",
     ErrorCode.AMBIGUOUS_TARGET: "Several elements match. Narrow the query, or take a ref from find.",
+    ErrorCode.INTERRUPTED: "Click an interruption's `dismiss` ref to leave it, when your task allows. "
+    "When `needs_human` is true, stop and ask your user.",
     ErrorCode.COMMIT_REFUSED: "Grant the listed effect with --commit only when your user asked for it.",
     ErrorCode.DENIED: "A policy rule forbids this on this device. No flag overrides it.",
     ErrorCode.DEVICE_AMBIGUOUS: "Several devices are connected. Pass -d <serial>.",
@@ -165,6 +167,7 @@ def snapshot_data(snapshot: Snapshot) -> dict[str, object]:
             for other in snapshot.others
         ],
         "toasts": list(snapshot.toasts),
+        "interruptions": snapshot.interruption_data(),
         "truncated": snapshot.truncated,
         "tree": [render_line(line, snapshot.id) for line in snapshot.lines],
     }

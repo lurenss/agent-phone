@@ -159,7 +159,7 @@ The second test is the plan's "every tap must target an element the consumer dec
 - `Snapshot` (`core/snapshot/snapshot.py`) is the printed lines plus the fingerprints, the `DeviceIdentity` (serial and boot id) and the ledger epoch it was taken at. The same frozen value is printed, persisted and read back. Nothing is recomputed or synced.
 - `Fingerprint` (`core/refs/fingerprint.py`) is a whole-value `Key`: package, window kind, role, class, resource-id, stable name, and the stable labels of the collection row. When two surface nodes share a key, a `Twin` stores the ordinal and the bounds of the whole twin set, and position counts as identity only while that set is geometrically unchanged. The same rule covers nameless icons and Compose `View`s, which resolve only on an unchanged screen.
 - `Ledger` (`core/act/ledger.py`) is one epoch counter per device. It is the only constructor of `Permit`.
-- `Policy` (`core/policy/model.py`, read and layered by `rules.py`) is a tuple of rules of five kinds (`commit`, `exempt`, `ignore`, `inherit`, `deny`), parsed from TOML at the boundary. `Verdict` is `Clear | Commits(effects) | Denied(rule)`, and `Grant` is the set of `Effect`s the caller allowed for one input. `PermissionMode` (`core/policy/mode.py`) says whether a `Commits` verdict needs a grant at all.
+- `Policy` (`core/policy/model.py`, read and layered by `rules.py`) is a tuple of rules of six kinds (`commit`, `exempt`, `ignore`, `inherit`, `deny`, `interruption`), parsed from TOML at the boundary. An `interruption` rule judges no input: `interruptions_of` (`core/policy/interrupt.py`) reads it on every recorded observation, and the `Snapshot` keeps each match as an `InterruptionNote` whose way out is a ref number, never a `NodeId`. `Verdict` is `Clear | Commits(effects) | Denied(rule)`, and `Grant` is the set of `Effect`s the caller allowed for one input. `PermissionMode` (`core/policy/mode.py`) says whether a `Commits` verdict needs a grant at all.
 - `Outcome` (`core/outcome.py`) is `Refused | Acted | Read`. `Acted.sent` is a `SentState`, which has no not-delivered member.
 
 ### Flow
@@ -204,8 +204,8 @@ agent_phone/core/
   outcome.py envelope.py phone.py context.py
   snapshot/  surface.py view.py budget.py snapshot.py capture.py
   refs/      fingerprint.py resolve.py store.py   (store.py also holds the device lock)
-  policy/    model.py rules.py reads.py engine.py
-  act/       intent.py hit.py axis.py site.py ledger.py act.py
+  policy/    model.py rules.py reads.py verdict.py engine.py interrupt.py
+  act/       intent.py hit.py axis.py site.py ledger.py interrupted.py act.py
   wait/      clock.py predicate.py observe.py until.py
   commands/  snapshot.py click.py set_text.py press.py stop.py wait.py screenshot.py devices.py server.py
 agent_phone/adapters/uiautomator2/  phone.py parse.py rpc.py delivery.py address.py shell.py adb.py server.py

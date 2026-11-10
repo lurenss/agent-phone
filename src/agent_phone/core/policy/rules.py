@@ -31,6 +31,8 @@ from agent_phone.core.policy.model import (
     ExemptRule,
     IgnoreRule,
     InheritRule,
+    InterruptionKind,
+    InterruptionRule,
     Origin,
     Phrase,
     Policy,
@@ -47,6 +49,7 @@ TABLE_KEYS: Mapping[str, frozenset[str]] = {
     "ignore": SCOPE_KEYS | {"node_ids"},
     "inherit": SCOPE_KEYS | {"words", "node_ids"},
     "deny": SCOPE_KEYS | {"words", "context_words", "effects", "stops"},
+    "interruption": SCOPE_KEYS | {"kind", "words", "dismiss", "needs_human"},
 }
 DOCUMENT_KEYS = frozenset({"languages", "disable", *TABLE_KEYS})
 
@@ -57,7 +60,7 @@ def parse_policy(
     """Validate one parsed TOML document. Returns its rules and the ids it disables.
 
     Raises `Refusal(POLICY_INVALID)` naming the file, the table and the field: an unknown key,
-    an unknown effect or window kind, an empty `words`, a duplicate id. Words are tokenized
+    an unknown effect, window kind or interruption kind, an empty `words`, a duplicate id. Words are tokenized
     here with `labels.words`, so rules and labels split text the same way. `trusted` marks the
     layer as the device's own (`model.Policy`); the profile parser strips its `[device]` and
     `[[protected]]` tables before calling this.
@@ -116,6 +119,15 @@ def parse_rule(table: Table) -> Rule:
             if not (rule.words or rule.node_ids):
                 table.fail("words", "is missing, and so is node_ids: the rule matches nothing")
             return rule
+        case "interruption":
+            return InterruptionRule(
+                origin,
+                scope,
+                table.choice("kind", InterruptionKind),
+                table.phrases("words", True),
+                table.phrases("dismiss"),
+                table.flag("needs_human"),
+            )
         case _:
             rule = DenyRule(
                 origin,
@@ -168,6 +180,12 @@ class Table:
         if not value:
             self.fail(field, "is empty")
         return tuple(value)
+
+    def flag(self, field: str) -> bool:
+        value = self.data.get(field, False)
+        if not isinstance(value, bool):
+            self.fail(field, "must be true or false")
+        return value
 
     def phrases(self, field: str, required: bool = False) -> tuple[Phrase, ...]:
         found = []
