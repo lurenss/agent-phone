@@ -137,3 +137,44 @@ def test_settle_with_after_diff_prints_what_changed(tmp_path):
     click = ["click", f"@{snapshot(tmp_path)}:e1", "--settle", "--after", "diff"]
     _, wire = invoke(click, hub, tmp_path)
     assert wire["data"]["after"]["added"] == ['text "Brightness" [0,500,1080,600]']
+
+
+class Banner(FakePhone):
+    """After an input, the second and third read show a line that then goes, on a screen that
+    never stops changing."""
+
+    def read(self):
+        if not self.permits:
+            return super().read()
+        self.reads += 1
+        seen = self.reads - self.before
+        banner = [text("Sent", 600)] if seen in (2, 3) else []
+        return page(text("Display", 0), text(f"frame {seen}", 300), *banner)
+
+    def inject(self, permit):
+        self.before = self.reads
+        return super().inject(permit)
+
+
+class BannerHub(FakeHub):
+    def open(self, serial, first_read=False):
+        self.phones.append(Banner(self._infos[serial], *self._screens))
+        return self.phones[-1]
+
+
+def test_settle_does_not_turn_an_effect_that_showed_and_went_into_a_timeout(tmp_path):
+    click = ["click", f"@{snapshot(tmp_path)}:e1", "--wait-for", "name=Sent", "--timeout-ms", "1000"]
+    plain = invoke(click, BannerHub([J7], screens=[BEFORE]), tmp_path)
+    code, wire = invoke(["snapshot"], FakeHub([J7], screens=[BEFORE]), tmp_path)
+    settled = [*click[:1], f"@{wire['data']['id']}:e1", *click[2:], "--settle"]
+    both = (plain, invoke(settled, BannerHub([J7], screens=[BEFORE]), tmp_path))
+    assert [(code, wire["delivery"]) for code, wire in both] == [(0, "delivered_verified")] * 2
+    assert both[1][1]["data"]["after"]["settled"] == "unsettled"
+
+
+def test_a_screen_that_stood_still_says_settled_also_when_the_effect_never_showed(tmp_path):
+    hub = FakeHub([J7], screens=[BEFORE], after_input=[AFTER])
+    click = ["click", f"@{snapshot(tmp_path)}:e1", "--wait-for", "name=Never", "--settle"]
+    code, wire = invoke(click, hub, tmp_path)
+    assert code == 1 and wire["error"]["code"] == "TIMEOUT"
+    assert wire["data"]["after"]["settled"] == "settled", "the screen did not change, so no second look"

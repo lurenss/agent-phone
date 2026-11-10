@@ -305,9 +305,9 @@ The same tap under `dangerously-skip` goes out with no grant, and the gate says 
 
 `--settle` on an input reads the screen after the input until every read for 800 ms prints the same lines, or until `--timeout-ms` has passed, and prints that screen as `after`. It is for an input whose effect the caller cannot name before it looks, so no query is guessed.
 
-- `after.settled` is `settled`, or `unsettled` when the deadline came first. `unsettled` is not an error: the result is `ok: true` and `after` is the last screen read.
-- A settled screen proves nothing about the input. `delivery` is `delivered_unverified` and `verified_by` is null, unless a `--wait-for` or a `--wait-for-gone` beside it saw its effect.
-- With a `--wait-for` beside it, the wait ends on the first read where the effect holds and the screen has settled. An effect that holds on a screen that never settles still verifies the input, and an effect that never shows is `TIMEOUT` as without the flag.
+- `after.settled` is `settled`, or `unsettled` when the deadline came first. `unsettled` is not an error: the result is `ok: true` and `after` is the last screen read. It tells only whether the screen stood still, so a wait that timed out on its effect can still say `settled`.
+- A settled screen proves nothing about the input. `delivery` is `delivered_unverified` and `verified_by` is null, unless a `--wait-for` or a `--wait-for-gone` beside it saw its effect, or a `set-text` read its field back.
+- With a `--wait-for` beside it, the wait ends on the first read where the effect holds and the screen has settled. An effect that showed on any read after the input verifies it, as without the flag, also when it went again or the screen never settled. An effect that showed on no read is `TIMEOUT`.
 - The snapshot is recorded like any `after`, so its refs serve the next input.
 
 ### Scroll until a line shows

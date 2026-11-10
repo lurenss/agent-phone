@@ -25,12 +25,14 @@ apart settled an empty grid before its items loaded (#4)."""
 @dataclass(frozen=True, slots=True)
 class Observation:
     """`held` is False when the deadline passed first; `screen` is then the last screen read.
-    `reads` counts every read the loop made, the empty ones too."""
+    `reads` counts every read the loop made, the empty ones too. `shown` says that every effect
+    predicate held together on some read, also one the screen had not settled on."""
 
     screen: Screen
     held: bool
     reads: int
     settled: SettleState
+    shown: bool
 
 
 def read_or_empty(ctx: Context) -> Screen | Refusal:
@@ -60,8 +62,9 @@ def observe(ctx: Context, predicates: tuple[Predicate, ...], deadline: float) ->
     produced a screen, it raises the `NO_SURFACE` of the last read instead. So a screen that is off
     reports `NO_SURFACE` after the whole timeout and not on the first read.
 
-    `settled` is SETTLED when a Settled predicate held, UNSETTLED when one was asked for and the
-    deadline came first, and UNCHECKED when none was asked.
+    `settled` is SETTLED when the reads were quiet for `SETTLE_QUIET_S` at the last read, UNSETTLED
+    when a Settled predicate was asked for and they were not, and UNCHECKED when none was asked. It
+    says nothing about the effects, so a wait that timed out on an effect can end SETTLED.
     """
     settles = [p for p in predicates if isinstance(p, Settled)]
     effects = [p for p in predicates if is_effect(p)]
@@ -69,6 +72,7 @@ def observe(ctx: Context, predicates: tuple[Predicate, ...], deadline: float) ->
     last: Screen | None = None
     quiet_since = ctx.clock.now()
     reads = 0
+    shown = False
     while True:
         current = read_or_empty(ctx)
         reads += 1
@@ -77,16 +81,18 @@ def observe(ctx: Context, predicates: tuple[Predicate, ...], deadline: float) ->
         if isinstance(current, Refusal):
             if expired and last is None:
                 raise current
-            held, previous = False, None
+            held, quiet, previous = False, False, None
         else:
             if not all(holds(p, previous, current) for p in settles):
                 quiet_since = now
             quiet = not settles or now - quiet_since >= SETTLE_QUIET_S
-            held = quiet and all(holds(p, previous, current) for p in effects)
+            effect = all(holds(p, previous, current) for p in effects)
+            shown = shown or effect
+            held = quiet and effect
             last = previous = current
         if held or expired:
             settled = SettleState.UNCHECKED
             if settles:
-                settled = SettleState.SETTLED if held else SettleState.UNSETTLED
-            return Observation(last, held, reads, settled)
+                settled = SettleState.SETTLED if quiet else SettleState.UNSETTLED
+            return Observation(last, held, reads, settled, shown)
         ctx.clock.pause(POLL_GAP_S)
