@@ -92,12 +92,12 @@ Every other key prints as in the full form. A snapshot inside `error.details`, a
 
 | Code | Meaning |
 | --- | --- |
-| `INVALID_ARGS` | The arguments do not parse. A target that is neither a ref nor a query, such as `e12` or `Display`, is one case. A step of a batch or of a [flow](#flow-file) that does not parse, names its own device, or is not a command that uses the phone is another, and so is a flow file that breaks one of its rules, and a batch file that is not a JSON array of non-empty arrays of strings, or a batch with no file on a terminal. A link for `open-url` that holds a line break or any other control character, written out or percent-encoded, is another. So is a value of `AGENT_PHONE_PERMISSION_MODE` that is neither `ask` nor `dangerously-skip`, which stops the process before a device is opened. So is a `--wait-for` or `--wait-for-gone` that already holds on the read the input is planned on: it would hold whether or not the input worked, so it cannot prove anything, and the input is not sent. |
+| `INVALID_ARGS` | The arguments do not parse. A target that is neither a ref nor a query, such as `e12` or `Display`, is one case. A step of a batch or of a [flow](#flow-file) that does not parse, names its own device, or is not a command that uses the phone is another, and so is a flow file that breaks one of its rules, and a batch file that is not a JSON array of non-empty arrays of strings, or a batch with no file on a terminal. A link for `open-url` that holds a line break or any other control character, written out or percent-encoded, is another. So is a value of `AGENT_PHONE_PERMISSION_MODE` that is neither `ask` nor `dangerously-skip`, which stops the process before a device is opened. So is an `AGENT_PHONE_REMOTE` that is not a host alias of letters, digits and `. _ @ -`, and an `AGENT_PHONE_TASK` that is longer than 80 characters or holds one that does not print. So is a `--wait-for` or `--wait-for-gone` that already holds on the read the input is planned on: it would hold whether or not the input worked, so it cannot prove anything, and the input is not sent. |
 | `POLICY_INVALID` | A policy file, or the order its layers merge in, is invalid. `details` names the `source`, the `table` and the `field`, or the `rule`. A file that disables a deny rule of the device profile, or of a file the profile names, is one case, and a file whose top-level `languages` names a language the built-in policy does not cover is another. |
 | `NO_DEVICE` | No device is connected and ready, or the requested one is not. |
 | `DEVICE_AMBIGUOUS` | Several devices are ready and neither `-d` nor a ref names one. |
 | `WRONG_DEVICE` | The ref belongs to another device, or `-d` contradicts the device the ref names. |
-| `DEVICE_BUSY` | Another process drives this device (`A3-4`). |
+| `DEVICE_BUSY` | Another process drives this device (`A3-4`). On a phone host, another holder has the phone: `details` then names `by`, `task` and `free_in_s`, with the meaning they have in the [`lease`](#devices-payload) of a `devices` row. A holder is one state root on one computer. |
 | `SERVER_UNAVAILABLE` | The on-device server did not answer its health check in time. |
 | `NOT_SUPPORTED` | The backend cannot perform this input. For an input that needs a capability the backend lacks, `details.capability` names it, one of the `capabilities` that `devices` prints. The refusal comes before any screen read for an input with no target, such as `press back`, and always before the input spends the refs. |
 | `SNAPSHOT_NOT_FOUND` | No stored snapshot has that id. It was never taken here, it is older than the newest 64 of its device, or it was written in a form this version cannot read. |
@@ -114,13 +114,15 @@ Every other key prints as in the full form. A snapshot inside `error.details`, a
 | `DENIED` | A deny rule forbids the input whatever the caller grants, and in either permission mode. `details` names the `rule`, its `source` and the `evidence`. A device profile's protected package is denied this way. A deny rule reads a tap, a set-text, a scroll and Enter, and never back, home or recents. |
 | `LOCALE_UNSUPPORTED` | The device language has no policy rules, so input that commit rules read, a tap or Enter, cannot be judged. |
 | `TIMEOUT` | A wait reached its deadline. For `wait`, nothing was sent, `delivery` is `not_delivered`, and `details.after` is the snapshot of the last screen it read, or null when that screen had no window to describe. For `--wait-for` on an input, the input went out, `delivery` says how far, and `data.after` is that snapshot. An input's `--settle` alone never times out (see [After a settle](#after-a-settle)). A wait that read a screen and then only empty dumps is a `TIMEOUT` with that screen. |
-| `TRANSPORT` | adb or the server failed, or the device returned output that does not parse. |
+| `TRANSPORT` | adb or the server failed, or the device returned output that does not parse. With `AGENT_PHONE_REMOTE`, ssh could not reach the phone host, the host did not answer as `phone-host` does, or this computer's adb and the host's adb server speak different protocol numbers. |
 | `ACTION_FAILED` | The input went out, and reading the screen back contradicts what was asked, such as a field that does not hold the text `set-text` sent. |
 | `INTERNAL` | A defect in agent-phone. |
 
 ## Devices payload
 
 `agent-phone devices` lists every device adb knows, in adb's order, as `{"devices": [...]}`. It reads facts from each ready device in one shell call and starts nothing on it. The envelope's `device` is null.
+
+When `AGENT_PHONE_REMOTE` names a phone host, the devices are the ones that host's adb knows, and a row says who holds its phone. `devices` takes no lease.
 
 | Key | Type | Present | Meaning |
 | --- | --- | --- | --- |
@@ -137,6 +139,7 @@ Every other key prints as in the full form. A snapshot inside `error.details`, a
 | `capabilities` | array | with facts | What the backend can do on this device, sorted: `point_input` (click, scroll), `key_back`, `key_recents`, `intent_links` (an `intent:` link of `open-url`), `rotate`, `power`, `clipboard`, `screenshot`. An input that needs one the list lacks is `NOT_SUPPORTED`. |
 | `problem` | string | when facts failed | Why a ready device has no facts. |
 | `profile` | string or null | always | The `name` of the device profile in `<state root>/profiles/` whose `serial` is this device's, or null when none is. |
+| `lease` | object | when held on a phone host | Who holds a phone that several computers share: `by`, the person's name on the phone host. `task`, what they said they are doing. `held_s`, for how many seconds. `free_in_s`, in how many seconds the phone is free unless the holder renews. `mine`, `true` when the holder is this state root. A free phone has no such key, and neither has any phone on this computer's own adb. |
 
 ```json
 {"v":1,"ok":true,"command":"devices","permission_mode":"ask","device":null,"data":{"devices":[

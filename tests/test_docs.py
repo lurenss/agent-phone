@@ -19,6 +19,7 @@ from agent_phone.core.device import (
     DeviceIdentity,
     DeviceInfo,
     DeviceList,
+    Lease,
     Listed,
     Package,
     Serial,
@@ -116,7 +117,8 @@ def test_the_devices_table_lists_exactly_the_keys_a_row_can_carry():
     info = DeviceInfo(
         DeviceIdentity(Serial("s"), BootId("b")), "m", 1, "abi", Size(1, 2), 3, "en", None, frozenset()
     )
-    full = payload_data(DeviceList((Listed(Connected(Serial("s"), "m", True), info, "p", None),)))
+    held = Connected(Serial("s"), "m", True, Lease("ben", "task", 1, 2, False))
+    full = payload_data(DeviceList((Listed(held, info, "p", None),)))
     assert set(full["devices"][0]) == set(first_column("## Devices payload"))
 
 

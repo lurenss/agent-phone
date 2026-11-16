@@ -28,6 +28,22 @@ def violations(source: str, forbidden: tuple[str, ...]) -> list[str]:
     ]
 
 
+REMOTE = "agent_phone.adapters.remote"
+
+
+def remote_internals(source: str) -> list[str]:
+    found = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Import):
+            found += [alias.name for alias in node.names if alias.name.startswith(REMOTE + ".")]
+        elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+            if node.module.startswith(REMOTE + "."):
+                found.append(node.module)
+            elif node.module == REMOTE:
+                found += [f"{REMOTE}.{alias.name}" for alias in node.names if alias.name != "remote_hub"]
+    return found
+
+
 def sources(layer: str) -> list[Path]:
     return sorted((PACKAGE / layer).rglob("*.py"))
 
@@ -48,6 +64,18 @@ def test_each_layer_imports_only_what_it_may():
         assert files, f"no source files found under {layer}/"
         for path in files:
             found = violations(path.read_text(), forbidden)
+            assert not found, f"{path.relative_to(PACKAGE)} imports {found}"
+
+
+def test_the_remote_package_is_used_through_remote_hub_only():
+    assert remote_internals(f"from {REMOTE}.link import Link") == [f"{REMOTE}.link"]
+    assert remote_internals(f"import {REMOTE}.claim") == [f"{REMOTE}.claim"]
+    assert remote_internals(f"from {REMOTE} import hub, remote_hub") == [f"{REMOTE}.hub"]
+    assert remote_internals(f"from {REMOTE} import remote_hub") == []
+    inside = PACKAGE / "adapters" / "remote"
+    for path in sorted(PACKAGE.rglob("*.py")):
+        if inside not in path.parents:
+            found = remote_internals(path.read_text())
             assert not found, f"{path.relative_to(PACKAGE)} imports {found}"
 
 

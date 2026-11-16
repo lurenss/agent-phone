@@ -9,11 +9,18 @@ AGENT_PHONE_PERMISSION_MODE
                           person who launches the agent sets it, never the agent
                           (`core/policy/mode.py`). Any other value is INVALID_ARGS.
 ADB                       the adb binary (default `adb`)
+AGENT_PHONE_REMOTE        the ssh host alias of a phone host, the computer the phones are plugged
+                          into. When it is set, every command drives that computer's phones
+                          (`adapters/remote/`). The address, port, user and key of the host stay in
+                          the user's ssh config.
+AGENT_PHONE_TASK          what other people read next to your name while you hold a phone of a
+                          phone host: at most 80 characters that print
 """
 
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -25,6 +32,10 @@ from agent_phone.core.refs.store import LOCK_WAIT_S
 IDLE_LIMIT_S = 15 * 60
 PERMISSION_MODE_VARIABLE = "AGENT_PHONE_PERMISSION_MODE"
 DEFAULT_STATE_ROOT = Path.home() / ".agent-phone"
+ALIAS = re.compile(r"[A-Za-z0-9_.@][A-Za-z0-9_.@-]*")
+"""The alias is an argument of ssh and a part of a file name, so it starts with no dash and holds
+no space and no slash."""
+TASK_CHARS = 80
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +45,8 @@ class Settings:
     lock_wait_s: float = LOCK_WAIT_S
     adb: str | None = None
     permission_mode: PermissionMode = PermissionMode.ASK
+    remote: str | None = None
+    task: str | None = None
 
     @staticmethod
     def from_environment(env: Mapping[str, str] = os.environ) -> Settings:
@@ -43,6 +56,8 @@ class Settings:
             lock_wait_s=float(whole(env, "AGENT_PHONE_LOCK_WAIT_S", int(LOCK_WAIT_S), 0)),
             adb=env.get("ADB") or None,
             permission_mode=permission_mode(env),
+            remote=remote(env),
+            task=task(env),
         )
 
 
@@ -73,3 +88,24 @@ def permission_mode(env: Mapping[str, str]) -> PermissionMode:
             ErrorCode.INVALID_ARGS,
             f"{PERMISSION_MODE_VARIABLE} is {text!r}. It must be {modes}, or unset for `ask`.",
         ) from None
+
+
+def remote(env: Mapping[str, str]) -> str | None:
+    text = env.get("AGENT_PHONE_REMOTE") or None
+    if text is not None and not ALIAS.fullmatch(text):
+        raise Refusal(
+            ErrorCode.INVALID_ARGS,
+            f"AGENT_PHONE_REMOTE is {text!r}. It must be a host alias of your ssh config: letters, "
+            "digits and . _ @ -, with no dash in front.",
+        )
+    return text
+
+
+def task(env: Mapping[str, str]) -> str | None:
+    text = env.get("AGENT_PHONE_TASK") or None
+    if text is not None and (len(text) > TASK_CHARS or not text.isprintable()):
+        raise Refusal(
+            ErrorCode.INVALID_ARGS,
+            f"AGENT_PHONE_TASK is {text!r}. It must be at most {TASK_CHARS} characters that print.",
+        )
+    return text

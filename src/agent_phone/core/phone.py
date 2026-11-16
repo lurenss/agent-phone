@@ -5,7 +5,8 @@ it is allowed: core hands it a `Permit`, which only `act/ledger.py` can construc
 `tests/test_architecture.py` pins both facts by AST:
 
 - `Permit(` is called only in `core/act/ledger.py`;
-- `.inject(` is called only in `core/act/act.py`.
+- `.inject(` is called only in `core/act/act.py`. A `Phone` that wraps another one may hand on,
+  inside its own `inject`, the permit it was given, and that is the one other place.
 
 So every input that reaches any backend went through resolution, the policy engine and a
 persisted ledger spend, in that order, and through one call site.

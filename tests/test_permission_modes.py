@@ -164,7 +164,7 @@ def test_an_invalid_value_stops_the_process_before_any_device_is_opened(monkeypa
     monkeypatch.setenv(VARIABLE, value)
     monkeypatch.setenv("ADB", "false")
     monkeypatch.setattr(sys, "argv", ["agent-phone", "snapshot"])
-    monkeypatch.setattr(process, "U2Hub", no_hub)
+    monkeypatch.setattr(process, "open_hub", no_hub)
     assert process.main() == 2
     wire = json.loads(capsys.readouterr().out)
     assert wire["ok"] is False and wire["error"]["code"] == "INVALID_ARGS"

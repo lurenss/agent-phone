@@ -11,7 +11,7 @@ Wiring order, each step a Refusal on failure:
    policy files, then caller files (`rules.merge`). A profile or a policy file that does not
    parse is POLICY_INVALID before the device is locked or opened;
 3. take the device lock `devices/<serial>/lock` (flock; DEVICE_BUSY after the wait budget);
-4. open the backend, read `DeviceInfo`;
+4. open the backend, which takes the lease first when a phone host is named, and read `DeviceInfo`;
 5. build `Context`.
 
 Setup failures arrive as `PhoneError`, like every other failure a consumer sees.
@@ -25,9 +25,8 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
-from agent_phone.adapters.uiautomator2.adb import SubprocessAdb
-from agent_phone.adapters.uiautomator2.phone import U2Hub
 from agent_phone.cli.commands import INPUT_TIMEOUT_MS, DriverCommand, ScreenshotCommand
+from agent_phone.cli.hub import open_hub
 from agent_phone.cli.policy import LoadedProfile, load_policy, load_profiles, profile_for
 from agent_phone.cli.request import TargetLike, effects, predicates, target_of
 from agent_phone.cli.settings import Settings
@@ -373,10 +372,10 @@ def open_phone(
     if state_root is not None:
         settings = replace(settings, state_root=state_root)
     clock = clock or SystemClock()
-    hub = hub or U2Hub(SubprocessAdb(settings.adb), settings.idle_limit_s, clock)
     chosen: Serial | None = None
     with ExitStack() as stack:
         try:
+            hub = hub or stack.enter_context(open_hub(settings, clock, task=command, linger=False))
             ref_device = SnapshotStore(settings.state_root).device_of(ref.snapshot) if ref else None
             chosen = select_device(hub.connected(), Serial(serial) if serial else None, ref_device)
             profile = profile_for(load_profiles(settings.state_root), chosen)

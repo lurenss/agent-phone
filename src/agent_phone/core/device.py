@@ -115,10 +115,26 @@ class DeviceProfile:
 
 
 @dataclass(frozen=True, slots=True)
+class Lease:
+    """Who holds a phone that several computers share, as the phone host reports it: the person,
+    what they said they are doing, for how long, and in how many seconds the phone is free unless
+    they renew. `mine` is True when the holder is this computer's own state root."""
+
+    by: str
+    task: str
+    held_s: int
+    free_in_s: int
+    mine: bool
+
+
+@dataclass(frozen=True, slots=True)
 class Connected:
+    """`lease` is None for a phone nobody holds, and for every phone on this computer's own adb."""
+
     serial: Serial
     model: str
     ready: bool
+    lease: Lease | None = None
 
 
 @dataclass(frozen=True, slots=True)

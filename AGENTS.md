@@ -16,16 +16,18 @@ probes/android/server_lifetime.sh                         # re-run a platform pr
 uv run python -I probes/android/unit2_probe.py <check>    # facts, watchdog, bench, idle, concurrent, stop, foreign
 uv run python -I probes/android/unit3_probe.py <check>    # windows, freshness, bench, commands (reading the screen)
 uv run python -I probes/android/compare_backends.py <label>   # compare the old dump with the server dump
+sh probes/remote/ssh_options_probe.sh                         # the ssh key options and the shared connection, against a throwaway sshd
+python3 -I probes/remote/adb_facts_probe.py client            # the adb client against a server on another computer; needs no device
 ```
 
-Probes touch the real phone. Read the phone safety rules below before you run one.
+The probes in `probes/android/` touch the real phone. Read the phone safety rules below before you run one. The probes in `probes/remote/` need no phone.
 
 Before you call a change to device behavior done, prove it on a connected phone with `.claude/skills/verify-agent-phone/SKILL.md`. It drives this checkout's CLI the way an agent does and keeps the evidence under `~/.agent-phone/verify/`, outside git, because that evidence holds what the screen showed.
 
 ## Where the truth lives
 
 - **Shipped behavior** is the code and its tests. A doc that contradicts the code is a defect. Fix it in the same change.
-- **Platform evidence** is `probes/android/FINDINGS.md`. A row id such as `A2-1` is the citation form for a measurement. Code and docs may cite row ids.
+- **Platform evidence** is `probes/android/FINDINGS.md`, and `probes/remote/FINDINGS.md` for ssh and for adb across two computers. A row id such as `A2-1` or `R2-4` is the citation form for a measurement. Code and docs may cite row ids.
 - **The build plan** is `docs/plan.md`. When the plan contradicts the code, the code says what shipped. Correct the plan in place and cite the row or the source line that disproved it.
 - **The decision trail** is `decisions.tsv`, one row per decision, append-only. Its format belongs to pstack's `show-me-your-work` skill.
 
@@ -34,12 +36,15 @@ Before you call a change to device behavior done, prove it on a connected phone 
 ```
 src/agent_phone/core/       platform-neutral domain types and command logic, one folder per concept
 src/agent_phone/adapters/   backends; each one translates one automation stack into core types
+                            (`remote/` is not a backend: it wraps one to drive the phones of a phone host)
 src/agent_phone/cli/        argument parsing and the Driver; the only place an adapter is wired to core
 src/agent_phone/policy/     the built-in policy rules, shipped as package data
 src/agent_phone/skills/     the usage guides for agents, shipped as package data; `agent-phone skills get` prints them
 .claude/skills/             project skills; verify-agent-phone proves a change on a real phone
+host/                       the one script that runs on a phone host, and its install guide; not part of the package
 examples/                   consumers built on the public API, with their own policy files
 probes/android/             phone measurements, their captures, and FINDINGS.md
+probes/remote/              ssh and adb measurements for a phone on another computer, and their FINDINGS.md
 docs/                       the plan, the JSON contract, and lessons from past bugs
 tests/                      behavior tests and redacted golden fixtures
 ```
@@ -51,6 +56,8 @@ tests/                      behavior tests and redacted golden fixtures
 **Commands.** A command lives in `core/commands/<name>.py`, named after the command. The CLI dispatches with one `match` over the parsed command. There is no command registry.
 
 **Design.** `docs/design/core-types.md` explains the types and the reasons behind them. Read it before you change a type in `core/`.
+
+**Phone host.** With `AGENT_PHONE_REMOTE`, the phones are plugged into another computer. `adapters/remote` exports one function, `remote_hub`, and `cli/hub.py` is the one caller. `host/phone_host.py` runs where agent-phone is not installed, so it imports the standard library only. `docs/design/remote.md` explains both, and `tests/test_remote_wire.py` keeps their JSON equal.
 
 **Backends.** The adapter interface is the `Phone` protocol in `core/phone.py`. A second backend, such as a custom `app_process` server, is a new folder under `adapters/` and changes no command. It adds a rig to `tests/test_phone_contract.py`, the suite every `Phone` passes, the test fake included.
 
@@ -74,8 +81,8 @@ The framework enforces these on every device:
 - Never send a commit action without the caller's explicit `--commit`, unless the person who launched the agent set `AGENT_PHONE_PERMISSION_MODE=dangerously-skip`. The policy engine decides what counts as a commit action from its rules. Tests never pass `--commit`. Tests never set the variable except to test the mode, and the verify skill's `evidence.py` drops it unless a journey passes it with `--env`. An agent never sets it. A deny rule and a protected package hold in both modes.
 - Never stop a package that the device profile marks as protected.
 - Install nothing on the device. The only footprint is `/data/local/tmp/u2.jar` (`A3-1`) and the empty file `/data/local/tmp/ap-lastuse` that the idle watchdog reads (`A3-8`). `agent-phone server stop` removes the second.
-- Only one process drives a device at a time (`A3-4`).
-- To try what the CLI does with its arguments, such as whether a flag parses, cut it off from the phone: `ADB=false uv run agent-phone ...` stops at `TRANSPORT` before it reaches any device. Every call that may reach a phone goes through the verify skill's `evidence.py`, which records it. A unit 6 experiment ran `batch --commit` against the connected J7 to see whether the flag was refused, and only the parser stood between it and an unrecorded input.
+- Only one process drives a device at a time (`A3-4`). On a phone host, only one holder does, and the host's lease says who.
+- To try what the CLI does with its arguments, such as whether a flag parses, cut it off from the phone: `ADB=false uv run agent-phone ...` stops at `TRANSPORT` before it reaches any device. With `AGENT_PHONE_REMOTE` set, the same command still reaches the phone host and takes a lease there before it stops, so unset that variable first. Every call that may reach a phone goes through the verify skill's `evidence.py`, which records it. A unit 6 experiment ran `batch --commit` against the connected J7 to see whether the flag was refused, and only the parser stood between it and an unrecorded input.
 - Never send a live input to see whether the gate refuses it. If the gate lets it through, it has gone out: a unit 7 set-text meant to be refused typed a draft into a live chat (`A6-6`). Judge it first with `probes/android/gate_check.py` on a raw dump, with the same action kind.
 - Raw dumps contain private screen content. Keep them in `probes/android/raw/`, which git ignores. Commit only fixtures that pass `tests/test_fixtures_are_redacted.py`.
 

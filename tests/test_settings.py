@@ -37,3 +37,33 @@ def test_a_permission_mode_that_does_not_exist_is_refused_with_the_two_that_do()
 def test_no_other_variable_changes_the_permission_mode():
     env = {"AGENT_PHONE_HOME": "/tmp/x", "AGENT_PHONE_IDLE_S": "5", "ADB": "adb", "PERMISSION_MODE": "x"}
     assert Settings.from_environment(env).permission_mode is PermissionMode.ASK
+
+
+def test_no_phone_host_is_named_unless_the_variable_names_one():
+    assert Settings.from_environment({}).remote is None
+    assert Settings.from_environment({"AGENT_PHONE_REMOTE": ""}).remote is None
+
+
+@pytest.mark.parametrize("alias", ["farm", "pi-2", "phones@farm.example", "farm_1"])
+def test_the_phone_host_is_the_ssh_alias_in_the_variable(alias):
+    assert Settings.from_environment({"AGENT_PHONE_REMOTE": alias}).remote == alias
+
+
+@pytest.mark.parametrize("alias", ["-oProxyCommand=id", "two words", "a/b", "../farm", "farm;id", "farm\n"])
+def test_an_alias_that_ssh_or_a_file_name_could_read_as_something_else_is_refused(alias):
+    with pytest.raises(Refusal) as refused:
+        Settings.from_environment({"AGENT_PHONE_REMOTE": alias})
+    assert refused.value.code is ErrorCode.INVALID_ARGS and "AGENT_PHONE_REMOTE" in refused.value.message
+
+
+def test_the_task_is_what_the_variable_says_and_nothing_when_it_is_unset_or_empty():
+    assert Settings.from_environment({"AGENT_PHONE_TASK": "schedule reel 12"}).task == "schedule reel 12"
+    assert Settings.from_environment({}).task is None
+    assert Settings.from_environment({"AGENT_PHONE_TASK": ""}).task is None
+
+
+@pytest.mark.parametrize("task", ["x" * 81, "clear\x1b[2J", "two\nlines"])
+def test_a_task_other_people_could_not_read_on_one_line_is_refused(task):
+    with pytest.raises(Refusal) as refused:
+        Settings.from_environment({"AGENT_PHONE_TASK": task})
+    assert refused.value.code is ErrorCode.INVALID_ARGS and "AGENT_PHONE_TASK" in refused.value.message

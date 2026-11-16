@@ -11,8 +11,6 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import TextIO
 
-from agent_phone.adapters.uiautomator2.adb import SubprocessAdb
-from agent_phone.adapters.uiautomator2.phone import U2Hub
 from agent_phone.cli.args import Command, Invocation, parse_args
 from agent_phone.cli.batch import BatchResult, read_steps, run_batch
 from agent_phone.cli.batch_args import BatchCommand
@@ -21,6 +19,7 @@ from agent_phone.cli.driver import Driver, PhoneError, device_lock, open_phone
 from agent_phone.cli.flow import FlowResult, run_flow_file
 from agent_phone.cli.flow_args import FlowRecordCommand, FlowRunCommand
 from agent_phone.cli.flow_record import FlowDraft, record_flow
+from agent_phone.cli.hub import open_hub
 from agent_phone.cli.policy import load_profiles
 from agent_phone.cli.settings import Settings
 from agent_phone.cli.trace import Trace, redacted, without_device
@@ -175,5 +174,6 @@ def main() -> int:
     except Refusal as refusal:
         sys.stdout.write(encode(to_wire("", None, Refused.of(refusal), mode=None)) + "\n")
         return 2
-    hub = U2Hub(SubprocessAdb(settings.adb), settings.idle_limit_s)
-    return run(sys.argv[1:], hub, settings, sys.stdout)
+    clock = SystemClock()
+    with open_hub(settings, clock, task="cli", linger=True) as hub:
+        return run(sys.argv[1:], hub, settings, sys.stdout, clock)
