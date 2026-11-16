@@ -25,9 +25,8 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
-from agent_phone.adapters.uiautomator2.adb import SubprocessAdb
-from agent_phone.adapters.uiautomator2.phone import U2Hub
 from agent_phone.cli.commands import INPUT_TIMEOUT_MS, DriverCommand, ScreenshotCommand
+from agent_phone.cli.hub import open_hub
 from agent_phone.cli.policy import LoadedProfile, load_policy, load_profiles, profile_for
 from agent_phone.cli.request import TargetLike, effects, predicates, target_of
 from agent_phone.cli.settings import Settings
@@ -373,10 +372,10 @@ def open_phone(
     if state_root is not None:
         settings = replace(settings, state_root=state_root)
     clock = clock or SystemClock()
-    hub = hub or U2Hub(SubprocessAdb(settings.adb), settings.idle_limit_s, clock)
     chosen: Serial | None = None
     with ExitStack() as stack:
         try:
+            hub = hub or stack.enter_context(open_hub(settings, clock))
             ref_device = SnapshotStore(settings.state_root).device_of(ref.snapshot) if ref else None
             chosen = select_device(hub.connected(), Serial(serial) if serial else None, ref_device)
             profile = profile_for(load_profiles(settings.state_root), chosen)

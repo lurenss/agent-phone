@@ -10,6 +10,7 @@ from agent_phone.core.device import (
     DeviceIdentity,
     DeviceInfo,
     DeviceList,
+    Lease,
     Listed,
     Package,
     Serial,
@@ -101,10 +102,7 @@ def test_a_device_row_has_facts_only_when_they_were_read():
     assert third["problem"] == "adb timed out." and "api" not in third
 
 
-@pytest.mark.xfail(strict=True, reason="a device row does not say who holds the phone yet")
 def test_a_device_row_names_who_holds_the_phone_only_while_someone_does():
-    from agent_phone.core.device import Lease
-
     lease = Lease("ben", "schedule reel 12", 312, 95, False)
     rows = DeviceList(
         (

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping
+from dataclasses import asdict
 from enum import Enum
 
 from agent_phone.core.commands.find import Found
@@ -295,6 +296,8 @@ def device_data(row: Listed) -> dict[str, object]:
     if row.problem is not None:
         data["problem"] = row.problem
     data["profile"] = row.profile
+    if row.connected.lease is not None:
+        data["lease"] = asdict(row.connected.lease)
     return data
 
 

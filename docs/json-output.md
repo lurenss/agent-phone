@@ -137,6 +137,7 @@ Every other key prints as in the full form. A snapshot inside `error.details`, a
 | `capabilities` | array | with facts | What the backend can do on this device, sorted: `point_input` (click, scroll), `key_back`, `key_recents`, `intent_links` (an `intent:` link of `open-url`), `rotate`, `power`, `clipboard`, `screenshot`. An input that needs one the list lacks is `NOT_SUPPORTED`. |
 | `problem` | string | when facts failed | Why a ready device has no facts. |
 | `profile` | string or null | always | The `name` of the device profile in `<state root>/profiles/` whose `serial` is this device's, or null when none is. |
+| `lease` | object | when held on a phone host | Who holds a phone that several computers share: `by`, the person's name on the phone host. `task`, what they said they are doing. `held_s`, for how many seconds. `free_in_s`, in how many seconds the phone is free unless the holder renews. `mine`, `true` when the holder is this state root. A free phone has no such key, and neither has any phone on this computer's own adb. |
 
 ```json
 {"v":1,"ok":true,"command":"devices","permission_mode":"ask","device":null,"data":{"devices":[
