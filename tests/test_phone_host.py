@@ -26,8 +26,6 @@ from host_support import (
     run_host,
 )
 
-pytestmark = pytest.mark.xfail(strict=True, reason="host/phone_host.py does not exist yet")
-
 J7 = "0a1b2c3d4e5f6a7b"
 ADA, BEN = ("ada", "5c0e11aa22bb33cc"), ("ben", "77dd88ee99ff0011")
 
