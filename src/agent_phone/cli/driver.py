@@ -11,7 +11,7 @@ Wiring order, each step a Refusal on failure:
    policy files, then caller files (`rules.merge`). A profile or a policy file that does not
    parse is POLICY_INVALID before the device is locked or opened;
 3. take the device lock `devices/<serial>/lock` (flock; DEVICE_BUSY after the wait budget);
-4. open the backend, read `DeviceInfo`;
+4. open the backend, which takes the lease first when a phone host is named, and read `DeviceInfo`;
 5. build `Context`.
 
 Setup failures arrive as `PhoneError`, like every other failure a consumer sees.
@@ -375,7 +375,7 @@ def open_phone(
     chosen: Serial | None = None
     with ExitStack() as stack:
         try:
-            hub = hub or stack.enter_context(open_hub(settings, clock))
+            hub = hub or stack.enter_context(open_hub(settings, clock, task=command, linger=False))
             ref_device = SnapshotStore(settings.state_root).device_of(ref.snapshot) if ref else None
             chosen = select_device(hub.connected(), Serial(serial) if serial else None, ref_device)
             profile = profile_for(load_profiles(settings.state_root), chosen)

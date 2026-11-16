@@ -6,11 +6,7 @@ import json
 import os
 import sys
 
-import pytest
-
 from agent_phone.cli import process
-
-pytestmark = pytest.mark.xfail(strict=True, reason="AGENT_PHONE_REMOTE is not read yet")
 
 J7 = "0a1b2c3d4e5f6a7b"
 BENS = {"by": "ben", "task": "schedule reel 12", "held_s": 312, "free_in_s": 95, "mine": False}
@@ -88,3 +84,8 @@ def test_a_phone_another_holder_drives_is_device_busy_with_their_name_and_task(
     assert asked[1].startswith(f"lease {J7} --holder ") and asked[1].endswith(
         "'--task=dry run' --ttl 120 --port 9008"
     )
+
+
+def test_a_command_that_needs_no_phone_asks_the_host_nothing(monkeypatch, capsys, short_root, tmp_path):
+    code, wire, asked = agent_phone(monkeypatch, capsys, short_root / "state", tmp_path, "skills", "list")
+    assert code == 0 and wire["ok"] and asked == [] and not (short_root / "state").exists()

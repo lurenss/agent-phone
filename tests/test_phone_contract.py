@@ -12,9 +12,12 @@ from typing import get_args
 
 import pytest
 from fakes import EMULATOR_SERIAL, J7_SERIAL, FakePhone, info_for
+from remote_support import FakeLink, granted
 from support import FIXTURES, FakeClock, fixture_screen, fixture_xml
 from test_u2_phone import IDLE_LIMIT_S, Forward, Server, Shell, answered
 
+from agent_phone.adapters.remote.claim import Claim
+from agent_phone.adapters.remote.hub import LeasedPhone
 from agent_phone.adapters.uiautomator2.phone import DUMP_METHOD, U2Phone
 from agent_phone.adapters.uiautomator2.rpc import Phase, RpcResult
 from agent_phone.core.act.capability import required
@@ -114,7 +117,14 @@ def u2_rig(fixture: str, lost: bool = False) -> Rig:
     return Rig(phone, lambda: len(rpc.inputs) + len(shell.ran))
 
 
-RIGS = {"fake": fake_rig, "uiautomator2": u2_rig}
+def leased_rig(fixture: str, lost: bool = False) -> Rig:
+    inner = u2_rig(fixture, lost)
+    claim = Claim(FakeLink(granted()), J7_SERIAL, "5c0e", "contract", 9008, False, FakeClock(), 0.0)
+    claim.take()
+    return Rig(LeasedPhone(inner.phone, claim, claim.drop), inner.sends)
+
+
+RIGS = {"fake": fake_rig, "uiautomator2": u2_rig, "leased": leased_rig}
 
 
 @pytest.fixture(params=RIGS)

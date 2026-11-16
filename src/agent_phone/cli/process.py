@@ -175,5 +175,5 @@ def main() -> int:
         sys.stdout.write(encode(to_wire("", None, Refused.of(refusal), mode=None)) + "\n")
         return 2
     clock = SystemClock()
-    with open_hub(settings, clock) as hub:
+    with open_hub(settings, clock, task="cli", linger=True) as hub:
         return run(sys.argv[1:], hub, settings, sys.stdout, clock)
