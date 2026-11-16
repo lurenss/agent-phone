@@ -202,11 +202,19 @@ What a process reads from the phone once, in one shell call (`DeviceInfo`, `core
 
 ### State root
 
-The folder for everything agent-phone keeps between commands: `AGENT_PHONE_HOME`, or `~/.agent-phone`. Each device has its own `devices/<serial>/` folder in it, with its snapshots, its ledger and its lock. Two state roots are two sets of locks, so processes that share a device must share a root.
+The folder for everything agent-phone keeps between commands: `AGENT_PHONE_HOME`, or `~/.agent-phone`. Each device has its own `devices/<serial>/` folder in it, with its snapshots, its ledger and its lock. Two state roots are two sets of locks, so processes that share a device must share a root. On a phone host, two state roots are two holders.
 
 ### Device lock
 
 The claim on one device (`DeviceLock`, `core/refs/store.py`). It is an advisory `flock` on `devices/<serial>/lock`, held for one command or for one Driver session. A second process waits up to `AGENT_PHONE_LOCK_WAIT_S` seconds (10 by default) and then gets `DEVICE_BUSY`. The kernel drops the lock when its holder dies, so a crash leaves nothing to clean up.
+
+### Phone host
+
+The computer the phones are plugged into, when that is not the computer that runs agent-phone. It runs adb's server, sshd and one script, `host/phone_host.py`. `AGENT_PHONE_REMOTE` names it by its ssh host alias, and every command then drives its phones (`adapters/remote/`). `docs/design/remote.md` explains the design. *Avoid:* "hub" for it. A `PhoneHub` is the transport that lists and opens devices, on any computer.
+
+### Holder and lease
+
+A holder is one state root on one computer. A lease is the phone host's record that one holder drives one phone for a named task until a deadline (`Lease`, `core/device.py`). The holder renews it by using the phone. A holder that stops loses the phone 120 seconds after its last call, so a crash frees the phone with nothing to clean up. `devices` prints the lease of each held phone, and a phone that another holder drives is `DEVICE_BUSY` with the holder's name and task. The device lock still serializes the processes of one state root. The lease serializes holders.
 
 ### Server, watchdog and idle limit
 

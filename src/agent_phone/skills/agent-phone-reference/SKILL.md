@@ -280,7 +280,7 @@ Every error carries `delivery` and `retry`.
 - Every input spends every ref taken before it. Running the same input again fails with `STALE_REF` and `details.reason` `spent` until you take a new snapshot, so a blind retry cannot repeat a tap. `not_delivered` is the one case after which the same command can work again.
 - `delivery_uncertain` means the request went out and no answer came back. The tap may have landed.
 - A batch that stops after an input went out has `retry` `unsafe`, even when its failed step sent nothing. Look at the screen before you run any step of it again.
-- `DEVICE_BUSY` means another process drives the phone. Nothing was sent. Run the command again when that process is done.
+- `DEVICE_BUSY` means another process drives the phone. Nothing was sent. Run the command again when that process is done. When `error.details` names `by` and `task`, a person drives the phone from another computer. See [Share the phones of a phone host](#share-the-phones-of-a-phone-host).
 - `SERVER_UNAVAILABLE` means the server on the phone did not answer, often because another tool holds the phone's one accessibility connection. Run `agent-phone server stop`, then the command again.
 
 ## Choose the device
@@ -306,6 +306,17 @@ agent-phone server stop       # stop it and free the phone for other tools
 - One process drives a phone at a time. A second command waits up to 10 s, then fails with `DEVICE_BUSY`. The lock lives in the state folder, `~/.agent-phone` by default, so processes that share a phone must share `AGENT_PHONE_HOME`.
 - The state folder keeps every snapshot, which is what the screen showed. Treat it as private.
 - `AGENT_PHONE_IDLE_S` sets the idle limit in seconds, `AGENT_PHONE_LOCK_WAIT_S` the lock wait, and `ADB` the adb binary. `AGENT_PHONE_PERMISSION_MODE` is your user's to set, never yours.
+
+## Share the phones of a phone host
+
+Your user may keep the phones plugged into another computer, the phone host, and set `AGENT_PHONE_REMOTE` to its ssh alias. Every command then drives that computer's phones. You run the same commands.
+
+- A `devices` row has a `lease` when someone holds the phone: `by` is the person, `task` is what they said they are doing, and `free_in_s` is the seconds until the phone is free unless they renew. `mine` is `true` when the holder is you.
+- Your first command for a phone takes its lease, and each later command renews it. The lease runs out 120 s after your last command, so finish a job without long pauses, or expect that someone else took the phone.
+- A phone that someone else holds is `DEVICE_BUSY`, and `error.details` names `by`, `task` and `free_in_s`. Nothing was sent. Wait that long and run the command again, or ask your user. Do not run `agent-phone server stop` to get the phone. It is refused the same way.
+- After a pause longer than 120 s, take a new snapshot before you act. Someone else may have used the phone, and your refs do not show it.
+- `TRANSPORT` with a message about ssh or the phone host means this computer could not reach the host. Nothing was sent. Tell your user.
+- `AGENT_PHONE_TASK` is what other people read next to your user's name. It is your user's to set, as `AGENT_PHONE_REMOTE` is.
 
 ## Print this guide
 

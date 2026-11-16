@@ -117,7 +117,7 @@ Every error carries `delivery` and `retry`. `retry` is `safe` only when nothing 
 | `NO_SURFACE` | The screen showed no window, or it is off. Look again. When it stays, ask your user. |
 | `COMMIT_REFUSED`, `DENIED` | See the gate above. Do not retry with a grant your user did not give. |
 | `DEVICE_AMBIGUOUS`, `NO_DEVICE` | Pass `-d <serial>`. `agent-phone devices` lists the phones. |
-| `DEVICE_BUSY`, `SERVER_UNAVAILABLE` | Another process or tool holds the phone. Run the command again, or `agent-phone server stop` first. |
+| `DEVICE_BUSY`, `SERVER_UNAVAILABLE` | Another process or tool holds the phone. Run the command again, or `agent-phone server stop` first. When `error.details.by` names a person, they drive the phone from another computer. Wait `free_in_s` seconds, or ask your user. |
 
 For any other code, read `error.message` and `error.hint`. The reference lists them all.
 
