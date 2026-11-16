@@ -101,6 +101,28 @@ def test_a_device_row_has_facts_only_when_they_were_read():
     assert third["problem"] == "adb timed out." and "api" not in third
 
 
+@pytest.mark.xfail(strict=True, reason="a device row does not say who holds the phone yet")
+def test_a_device_row_names_who_holds_the_phone_only_while_someone_does():
+    from agent_phone.core.device import Lease
+
+    lease = Lease("ben", "schedule reel 12", 312, 95, False)
+    rows = DeviceList(
+        (
+            Listed(Connected(J7.serial, "SM_J730F", True, lease), INFO, None, "j7"),
+            Listed(Connected(Serial("emulator-5554"), "emu", True), None, None, None),
+        )
+    )
+    held, free = to_wire("devices", None, Read(rows), mode=PermissionMode.ASK)["data"]["devices"]
+    assert held["lease"] == {
+        "by": "ben",
+        "task": "schedule reel 12",
+        "held_s": 312,
+        "free_in_s": 95,
+        "mine": False,
+    }
+    assert list(held)[-2:] == ["profile", "lease"] and "lease" not in free
+
+
 def acted(sent, error=None):
     address = NodeAddress(Package("com.android.settings"), "", "", "", "", Rect(0, 910, 1920, 1080), (), None)
     tap = Tap(Point(960, 995), address)
