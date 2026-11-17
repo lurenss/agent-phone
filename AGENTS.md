@@ -42,7 +42,7 @@ src/agent_phone/cli/        argument parsing and the Driver; the only place an a
 src/agent_phone/policy/     the built-in policy rules, shipped as package data
 src/agent_phone/skills/     the usage guides for agents, shipped as package data; `agent-phone skills get` prints them
 .claude/skills/             project skills; verify-agent-phone proves a change on a real phone
-host/                       the one script that runs on a phone host, and its install guide; not part of the package
+host/                       the two scripts that run on a phone host, and their install guides; not part of the package
 examples/                   consumers built on the public API, with their own policy files
 probes/android/             phone measurements, their captures, and FINDINGS.md
 probes/remote/              ssh and adb measurements for a phone on another computer, and their FINDINGS.md
@@ -58,7 +58,7 @@ tests/                      behavior tests and redacted golden fixtures
 
 **Design.** `docs/design/core-types.md` explains the types and the reasons behind them. Read it before you change a type in `core/`.
 
-**Phone host.** With `AGENT_PHONE_REMOTE`, the phones are plugged into another computer. `adapters/remote` exports one function, `remote_hub`, and `cli/hub.py` is the one caller. `host/phone_host.py` runs where agent-phone is not installed, so it imports the standard library only. `docs/design/remote.md` explains both, and `tests/test_remote_wire.py` keeps their JSON equal.
+**Phone host.** With `AGENT_PHONE_REMOTE`, the phones are plugged into another computer. `adapters/remote` exports one function, `remote_hub`, and `cli/hub.py` is the one caller. `host/phone_host.py` runs where agent-phone is not installed, so it imports the standard library only. `docs/design/remote.md` explains both, and `tests/test_remote_wire.py` keeps their JSON equal. `host/phone_manifest.py` runs there too, under the same rule and without the other script. It is an HTTP service that lists the phones and says whether each one is healthy, and it only reads. `host/phone-manifest.md` is its guide.
 
 **Backends.** The adapter interface is the `Phone` protocol in `core/phone.py`. A second backend, such as a custom `app_process` server, is a new folder under `adapters/` and changes no command. It adds a rig to `tests/test_phone_contract.py`, the suite every `Phone` passes, the test fake included.
 

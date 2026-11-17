@@ -169,6 +169,20 @@ def test_adb_only_ever_gets_the_listing_and_the_one_shell_line_that_reads(servic
     }
 
 
+def test_the_guide_explains_exactly_the_problems_the_service_can_name_with_its_limits(service):
+    guide = MANIFEST_SCRIPT.with_name("phone-manifest.md").read_text()
+    table = guide.split("| `problem` | Meaning | What to do |")[1].split("\n\n")[0]
+    assert re.findall(r"^\| `(\w+)` \|", table, re.MULTILINE) == [
+        problem.value for problem in service.Problem
+    ]
+    for limit in (
+        f"in {service.DEADLINE_S:g} seconds",
+        f"hotter than {service.HOT_C:g} °C",
+        f"below {service.BATTERY_LOW} %",
+    ):
+        assert limit in table
+
+
 def run_service(*flags, adb_port=1):
     return subprocess.Popen(
         [sys.executable, "-IS", str(MANIFEST_SCRIPT), "--port", "0", *flags],
