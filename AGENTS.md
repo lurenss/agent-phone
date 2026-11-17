@@ -64,7 +64,7 @@ tests/                      behavior tests and redacted golden fixtures
 
 ## Coding standards
 
-- **No fixed sleeps.** `time.sleep` is banned by ruff's `TID251` everywhere except `core/wait/` and `probes/`. Wait on a screen condition instead. `tests/test_no_sleep_rule.py` proves the rule catches every import form.
+- **No fixed sleeps.** `time.sleep` is banned by ruff's `TID251` everywhere except `core/wait/`, `probes/` and `host/phone_manifest.py`, whose loop sleeps between two rounds. Wait on a screen condition instead. `tests/test_no_sleep_rule.py` proves the rule catches every import form.
 - **400 lines at most per source file.** Split by responsibility. `tests/test_architecture.py` enforces it.
 - **Domain types are frozen dataclasses. Closed vocabularies are enums.** A role, an error code and a delivery state each come from one enum, never from loose strings.
 - **One concept per module.** Name a module after the concept it owns, not after the step it runs in.

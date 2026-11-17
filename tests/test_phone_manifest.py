@@ -11,8 +11,6 @@ import urllib.request
 import pytest
 from host_support import EMULATOR_ROW, J7_FACTS, J7_ROW, MANIFEST_SCRIPT, FakeAdbServer, load_script
 
-pytestmark = pytest.mark.xfail(strict=True, reason="host/phone_manifest.py does not exist yet")
-
 J7, EMULATOR, THIRD_PHONE = "0a1b2c3d4e5f6a7b", "emulator-5554", "R58M1234567"
 UNAUTHORIZED_ROW = f"{J7}       unauthorized usb:1-1.4 transport_id:1"
 NO_PERMISSIONS_ROW = (
