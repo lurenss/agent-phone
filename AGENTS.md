@@ -18,9 +18,10 @@ uv run python -I probes/android/unit3_probe.py <check>    # windows, freshness, 
 uv run python -I probes/android/compare_backends.py <label>   # compare the old dump with the server dump
 sh probes/remote/ssh_options_probe.sh                         # the ssh key options and the shared connection, against a throwaway sshd
 python3 -I probes/remote/adb_facts_probe.py client            # the adb client against a server on another computer; needs no device
+python3 -I probes/remote/adb_facts_probe.py facts SERIAL      # one shell line that only reads, sent to a phone over adb's socket and timed
 ```
 
-The probes in `probes/android/` touch the real phone. Read the phone safety rules below before you run one. The probes in `probes/remote/` need no phone.
+The probes in `probes/android/` touch the real phone. Read the phone safety rules below before you run one. The probes in `probes/remote/` need no phone. The `facts` check of `adb_facts_probe.py` may ask one, because the shell line it sends only reads.
 
 Before you call a change to device behavior done, prove it on a connected phone with `.claude/skills/verify-agent-phone/SKILL.md`. It drives this checkout's CLI the way an agent does and keeps the evidence under `~/.agent-phone/verify/`, outside git, because that evidence holds what the screen showed.
 

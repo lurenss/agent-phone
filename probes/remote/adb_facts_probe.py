@@ -3,6 +3,8 @@
 
     python3 -I probes/remote/adb_facts_probe.py client
     python3 -I probes/remote/adb_facts_probe.py forward emulator-5570
+    python3 -I probes/remote/adb_facts_probe.py facts SERIAL [RUNS]
+    python3 -I probes/remote/adb_facts_probe.py hang emulator-5554
 
 `client` needs no device and no adb server. It runs the adb client on PATH (or `$ADB`) against
 ports where nothing listens, and against a stand-in server that records what it is asked and
@@ -14,12 +16,22 @@ against an emulator, never against a phone with accounts: it opens and closes po
 sends nothing to the device. For an emulator it also runs `adb connect` to the emulator's own adb
 port, so the server lists the one device under a second serial, and disconnects it again. That
 stands in for a second phone.
+
+`facts` sends one phone the shell line in `FACTS`, the one line `host/phone_manifest.py` sends, over
+the same socket protocol, and times it. The line only reads, so this is the one check that may run
+against a phone with accounts. It never runs the adb client, so it can run on a phone host, whose
+adb server belongs to the service manager: `python3 -I - facts SERIAL < adb_facts_probe.py` there.
+With no serial it prints what the server lists and asks no phone anything.
+
+`hang` starts `sleep 60` on the device, closes the socket and looks for the process. It refuses a
+serial that is not an emulator's.
 """
 
 from __future__ import annotations
 
 import os
 import socket
+import statistics
 import subprocess
 import sys
 import threading
@@ -29,6 +41,8 @@ ADB = os.environ.get("ADB", "adb")
 SERVER = ("127.0.0.1", 5037)
 DEVICE_PORT = 9008
 QUIET = {"ADB_USB": "0", "ADB_EMU": "0", "ADB_MDNS": "0", "ADB_MDNS_OPENSCREEN": "0"}
+FACTS = "getprop sys.boot_completed; getprop ro.build.version.release; dumpsys battery"
+UNLISTED = "0a1b2c3d4e5f6a7b"
 
 
 def check(name: str, expected: object, seen: object) -> None:
@@ -175,7 +189,7 @@ def forward_checks(serial: str) -> None:
     check("killforward of a port that is closed is FAIL", b"FAIL", twice[:4])
     print(f"      message: {twice[8:].decode()!r}")
 
-    missing = ask(f"host-serial:0a1b2c3d4e5f6a7b:forward:tcp:0;tcp:{DEVICE_PORT}")
+    missing = ask(f"host-serial:{UNLISTED}:forward:tcp:0;tcp:{DEVICE_PORT}")
     check("forward for a serial adb does not list is FAIL", b"FAIL", missing[:4])
     print(f"      raw: {missing!r}")
 
@@ -241,6 +255,87 @@ def named_port_checks(serial: str, tries: int = 20) -> None:
     check("and no forward is left", [], forwards())
 
 
+def open_shell(serial: str, command: str) -> tuple[socket.socket, list[bytes], list[float]]:
+    stamps = [time.monotonic()]
+    sock = socket.create_connection(SERVER, 5)
+    sock.settimeout(20)
+    answers = []
+    for request in (f"host:transport:{serial}", f"shell:{command}"):
+        payload = request.encode()
+        sock.sendall(b"%04x" % len(payload) + payload)
+        answers.append(sock.recv(4, socket.MSG_WAITALL))
+        stamps.append(time.monotonic())
+        if answers[-1] != b"OKAY":
+            break
+    return sock, answers, stamps
+
+
+def shell(serial: str, command: str) -> tuple[list[bytes], bytes, list[int]]:
+    sock, answers, stamps = open_shell(serial, command)
+    output = b""
+    with sock:
+        while chunk := sock.recv(4096):
+            if not output:
+                stamps.append(time.monotonic())
+            output += chunk
+    stamps.append(time.monotonic())
+    return answers, output, [round((stamp - stamps[0]) * 1000) for stamp in stamps[1:]]
+
+
+def facts_checks(serial: str, runs: int) -> None:
+    check("host:version is 4 hex digits of the protocol number", b"OKAY00040029", ask("host:version"))
+    answers, output, _ = shell(serial, FACTS)
+    check("host:transport:<serial> and shell:<FACTS> each answer the 4 bytes OKAY", [b"OKAY"] * 2, answers)
+    print(f"      what follows, to the close: {output!r}")
+    check("no line of it ends with a carriage return", False, b"\r" in output)
+    lines = output.decode().splitlines()
+    check("line 1 is sys.boot_completed", "1", lines[0])
+    print(f"      line 2, ro.build.version.release: {lines[1]!r}")
+    check("line 3 opens dumpsys battery", "Current Battery Service state:", lines[2])
+    battery = {key.strip(): value.strip() for key, _, value in (line.partition(":") for line in lines[3:])}
+    print(f"      level: {battery.get('level')!r}, temperature: {battery.get('temperature')!r}")
+
+    totals = []
+    for _ in range(runs):
+        marks = shell(serial, FACTS)[2]
+        totals.append(marks[-1])
+        print(f"      ms from the connect to each OKAY, to the first byte and to the close: {marks}")
+    if totals:
+        print(
+            f"      {runs} runs, connect to close: median {statistics.median(totals)} ms,"
+            f" least {min(totals)} ms, most {max(totals)} ms"
+        )
+
+    answers, said, _ = shell(UNLISTED, FACTS)
+    check("a serial adb does not list is FAIL at the transport request", [b"FAIL"], answers)
+    print(f"      raw: {said!r}")
+
+
+def hang_checks(serial: str) -> None:
+    if not serial.startswith("emulator-"):
+        sys.exit("`hang` starts a process on the device. Run it against an emulator, never against a phone.")
+
+    def sleeping() -> list[bytes]:
+        return shell(serial, "pidof sleep")[1].split()
+
+    check("control: no sleep runs on the device", [], sleeping())
+    sock, answers, _ = open_shell(serial, "sleep 60")
+    check("shell:sleep 60 answers OKAY", [b"OKAY"] * 2, answers)
+    sock.settimeout(1.0)
+    try:
+        silent = sock.recv(4096)
+    except TimeoutError:
+        silent = None
+    check("and then sends nothing and does not close", None, silent)
+    check("the sleep runs on the device while the socket is open", 1, len(sleeping()))
+    sock.close()
+    closed = time.monotonic()
+    while sleeping() and time.monotonic() - closed < 10:
+        time.sleep(0.1)
+    check("closing the socket ends the sleep on the device", [], sleeping())
+    print(f"      it was gone {time.monotonic() - closed:.1f} s after the close, or sooner")
+
+
 if __name__ == "__main__":
     match sys.argv[1:]:
         case ["client"]:
@@ -249,5 +344,11 @@ if __name__ == "__main__":
             forward_checks(serial)
             rebind_checks(serial)
             named_port_checks(serial)
+        case ["facts"]:
+            print(f"host:devices-l: {ask('host:devices-l')[8:].decode()!r}")
+        case ["facts", serial, *runs]:
+            facts_checks(serial, int(runs[0]) if runs else 10)
+        case ["hang", serial]:
+            hang_checks(serial)
         case _:
             sys.exit(__doc__)

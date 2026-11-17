@@ -4,11 +4,11 @@ Each row records one measurement that the remote mode builds on: what OpenSSH an
 
 Row ids are `R<area>-<n>`. Area 1 is OpenSSH: the `authorized_keys` options and the shared connection. Area 2 is adb: its client against a server on another computer, and the server's socket protocol.
 
-No row needed a phone. The probes run on one computer, against a throwaway sshd on 127.0.0.1, a stand-in adb server that only records requests, and an emulator.
+The probes run on one computer, against a throwaway sshd on 127.0.0.1, a stand-in adb server that only records requests, and an emulator. No row up to R2-17 needed a phone. R2-18, R2-19 and R2-22 also asked one phone, on a phone host, and sent it one shell line that only reads.
 
 ## Environment
 
-Every row was measured on 2026-11-16.
+The rows up to R2-17 were measured on 2026-11-16, and R2-18 to R2-22 on 2026-11-17.
 
 | Fact | Value |
 | --- | --- |
@@ -16,6 +16,9 @@ Every row was measured on 2026-11-16.
 | OpenSSH | client and server `OpenSSH_10.3p1, LibreSSL 3.3.6` |
 | adb | `Android Debug Bridge version 1.0.41`, `37.0.1-15733141` |
 | Device for area 2 | an Android 15 emulator, `emulator-5570`, on the adb server of the same computer |
+| Device for R2-18 to R2-22 | an Android 15 emulator, `emulator-5554`, on the adb server of the same computer |
+| Phone host for R2-18, R2-19 and R2-22 | a Raspberry Pi 4, Raspberry Pi OS Trixie, Python 3.13.5. Its adb server answers protocol number 41 and runs as a systemd service |
+| Phone for R2-18, R2-19 and R2-22 | a Samsung Galaxy J7 (2017), Android 9, on USB at the phone host |
 
 ## Area 1: OpenSSH
 
@@ -48,6 +51,8 @@ The probe is `sh probes/remote/ssh_options_probe.sh`. Its sshd has one key with 
 
 The probe is `python3 -I probes/remote/adb_facts_probe.py client` for R2-1 to R2-5 and `python3 -I probes/remote/adb_facts_probe.py forward emulator-5570` for R2-6 to R2-17. Every check passed in one run. For R2-13, R2-15 and R2-16 the probe runs `adb connect` to the emulator's own adb port, so the server lists the one emulator under a second serial.
 
+R2-18 to R2-20 and R2-22 are `python3 -I probes/remote/adb_facts_probe.py facts emulator-5554`, and the same probe on the phone host with the phone's serial, read from standard input there so that nothing is installed: `python3 -I - facts SERIAL < adb_facts_probe.py`. That check speaks to the adb server's socket and never runs the adb client, so it cannot start a server. The one line it sends a phone is `getprop sys.boot_completed; getprop ro.build.version.release; dumpsys battery`, called FACTS below. R2-21 is `python3 -I probes/remote/adb_facts_probe.py hang emulator-5554`, which refuses a serial that is not an emulator's. Every check passed.
+
 | id | observed | verdict | action |
 | --- | --- | --- | --- |
 | R2-1 | `adb -H 127.0.0.1 -P <port> devices` with nothing listening exits 1 with `cannot start server on remote host`. Nothing listens on the port 3 s later. | CONFIRMS | `RemoteAdb` runs every command as `adb -H 127.0.0.1 -P <forwarded port>`. A dead tunnel is an error, and no local server takes the tunnel's port. |
@@ -67,3 +72,8 @@ The probe is `python3 -I probes/remote/adb_facts_probe.py client` for R2-1 to R2
 | R2-15 | `norebind` for a port that another serial holds answers `FAIL` with `cannot rebind existing socket`. | CONFIRMS | A renewal cannot take the port of another phone. |
 | R2-16 | `host-serial:<serial>:killforward:tcp:<port>` answers `OKAYOKAY` for a port that another serial holds, and the port is closed. | NEW-EDGE | The serial of a `killforward` selects nothing. `phone-host` closes a record's port only while `host:list-forward` lists that port for the record's phone. |
 | R2-17 | A process binds port 0 on 127.0.0.1, reads the number and closes the socket. `norebind` for that number then makes the forward, in each of 20 tries. | CONFIRMS | Supersedes the actions of R2-7, R2-9 and R2-14 where `phone-host` asks for port 0. adb's own pick can be a number that sits in the record of another lease, after adb started again and forgot it. So `phone-host` names every port: a free number from the kernel that is in no record, asked for with `norebind`. When adb refuses it, the script asks for the next one, and after 8 the lease is refused. `Link.forward` finds its local port the same way (R1-9). |
+| R2-18 | `host:transport:<serial>` and then `shell:<FACTS>` on one connection each answer the 4 bytes `OKAY`, with no counted length. The shell's output follows as plain bytes, and the server closes the connection when the command ends. The emulator and the J7 answer alike. Every line ends with `\n` and none with `\r\n`. Line 1 is `1`, line 2 is the release (`15` and `9`), and line 3 opens `dumpsys battery`. | CONFIRMS | `phone_manifest.py` reads 4 bytes after each request and then reads to the close. The answer has no length to check, so only the close and the deadline end the read. |
+| R2-19 | The J7's `dumpsys battery` has 43 lines where the emulator's has 18. Samsung adds lines with no indent, a line with nothing after its colon (`LLB MAN: `), a line with no colon (`BatteryInfoBackUp`), and the key `charge counter` beside `Charge counter`. The keys `level` and `temperature` are there once each on both devices. The J7 says `level: 100` and `temperature: 262`, which is tenths of a degree Celsius. | NEW-EDGE | The first version of this probe split each line at `": "` and stopped on `LLB MAN:`. `phone_manifest.py` splits a line at its first colon, reads only the keys `level` and `temperature`, and ignores every other line. `tests/host_support.py` keeps the J7's text as the fixture. |
+| R2-20 | `host:transport:<serial>` for a serial the server does not list answers `FAIL` and the counted text `device '<serial>' not found`. | CONFIRMS | A phone that leaves between `host:devices-l` and its shell is a failed request for `phone_manifest.py`. The phone is `no_answer` in that round and `gone` in the next. |
+| R2-21 | `shell:sleep 60` answers `OKAY` and then sends nothing and does not close. `pidof sleep` on a second connection shows one process. After the first socket closes, the process is gone within 1.1 s, in each of 4 runs. Emulator only. | CONFIRMS | A shell that misses its deadline needs no cleanup but closing the socket. Not measured on Android 9, because the check starts a process on the device. |
+| R2-22 | FACTS on the J7 through the phone host's adb server, 10 runs, from the connect to the close: median 60.5 ms, least 58 ms, most 108 ms. In a run, the first `OKAY` comes within 1 ms, the second after 2 to 4 ms, the first byte of output after 44 to 53 ms, and the close after 58 to 108 ms. So about 40 ms pass on the phone before the first `getprop` prints, and the USB round trip is a few ms. The phone host's load average was 0.04. The emulator takes 10 ms. | CONFIRMS | `DEADLINE_S` in `phone_manifest.py` is 3 s, 28 times the slowest run. By this number a round of 12 such phones takes about 1 s, and each phone that hangs adds 3 s. Not measured: the J7 while an agent drives it. |
