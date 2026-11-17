@@ -2,12 +2,14 @@
 
 `phone_host.py` runs on the phone host, the computer the phones are plugged into. It answers one question for people and for agent-phone: which phone is free, and who holds each of the others for which task. The phone host needs adb, sshd and this one script. agent-phone runs on each person's own computer and reaches the phones when `AGENT_PHONE_REMOTE` names the host.
 
+This folder holds a second script, and each of the two installs without the other. [`phone_manifest.py`](phone-manifest.md) is a small HTTP service that lists the phones and says whether each one is healthy.
+
 The examples use the ssh alias `farm`, the account `phones` on the host, and the people `ada` and `ben`.
 
 ## What the phone host needs
 
 - Linux. The script reads its clock and the id of the current boot from the kernel. Where it finds no boot id, it serves nothing.
-- An adb server that runs as the account `phones`, listens on 127.0.0.1:5037 only, and is authorized on each phone. Start it from a service that always restarts it, such as a systemd unit with `Restart=always`. Each ssh key reaches that one server, so nobody else can start it again.
+- An adb server that runs as the account `phones`, listens on 127.0.0.1:5037 only, and is authorized on each phone. Start it from a service that always restarts it. [`adb-server.service`](adb-server.service) is such a systemd unit, and [phone-manifest.md](phone-manifest.md#install) shows how to install it. Each ssh key reaches that one server, so nobody else can start it again.
 - Python 3.10 or newer, standard library only. The script uses `match`.
 - `/bin/sh` as the login shell of `phones`, so that no start-up file prints into the script's JSON.
 

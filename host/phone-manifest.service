@@ -1,0 +1,12 @@
+[Unit]
+Description=phone-manifest: the phones plugged into this computer, and whether each one is healthy
+
+[Service]
+ExecStart=/usr/local/bin/phone-manifest --host 127.0.0.1 --port 8037 --every 30
+DynamicUser=yes
+Restart=always
+# 5 s between starts stays under systemd's limit of 5 starts in 10 s, so it restarts for ever.
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

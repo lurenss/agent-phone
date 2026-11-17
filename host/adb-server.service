@@ -1,0 +1,14 @@
+[Unit]
+Description=adb server for the phones on this hub (localhost:5037 only)
+After=network.target
+
+[Service]
+User=phones
+Group=phones
+Environment=HOME=/home/phones
+ExecStart=/usr/bin/adb nodaemon server
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

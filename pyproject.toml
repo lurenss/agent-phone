@@ -29,6 +29,7 @@ select = ["E", "F", "I", "B", "UP", "TID251"]
 
 [tool.ruff.lint.per-file-ignores]
 "probes/**" = ["TID251"]
+"host/phone_manifest.py" = ["TID251"]
 "src/agent_phone/core/wait/**" = ["TID251"]
 
 [tool.pytest.ini_options]
