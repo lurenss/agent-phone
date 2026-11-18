@@ -1,8 +1,9 @@
 #!/usr/bin/env bun
 import { parseArgs } from "node:util";
-import * as walkie from "./walkie";
+import * as transport from "./transport";
 
-const help = `agent-phone devices
+const help = `Add --local to use a USB phone or emulator on this Mac. Default: Raspberry Pi.
+agent-phone devices
 agent-phone lease SERIAL --why TASK
 agent-phone release SERIAL
 
@@ -22,12 +23,17 @@ Use -- before positional text starting with a dash. Set AGENT_PHONE_WP to overri
 
 class UsageError extends Error {}
 
-async function unique(serial: string, selector: string, why: string): Promise<string> {
-  const answer = await walkie.call(["ui", serial, "--on", selector, `--why=${why}`]);
+async function unique(
+  local: boolean,
+  serial: string,
+  selector: string,
+  why: string,
+): Promise<string> {
+  const answer = await transport.call(local, ["ui", serial, "--on", selector, `--why=${why}`]);
   const { elements } = JSON.parse(answer);
   if (!Array.isArray(elements)) throw new Error("Expected an array of screen elements.");
   if (elements.length !== 1) {
-    throw new walkie.TransportError(
+    throw new transport.TransportError(
       JSON.stringify({
         error: elements.length ? "ambiguous" : "not_found",
         matches: elements.length,
@@ -48,18 +54,21 @@ async function run(argv: string[]): Promise<string> {
       options: {
         why: { type: "string" },
         id: { type: "string" },
+        local: { type: "boolean", default: false },
       },
     });
   } catch (error) {
     throw new UsageError(String(error));
   }
-  const { why: given, id } = parsed.values;
+  const { why: given, id, local } = parsed.values;
+  const call = (args: string[]) => transport.call(local, args);
   const [command, serial, ...words] = parsed.positionals;
   if (command === "devices" && serial === undefined && given === undefined && id === undefined)
-    return walkie.call(["phones"]);
-  if (!serial || !/^[\w.:-]{1,64}$/.test(serial) || serial.startsWith("-")) throw new UsageError(help);
+    return call(["phones"]);
+  if (!serial || !/^[\w.:-]{1,64}$/.test(serial) || serial.startsWith("-"))
+    throw new UsageError(help);
   if (command === "release" && !words.length && given === undefined && id === undefined)
-    return walkie.call(["release", serial]);
+    return call(["release", serial]);
   const why = given?.trim();
   if (!why || why.length > 200) throw new UsageError("Give --why with 1 to 200 characters.");
   const args = [serial, `--why=${why}`];
@@ -74,23 +83,23 @@ async function run(argv: string[]): Promise<string> {
       !words.every((value) => /^\d+$/.test(value) && Number(value) <= 10000)
     )
       throw new UsageError(`Give ${count} coordinates, each an integer from 0 to 10000.`);
-    return walkie.call([command, ...args, "--", ...words]);
+    return call([command, ...args, "--", ...words]);
   }
 
   switch (command) {
     case "lease":
       if (why.length > 80) throw new UsageError("A lease task can contain up to 80 characters.");
-      if (words.length === 0 && noId) return walkie.call(["lease", serial, `--task=${why}`]);
+      if (words.length === 0 && noId) return call(["lease", serial, `--task=${why}`]);
       break;
     case "state":
     case "snapshot":
       if (words.length === 0 && noId)
-        return walkie.call([command === "snapshot" ? "ui" : "state", ...args]);
+        return call([command === "snapshot" ? "ui" : "state", ...args]);
       break;
     case "open":
     case "key":
     case "screenshot":
-      if (words.length === 1 && first && noId) return walkie.call([command, ...args, "--", first]);
+      if (words.length === 1 && first && noId) return call([command, ...args, "--", first]);
       break;
     case "tap":
     case "find":
@@ -99,20 +108,20 @@ async function run(argv: string[]): Promise<string> {
         id && !words.length ? { id } : noId && words.length === 1 && first ? { text: first } : null;
       if (!selector) break;
       if (command === "wait")
-        return walkie.call(["wait", ...args, "--until", JSON.stringify({ see: selector })]);
+        return call(["wait", ...args, "--until", JSON.stringify({ see: selector })]);
       const on = JSON.stringify(selector);
-      const element = await unique(serial, on, why);
-      if (command === "find") return element;
-      return walkie.call(["tap", ...args, "--on", on]);
+      if (command === "find") return unique(local, serial, on, why);
+      if (!local) await unique(false, serial, on, why);
+      return call(["tap", ...args, "--on", on]);
     }
     case "set-text":
       if (words.length !== 1 || first === undefined || id === "") break;
       if (id !== undefined) {
         const on = JSON.stringify({ id });
-        await unique(serial, on, why);
-        return walkie.call(["set-text", ...args, "--on", on, "--", first]);
+        if (!local) await unique(false, serial, on, why);
+        return call(["set-text", ...args, "--on", on, "--", first]);
       }
-      return walkie.call(["set-text", ...args, "--", first]);
+      return call(["set-text", ...args, "--", first]);
   }
   throw new UsageError(help);
 }
@@ -120,11 +129,13 @@ async function run(argv: string[]): Promise<string> {
 try {
   process.stdout.write(await run(process.argv.slice(2)));
 } catch (error) {
-  if (error instanceof walkie.TransportError) {
+  if (error instanceof transport.TransportError) {
     console.error(error.output);
     process.exitCode = error.status;
   } else {
-    console.error(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }));
+    console.error(
+      JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
+    );
     process.exitCode = error instanceof UsageError ? 2 : 1;
   }
 }

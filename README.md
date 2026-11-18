@@ -1,8 +1,8 @@
 # agent-phone
 
-Una CLI per guidare un telefono Android collegato al Raspberry Pi. L’agente legge la schermata, sceglie una mossa e verifica il risultato. Il Pi parla con Android tramite l’API di walkie-porkie.
+Una CLI per guidare Android passo per passo. Funziona con i telefoni collegati al Raspberry Pi, i telefoni collegati al Mac via USB e gli emulatori Android sul Mac. L’agente legge la schermata, sceglie una mossa e verifica il risultato.
 
-## Primo utilizzo
+## Telefono sul Raspberry Pi
 
 Sul Mac servono Bun, Python 3 e il client `wp.py` della skill `driving-phones-via-walkie-api`, con tunnel SSH e token già configurati. La CLI trova lo script nella posizione installata da Claude Code. Per usare un’altra copia, imposta `AGENT_PHONE_WP` al percorso dello script.
 
@@ -17,9 +17,32 @@ Dalla radice del checkout esegui `./agent-phone devices`. Scegli un telefono lib
 ./agent-phone release "$SERIAL"
 ```
 
+## Telefono USB o emulatore sul Mac
+
+Sul Mac servono Bun, `uv` e Android SDK Platform-Tools, che include `adb`. La CLI trova ADB nel PATH o nella cartella standard dell’SDK Android sul Mac. Al primo comando locale, `uv` scarica le dipendenze Python.
+
+Per un telefono USB, abilita **Debug USB**, collega il cavo e autorizza il Mac sul telefono sbloccato. Per un emulatore, avvialo dal **Device Manager** di Android Studio. Poi elenca i dispositivi locali.
+
+```sh
+./agent-phone --local devices
+```
+
+Copia da `devices` un seriale con stato `device`. Ogni comando usa esattamente quel seriale, anche quando il Mac vede più dispositivi. Puoi elencare i dispositivi del Pi con `./agent-phone devices`.
+
+```sh
+SERIAL=emulator-5554  # sostituisci con il seriale mostrato sul tuo Mac
+./agent-phone --local lease "$SERIAL" --why "Esplorare le impostazioni"
+./agent-phone --local open "$SERIAL" com.android.settings --why "Aprire le impostazioni"
+./agent-phone --local state "$SERIAL" --why "Verificare l’app in primo piano"
+./agent-phone --local snapshot "$SERIAL" --why "Leggere i controlli disponibili"
+./agent-phone --local release "$SERIAL"
+```
+
+La prenotazione locale dura dieci minuti. Ripeti `lease` per rinnovarla. La CLI registra la prenotazione per seriale e utente macOS. Altri programmi che usano ADB possono interagire con lo stesso dispositivo.
+
 ## Trovare e usare un controllo
 
-`snapshot` restituisce testo, descrizione, ID e coordinate degli elementi visibili. Un agente può cercare un’etichetta esatta oppure usare l’ID quando due pulsanti hanno lo stesso testo. Questi esempi si riferiscono a una schermata di ricerca con il campo `query` e l’etichetta «Risultati».
+`snapshot` restituisce testo, descrizione, ID e coordinate degli elementi visibili. Un agente può cercare un’etichetta esatta oppure usare l’ID quando due pulsanti hanno lo stesso testo. Aggiungi `--local` a ogni comando quando usi il Mac. Questi esempi si riferiscono a una schermata di ricerca con il campo `query` e l’etichetta «Risultati».
 
 ```sh
 ./agent-phone find "$SERIAL" --id query --why "Individuare il campo di ricerca"
@@ -36,7 +59,8 @@ Il chiamante decide se un tap è coerente con la richiesta dell’utente, anche 
 ## Come leggere il codice
 
 1. [src/cli.ts](src/cli.ts) traduce i comandi dell’agente. Segui il ramo `tap` per vedere il controllo di unicità e l’invio.
-2. [src/walkie.ts](src/walkie.ts) avvia `wp.py` e riporta l’esito. Il client esistente gestisce il tunnel, il token, il lock locale e l’audit operativo.
-3. [tests/cli.test.ts](tests/cli.test.ts) esegue la CLI come processo e verifica quali comandi arrivano al trasporto.
+2. [src/transport.ts](src/transport.ts) avvia il client scelto. Per raggiungere il Pi, `wp.py` gestisce tunnel, token, prenotazione e registro delle azioni.
+3. [src/local.py](src/local.py) seleziona il dispositivo tramite ADB. Usa UI Automator per leggere i controlli e modificare i campi.
+4. [tests/cli.test.ts](tests/cli.test.ts) esegue la CLI come processo e verifica quali comandi arrivano al trasporto.
 
-`./agent-phone --help` elenca tutti i comandi. Per sviluppare, esegui `bun install --frozen-lockfile` e `bun run check`. I test usano un telefono simulato a livello del client. Questa versione supporta Android sul Pi. La precedente CLI Python, con USB diretto, profili e flussi TOML, è disponibile nella cronologia Git al commit `b09e614`.
+`./agent-phone --help` elenca tutti i comandi. Per sviluppare, esegui `bun install --frozen-lockfile` e `bun run check`. I test usano un telefono simulato a livello del client. La precedente CLI Python, con USB diretto, profili e flussi TOML, è disponibile nella cronologia Git al commit `b09e614`.

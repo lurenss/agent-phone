@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { chmod, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -26,6 +26,20 @@ else:
     print(json.dumps({"ok":True}))
 `,
   );
+  const uv = join(folder, "uv");
+  await Bun.write(
+    uv,
+    `#!/usr/bin/env python3
+import json, os, sys
+with open(os.environ["CALL_LOG"], "a") as log:
+    print(json.dumps(sys.argv[1:]), file=log)
+if os.environ.get("FAIL_CMD"):
+    print(json.dumps({"error": "unknown_delivery"}))
+    sys.exit(1)
+print(json.dumps({"ok": True}))
+`,
+  );
+  await chmod(uv, 0o755);
 });
 afterAll(async () => {
   await rm(folder, { recursive: true, force: true });
@@ -34,7 +48,13 @@ afterAll(async () => {
 async function call(args: string[], fail = "") {
   const log = join(folder, crypto.randomUUID());
   const child = Bun.spawn([cli, ...args], {
-    env: { ...process.env, CALL_LOG: log, AGENT_PHONE_WP: script, FAIL_CMD: fail },
+    env: {
+      ...process.env,
+      PATH: folder + ":" + process.env.PATH,
+      CALL_LOG: log,
+      AGENT_PHONE_WP: script,
+      FAIL_CMD: fail,
+    },
     stderr: "pipe",
     stdout: "pipe",
   });
@@ -168,5 +188,27 @@ test("usage errors make no transport calls", async () => {
     const result = await call(args);
     expect(result.status).toBe(2);
     expect(result.calls).toEqual([]);
+  }
+});
+
+test("--local selects the bundled adapter and sends each input once", async () => {
+  const program = ["run", "--no-project", "--script", join(import.meta.dir, "../src/local.py")];
+  const devices = await call(["--local", "devices"]);
+  expect(devices.status).toBe(0);
+  expect(devices.calls).toEqual([[...program, "phones"]]);
+  for (const [command, serial] of [
+    ["tap", "R58M1234"],
+    ["set-text", "emulator-5554"],
+  ] as const) {
+    const words = command === "set-text" ? ["--", "--caffè"] : [];
+    const result = await call(
+      [command, serial, "--id", "query", "--why", "test", "--local", ...words],
+      command,
+    );
+    expect(result.status).toBe(1);
+    expect(JSON.parse(result.error).error).toBe("unknown_delivery");
+    expect(result.calls).toEqual([
+      [...program, command, serial, "--why=test", "--on", '{"id":"query"}', ...words],
+    ]);
   }
 });
