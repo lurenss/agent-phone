@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 340" width="1080" height="340" xml:lang="en" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 420" width="1080" height="420" xml:lang="en" role="img" aria-labelledby="title desc">
   <title id="title">Agent Phone architecture</title>
-  <desc id="desc">A coding agent runs the Bun CLI on the Mac. The CLI starts the bundled Python driver with uv. The driver uses the local ADB server to reach a USB phone or Android emulator by serial number. UIAutomator2 reads screen elements on Android. The CLI returns the result as JSON.</desc>
+  <desc id="desc">A coding agent runs the Bun CLI on the Mac. The CLI starts the bundled Python driver with uv. Redis stores inventory, leases, routines, and action history. The driver uses the local ADB server to reach a USB phone or Android emulator by serial number. UIAutomator2 reads screen elements on Android. The CLI returns the result as JSON.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
       <path d="M0 0 10 5 0 10Z" fill="#424c57"/>
@@ -17,7 +17,7 @@
       rect { stroke-width: 1.4; }
     </style>
   </defs>
-  <rect width="1080" height="340" fill="white"/>
+  <rect width="1080" height="420" fill="white"/>
   <text x="28" y="48" class="title">Agent Phone</text>
   <text x="28" y="82" class="subtitle">The agent runs a command on the Mac and reads the JSON response.</text>
 
@@ -46,5 +46,11 @@
   <path class="edge" d="M578 198 H603"/>
   <path class="edge" d="M782 198 H808 V146 H831"/>
   <path class="edge" d="M808 198 V250 H831"/>
-  <text x="28" y="310" class="detail">ADB selects the device by serial number. UIAutomator2 reads controls, taps elements, and enters text on Android.</text>
+  <path class="edge" d="M495 237 V285"/>
+  <rect x="309" y="290" width="372" height="66" rx="10" fill="#ffecd2" stroke="#c89551"/>
+  <g text-anchor="middle">
+    <text x="495" y="317" class="label">Redis · src/store.py</text>
+    <text x="495" y="338" class="detail">Inventory, owners, routines and action history</text>
+  </g>
+  <text x="28" y="396" class="detail">ADB selects the device by serial number. UIAutomator2 reads controls, taps elements, and enters text on Android.</text>
 </svg>

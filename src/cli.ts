@@ -6,6 +6,9 @@ const help = `Control an Android USB phone or emulator through ADB on this Mac.
 agent-phone devices
 agent-phone lease SERIAL --why TASK
 agent-phone release SERIAL
+agent-phone history SERIAL
+agent-phone routine save NAME FILE.json | list | show NAME
+agent-phone routine run NAME SERIAL --why TASK
 
 Commands below take SERIAL and --why TASK.
   state                        active app, screen and keyboard
@@ -32,10 +35,24 @@ class AndroidError extends Error {
   }
 }
 
-async function call(args: string[]): Promise<string> {
+async function call(args: string[], input?: string): Promise<string> {
   if (!Bun.which("uv")) throw new Error("Install uv to run Agent Phone.");
-  const program = ["uv", "run", "--no-project", "--script", join(import.meta.dir, "local.py")];
-  const child = Bun.spawn([...program, ...args], { stdout: "pipe", stderr: "pipe" });
+  const program = [
+    "uv",
+    "run",
+    "--no-project",
+    "--python",
+    ">=3.11,<3.15",
+    "--with-requirements",
+    join(import.meta.dir, "../requirements.txt"),
+    "python",
+    join(import.meta.dir, "local.py"),
+  ];
+  const child = Bun.spawn([...program, ...args], {
+    stdin: input === undefined ? "ignore" : new Blob([input]),
+    stdout: "pipe",
+    stderr: "pipe",
+  });
   const [output, diagnostic, status] = await Promise.all([
     new Response(child.stdout).text(),
     new Response(child.stderr).text(),
@@ -50,24 +67,7 @@ async function call(args: string[]): Promise<string> {
   return output;
 }
 
-async function unique(serial: string, selector: string, why: string): Promise<string> {
-  const answer = await call(["ui", serial, "--on", selector, `--why=${why}`]);
-  const { elements } = JSON.parse(answer);
-  if (!Array.isArray(elements)) throw new Error("Expected an array of screen elements.");
-  if (elements.length !== 1) {
-    throw new AndroidError(
-      JSON.stringify({
-        error: elements.length ? "ambiguous" : "not_found",
-        matches: elements.length,
-      }),
-      1,
-    );
-  }
-  return JSON.stringify(elements[0]) + "\n";
-}
-
-async function run(argv: string[]): Promise<string> {
-  if (argv.length === 0 || (argv.length === 1 && argv[0] === "--help")) return help + "\n";
+function plan(argv: string[], routine?: string): string[] {
   let parsed;
   try {
     parsed = parseArgs({
@@ -85,14 +85,33 @@ async function run(argv: string[]): Promise<string> {
   const { why: given, id } = parsed.values;
   const [command, serial, ...words] = parsed.positionals;
   if (command === "devices" && serial === undefined && given === undefined && id === undefined)
-    return call(["phones"]);
+    return ["phones"];
   if (!serial || !/^[\w.:-]{1,64}$/.test(serial) || serial.startsWith("-"))
     throw new UsageError(help);
-  if (command === "release" && !words.length && given === undefined && id === undefined)
-    return call(["release", serial]);
+  if (
+    (command === "release" || command === "history") &&
+    !words.length &&
+    given === undefined &&
+    id === undefined
+  )
+    return [command, serial];
   const why = given?.trim();
   if (!why || why.length > 200) throw new UsageError("Give --why with 1 to 200 characters.");
-  const args = [serial, `--why=${why}`];
+  if (routine !== undefined) {
+    if (words.length || id !== undefined) throw new UsageError(help);
+    return ["routine-run", serial, `--why=${why}`, "--", routine];
+  }
+  if (command === "lease") {
+    if (why.length > 80) throw new UsageError("A lease task can contain up to 80 characters.");
+    if (words.length || id !== undefined) throw new UsageError(help);
+    return ["lease", serial, `--task=${why}`];
+  }
+  if (!command) throw new UsageError(help);
+  const [action, ...options] = actionArgs(command, words, id);
+  return [action, serial, `--why=${why}`, ...options];
+}
+
+function actionArgs(command: string, words: string[], id?: string): [string, ...string[]] {
   const first = words[0];
   const noId = id === undefined;
 
@@ -104,23 +123,25 @@ async function run(argv: string[]): Promise<string> {
       !words.every((value) => /^\d+$/.test(value) && Number(value) <= 10000)
     )
       throw new UsageError(`Give ${count} coordinates, each an integer from 0 to 10000.`);
-    return call([command, ...args, "--", ...words]);
+    return [command, "--", ...words];
   }
 
   switch (command) {
-    case "lease":
-      if (why.length > 80) throw new UsageError("A lease task can contain up to 80 characters.");
-      if (words.length === 0 && noId) return call(["lease", serial, `--task=${why}`]);
-      break;
     case "state":
     case "snapshot":
-      if (words.length === 0 && noId)
-        return call([command === "snapshot" ? "ui" : "state", ...args]);
+      if (words.length === 0 && noId) return [command === "snapshot" ? "ui" : "state"];
       break;
     case "open":
+      if (!first || !/^[A-Za-z]\w*(\.\w+)+$/.test(first))
+        throw new UsageError("Invalid Android package.");
+      if (words.length === 1 && noId) return [command, "--", first];
+      break;
     case "key":
+      if (!first || !/^[A-Za-z0-9_]+$/.test(first)) throw new UsageError("Invalid Android key.");
+      if (words.length === 1 && noId) return [command, "--", first];
+      break;
     case "screenshot":
-      if (words.length === 1 && first && noId) return call([command, ...args, "--", first]);
+      if (words.length === 1 && first && noId) return [command, "--", first];
       break;
     case "tap":
     case "find":
@@ -128,21 +149,55 @@ async function run(argv: string[]): Promise<string> {
       const selector =
         id && !words.length ? { id } : noId && words.length === 1 && first ? { text: first } : null;
       if (!selector) break;
-      if (command === "wait")
-        return call(["wait", ...args, "--until", JSON.stringify({ see: selector })]);
-      const on = JSON.stringify(selector);
-      if (command === "find") return unique(serial, on, why);
-      return call(["tap", ...args, "--on", on]);
+      if (command === "wait") return ["wait", "--until", JSON.stringify({ see: selector })];
+      return [command, "--on", JSON.stringify(selector)];
     }
     case "set-text":
       if (words.length !== 1 || first === undefined || id === "") break;
       if (id !== undefined) {
         const on = JSON.stringify({ id });
-        return call(["set-text", ...args, "--on", on, "--", first]);
+        return ["set-text", "--on", on, "--", first];
       }
-      return call(["set-text", ...args, "--", first]);
+      return ["set-text", "--", first];
   }
   throw new UsageError(help);
+}
+
+async function run(argv: string[]): Promise<string> {
+  if (!argv.length || (argv.length === 1 && argv[0] === "--help")) return help + "\n";
+  if (argv[0] !== "routine") return call(plan(argv));
+  const [, verb, name, ...rest] = argv;
+  if (verb === "list" && name === undefined) return call(["routine-list"]);
+  if (!name || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/.test(name)) {
+    throw new UsageError(
+      "Give the routine a name of 1 to 64 letters, digits, hyphens or underscores.",
+    );
+  }
+  if (verb === "show" && !rest.length) return call(["routine-show", name]);
+  if (verb === "run") return call(plan(["run", ...rest], name));
+  if (verb !== "save" || rest.length !== 1) throw new UsageError(help);
+  const steps: unknown = await Bun.file(rest[0]!).json();
+  if (!Array.isArray(steps) || !steps.length || steps.length > 100) {
+    throw new UsageError("A routine is a JSON array of 1 to 100 steps.");
+  }
+  const commands = steps.map((step, index) => {
+    try {
+      if (!Array.isArray(step) || !step.every((v) => typeof v === "string") || !step[0]) {
+        throw new Error("Expected a command and string arguments.");
+      }
+      if (step[0] === "screenshot")
+        throw new Error("Use screenshot directly to choose a local file.");
+      const { values, positionals } = parseArgs({
+        args: step.slice(1),
+        allowPositionals: true,
+        options: { id: { type: "string" } },
+      });
+      return actionArgs(step[0], positionals, values.id);
+    } catch (error) {
+      throw new UsageError(`Step ${index + 1}: ${error instanceof Error ? error.message : error}`);
+    }
+  });
+  return call(["routine-save", name], JSON.stringify({ steps, commands }));
 }
 
 try {

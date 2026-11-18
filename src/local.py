@@ -1,11 +1,8 @@
-# /// script
-# requires-python = ">=3.11,<3.15"
-# dependencies = ["uiautomator2==3.7.1", "adbutils==2.12.0"]
-# ///
 """Commands over the Mac's loopback ADB server. One command, one selected serial."""
 
 import argparse
 import fcntl
+import math
 import hashlib
 import json
 import os
@@ -16,6 +13,10 @@ import sys
 import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from uuid import uuid4
+
+from redis.exceptions import RedisError
+from store import Store
 
 import adbutils
 import uiautomator2 as u2
@@ -60,13 +61,19 @@ def public(row):
     return {k: row[k] for k in ("text", "desc", "id", "center", "clickable", "focused")}
 
 
+class MatchError(ValueError):
+    def __init__(self, count):
+        super().__init__("ambiguous" if count else "not_found")
+        self.matches = count
+
+
 def one(rows):
     if len(rows) != 1:
-        raise ValueError("ambiguous" if rows else "not_found")
+        raise MatchError(len(rows))
     return rows[0]
 
 
-def drive(adb, args):
+def drive(adb, args, before_input):
     command, words = args.command, args.words
     on = json.loads(args.on) if args.on else None
     if command in ("open", "key", "swipe") or (command == "tap" and on is None):
@@ -81,6 +88,7 @@ def drive(adb, args):
                 shell.append("300")
             if command == "key" and not re.fullmatch(r"[A-Z0-9_]+", shell[-1]):
                 raise ValueError("invalid_key")
+        before_input()
         reply = adb.shell2(shell, timeout=15)
         if reply.returncode or (command == "open" and "Events injected: 1" not in reply.output):
             raise ValueError("Android refused " + command)
@@ -94,14 +102,14 @@ def drive(adb, args):
 
     device = u2.Device(adb)
     try:
-        return drive_ui(device, adb, args, on)
+        return drive_ui(device, adb, args, on, before_input)
     finally:
         # Hold the serial lock until our helper exits. Another CLI process may already be waiting.
         if device._process is not None:
             device.stop_uiautomator(wait=True)
 
 
-def drive_ui(device, adb, args, on):
+def drive_ui(device, adb, args, on, before_input):
     command = args.command
     if command == "state":
         info = device.info
@@ -122,6 +130,8 @@ def drive_ui(device, adb, args, on):
         return {"ms": round((time.monotonic() - start) * 1000)}
 
     rows = elements(device, on)
+    if command == "find":
+        return public(one(rows))
     if command == "ui":
         return {
             "elements": [public(r) for r in rows if on or r["text"] or r["desc"] or r["clickable"]]
@@ -150,6 +160,7 @@ def drive_ui(device, adb, args, on):
         method, params = "setText", [sel, args.words[0]]
     else:
         raise ValueError("unknown command")
+    before_input()
     # The SDK's public JSON-RPC wrapper retries on transport failure. An input must go out only once.
     if (
         _jsonrpc_call(adb, DEFAULT_SERVER_PORT, method, params, timeout=10, print_request=False)
@@ -159,19 +170,26 @@ def drive_ui(device, adb, args, on):
     return public(target) if command == "tap" else None
 
 
-def lease_path(root, serial):
-    return root / hashlib.sha256(serial.encode()).hexdigest()
+def migrate_file_lease(store, serial):
+    root = Path(
+        os.environ.get("AGENT_PHONE_LOCAL_STATE", Path.home() / ".agent-phone/local-leases")
+    )
+    path = root / hashlib.sha256(serial.encode()).hexdigest()
+    if not path.is_file():
+        return
+    with path.with_suffix(".lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if not path.is_file():
+            return
+        lease = json.loads(path.read_text())
+        remaining = math.ceil(lease["until"] - time.time())
+        if remaining > 0:
+            lease.update(owner=store.user, since=lease["until"] - 600)
+            store.db.set(store.lease_key(serial), json.dumps(lease), ex=remaining, nx=True)
+        path.unlink()
 
 
-def active(path):
-    try:
-        data = json.loads(path.read_text())
-    except FileNotFoundError:
-        return None
-    return data if data["until"] > time.time() else None
-
-
-def main(argv):
+def parse(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument("command")
     parser.add_argument("serial", nargs="?")
@@ -181,6 +199,10 @@ def main(argv):
     split = argv.index("--") if "--" in argv else len(argv)
     args = parser.parse_args(argv[:split])
     args.words = argv[split + 1 :]
+    return args
+
+
+def adb_client():
     exe = shutil.which("adb") or Path.home() / "Library/Android/sdk/platform-tools/adb"
     if not Path(exe).is_file():
         raise ValueError("Install Android SDK Platform-Tools or add adb to PATH.")
@@ -190,53 +212,137 @@ def main(argv):
         if k not in ("ADB_SERVER_SOCKET", "ANDROID_ADB_SERVER_ADDRESS", "ANDROID_ADB_SERVER_PORT")
     }
     subprocess.run([exe, "-P", "5037", "start-server"], check=True, timeout=12, env=host_env)
-    client = adbutils.AdbClient(host="127.0.0.1", port=5037, socket_timeout=15)
-    root = Path(
-        os.environ.get("AGENT_PHONE_LOCAL_STATE", Path.home() / ".agent-phone/local-leases")
-    )
-    root.mkdir(mode=0o700, parents=True, exist_ok=True)
-    if args.command == "phones":
-        return {
-            "phones": [
-                dict(
-                    serial=d.serial,
-                    state=d.state,
-                    model=d.tags.get("model", ""),
-                    healthy=d.state == "device",
-                    lease=active(lease_path(root, d.serial)),
-                )
-                for d in client.list(extended=True)
-            ]
-        }
+    return adbutils.AdbClient(host="127.0.0.1", port=5037, socket_timeout=15)
 
-    path = lease_path(root, args.serial)
-    # A persistent lock inode serializes release, renewal and input across CLI processes.
-    with path.with_suffix(".lock").open("a") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
-        if args.command == "release":
-            path.unlink(missing_ok=True)
-            return {}
-        adb = client.device(serial=args.serial)
+
+def device_action(store, adb, args, lock, **details):
+    def before_input():
+        # Looking up a control can take time. Recheck both reservations before sending the input.
+        lock.reacquire()
+        store.require_owner(args.serial)
+
+    def perform():
+        store.require_owner(args.serial)
         if adb.get_state() != "device":
             raise ValueError("device_not_ready")
+        return drive(adb, args, before_input)
+
+    action = "snapshot" if args.command == "ui" else args.command
+    if args.command in ("open", "key", "swipe") or (args.command == "tap" and not args.on):
+        details["arguments"] = args.words
+    if args.on and "id" in json.loads(args.on):
+        details["targetId"] = json.loads(args.on)["id"]
+    return store.audit(args.serial, action, args.why, perform, **details)
+
+
+class RunFailed(Exception):
+    def __init__(self, run_id, step, error):
+        self.result = {
+            "error": str(error),
+            "runId": run_id,
+            "failedStep": step,
+            "completed": step - 1,
+        }
+
+
+def run_routine(store, adb, args, lock):
+    name = args.words[0]
+    routine = store.routine(name)
+    run_id = uuid4().hex
+
+    def execute():
+        store.require_owner(args.serial)
+        for index, (command, *options) in enumerate(routine["commands"], 1):
+            try:
+                # Reserve time for this step without taking over an expired lease.
+                lock.reacquire()
+                lease = store.require_owner(args.serial)
+                store.reserve(args.serial, lease["task"])
+                step = parse([command, args.serial, "--why=" + args.why, *options])
+                last = device_action(store, adb, step, lock, runId=run_id, routine=name, step=index)
+            except Exception as error:
+                raise RunFailed(run_id, index, error) from error
+        return {
+            "runId": run_id,
+            "routine": name,
+            "completed": len(routine["commands"]),
+            "lastResult": last,
+        }
+
+    return store.audit(args.serial, "routine-run", args.why, execute, runId=run_id, routine=name)
+
+
+def main(argv):
+    args = parse(argv)
+    store = Store()
+    if args.command == "history":
+        return store.history(args.serial)
+    if args.command == "routine-list":
+        return {"routines": sorted(store.db.hkeys(store.prefix + "routines"))}
+    if args.command == "routine-show":
+        return {"name": args.serial, "steps": store.routine(args.serial)["steps"]}
+    if args.command == "routine-save":
+        return store.save(args.serial, json.load(sys.stdin))
+
+    if args.command == "phones":
+        devices = adb_client().list(extended=True)
+        for device in devices:
+            migrate_file_lease(store, device.serial)
+        return store.inventory(devices)
+
+    serial = args.serial
+    lock = store.db.lock(store.prefix + "operation:" + serial, timeout=600, blocking=False)
+    if not lock.acquire():
+        raise ValueError("device_busy")
+    try:
+        migrate_file_lease(store, serial)
+        if args.command == "release":
+
+            def release():
+                if store.lease(serial):
+                    store.require_owner(serial)
+                    store.db.delete(store.lease_key(serial))
+                return {}
+
+            return store.audit(serial, "release", "", release)
+        adb = adb_client().device(serial=serial)
         if args.command == "lease":
-            renewed = active(path) is not None
-            lease = {"task": args.task, "until": time.time() + 600}
-            staged = path.with_suffix(".tmp")
-            staged.write_text(json.dumps(lease))
-            staged.replace(path)
-            return {"lease": lease, "renewed": renewed}
-        if not active(path):
-            raise ValueError("not_leased")
-        value = drive(adb, args)
-        if args.command in ("ui", "screenshot"):
+
+            def reserve():
+                if adb.get_state() != "device":
+                    raise ValueError("device_not_ready")
+                return store.reserve(serial, args.task)
+
+            return store.audit(serial, "lease", args.task, reserve)
+        if args.command == "routine-run":
+            return run_routine(store, adb, args, lock)
+        value = device_action(store, adb, args, lock)
+        if args.command in ("ui", "find", "screenshot"):
             return value
         return {"action": args.command, "answer": value}
+    finally:
+        lock.release()
 
 
 if __name__ == "__main__":
     try:
-        print(json.dumps({"ok": True, **main(sys.argv[1:])}, ensure_ascii=False))
+        result = main(sys.argv[1:])
+        print(
+            json.dumps(
+                result if sys.argv[1] == "find" else {"ok": True, **result}, ensure_ascii=False
+            )
+        )
+    except MatchError as error:
+        print(json.dumps({"ok": False, "error": str(error), "matches": error.matches}))
+        sys.exit(1)
+    except RunFailed as error:
+        print(json.dumps({"ok": False, **error.result}))
+        sys.exit(1)
+    except RedisError as error:
+        print(
+            json.dumps({"ok": False, "error": "redis_unavailable", "detail": type(error).__name__})
+        )
+        sys.exit(1)
     except Exception as error:
         print(json.dumps({"ok": False, "error": str(error)}))
         sys.exit(1)
