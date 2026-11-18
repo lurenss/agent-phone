@@ -21,13 +21,15 @@ The CLI writes JSON results to stdout and errors to stderr. Exit code 0 means th
 
 ## Connections and leases
 
-The CLI looks for `adb` on PATH or at `~/Library/Android/sdk/platform-tools/adb`. It connects to the local ADB server at `127.0.0.1:5037`. On first use, `uv` sets up the Python dependencies. If a USB phone appears as `unauthorized`, unlock it and accept the USB debugging prompt. Select a serial number whose state is `device`.
+The CLI looks for `adb` on PATH or at `~/Library/Android/sdk/platform-tools/adb`. It connects to the local ADB server at `127.0.0.1:5037`. If a USB phone appears as `unauthorized`, unlock it and accept the USB debugging prompt. Select a serial number whose state is `device`.
 
-UIAutomator2 reads the screen hierarchy, taps controls by label or ID, and fills in text fields. ADB opens apps, takes screenshots, taps coordinates, swipes, and sends key events. A command stops any UIAutomator2 service it started before it exits. Include that startup time when measuring local command latency.
+The TypeScript driver uses ADB to open apps, tap coordinates, swipe, and send key events. It calls UIAutomator2 on the selected Android device to read controls, tap by label or ID, enter Unicode text, and capture a JPEG.
 
-Redis defaults to `redis://127.0.0.1:6379/0`. Set `AGENT_PHONE_REDIS_URL` to override it. Use the same Redis database for every operator on this Mac. Keys are scoped to the hostname. Configure Redis persistence if routine definitions and history need to survive a server restart.
+On first use, the driver downloads the pinned Android helper from [its upstream release](https://github.com/openatx/android-uiautomator-server-jar/releases/tag/0.4.1), verifies its SHA-256 digest, and installs it through ADB. Later calls reuse the verified JAR. The host cache is `~/.cache/agent-phone`. A command or routine removes its temporary port forwarding rule and stops any helper process it started. Include that startup time when measuring local command latency.
 
-A lease lasts ten minutes. Only its owner can renew, act, or release it. The identity combines the macOS account with the optional `AGENT_PHONE_OWNER` label. Labels distinguish trusted local sessions. Any process under that account can choose the same label. Existing file leases are imported with their original expiry and the account as owner. Stop older versions of the CLI before upgrading.
+Redis defaults to `redis://127.0.0.1:6379/0`. Set `AGENT_PHONE_REDIS_URL` to override it. Use the same Redis database for every operator on the same host. Keys are scoped to the hostname. Configure Redis persistence if routine definitions and history need to survive a server restart.
+
+A lease lasts ten minutes. Only its owner can renew, act, or release it. The identity combines the host account with the optional `AGENT_PHONE_OWNER` label. Labels distinguish trusted local sessions. Any process under that account can choose the same label. Existing file leases are imported with their original expiry and the account as owner. Stop older versions of the CLI before upgrading.
 
 `devices` refreshes discovery on demand. Active means ADB reports `device`. Busy means active with a live lease. Offline, unauthorized, and previously seen disconnected devices remain in the inventory. `lastSeen`, `since`, and `until` are Unix seconds. Other ADB clients can still act outside Agent Phone.
 
@@ -42,5 +44,5 @@ A lease lasts ten minutes. Only its owner can renew, act, or release it. The ide
 ## Change the CLI
 
 - Keep command syntax, validation, and `--help` in [src/cli.ts](src/cli.ts).
-- Pass arguments to the Android driver as an array. Implement device operations in [src/local.py](src/local.py) and Redis state in [src/store.py](src/store.py).
-- Run `bun install --frozen-lockfile` to set up development dependencies. Run `bun run check` before committing. The [CLI tests](tests/cli.test.ts) use simulated clients. The [management tests](tests/test_management.py) start a temporary Redis server and simulate ADB. Neither suite needs a phone or credentials.
+- Write all application code and tests in TypeScript. [src/manager.ts](src/manager.ts) checks ownership, runs routines, and records each action. [src/android.ts](src/android.ts) implements Android actions. [src/uiautomator.ts](src/uiautomator.ts) manages the ADB connection and UIAutomator2 helper. [src/store.ts](src/store.ts) owns Redis keys, leases, and history.
+- Run `bun install --frozen-lockfile` to set up development dependencies. Run `bun run check` before committing. The CLI tests exercise argument handling and the executable. The management tests start an isolated Redis server and simulate Android. Run the Settings example on a device to check the Android side.

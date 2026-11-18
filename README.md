@@ -1,18 +1,20 @@
 # Agent Phone
 
-Agent Phone lets a coding agent control Android one step at a time. It uses UIAutomator2 to read text and controls on the screen. The agent can open an app, tap a button, fill in a field, and check what changed.
+Agent Phone is a TypeScript CLI that lets a coding agent control Android one step at a time. It uses UIAutomator2 to read text and controls on the screen. The agent can open an app, tap a button, fill in a field, and check what changed.
 
 ![Agent Phone controls Android over local ADB and uses Redis for inventory, leases, routines, and action history.](docs/architecture.svg)
 
 ## Connect a device
 
-Install Bun, `uv`, Redis, and Android SDK Platform-Tools on the Mac. Start Redis on the Mac (for a Homebrew installation, run `brew services start redis`). Run the CLI from the project directory.
+Install Bun, Redis, and Android SDK Platform-Tools. In the project directory, run `bun install --frozen-lockfile`. Start Redis on the same host. On macOS with Homebrew, run `brew services start redis`.
+
+The first screen read on a new device downloads a verified UIAutomator2 helper.
 
 For a USB phone, turn on **USB debugging** and authorize the Mac on the phone. For an emulator, start it in Android Studio’s **Device Manager**.
 
 ## Open Settings and check the result
 
-Set `AGENT_PHONE_OWNER` to a distinct label for each agent or operator. It defaults to the macOS account when unset. Run `./agent-phone devices` and replace `emulator-5554` with the serial number of your device.
+Set `AGENT_PHONE_OWNER` to a distinct label for each agent or operator. It defaults to the host account when unset. Run `./agent-phone devices` and replace `emulator-5554` with the serial number of your device.
 
 ```sh
 export AGENT_PHONE_OWNER=codex
@@ -30,7 +32,7 @@ When Settings is in the foreground, `state` reports `com.android.settings` in `a
 
 `devices` reports how many phones are known, active, busy, and available. Each row shows the ADB state, last observation, and current lease owner and task. Run `history SERIAL` for timestamped actions, owners, reasons, and outcomes.
 
-A routine is a JSON array of CLI steps. The [Settings example](routines/check-settings.json) opens Settings, waits for its search control, and reads the foreground app. Use a control ID from your device when adapting the example.
+A routine is a JSON array of CLI steps. The [Settings example](routines/check-settings.json) opens Settings, waits for its search control, and reads the foreground app. Start on the main Settings screen. Android can reopen the last Settings page. Use a control ID from your device when adapting the example.
 
 ```sh
 ./agent-phone routine save check-settings routines/check-settings.json
