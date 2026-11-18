@@ -1,104 +1,36 @@
-# AGENTS.md
+# Istruzioni per Agent Phone
 
-Guidance for AI coding agents working in this repository.
+Usa pstack per progettare, modificare e verificare Agent Phone. Il [README](README.md) contiene i prerequisiti e un esempio completo.
 
-agent-phone is a tool that AI agents call, not an agent. It is a Python CLI that reads an Android phone's accessibility tree over adb and returns JSON with refs for the elements an agent can act on. The observe, act and verify loop lives in the calling agent. agent-phone embeds no LLM and has no interactive prompt. Its design follows [vercel-labs/agent-desktop](https://github.com/vercel-labs/agent-desktop), and its layout mirrors that repo's.
+## Guidare Android
 
-## Commands
+1. Esegui `devices` e scegli il seriale del dispositivo richiesto. Il Raspberry Pi è la destinazione predefinita. Per USB ed emulatori sul Mac, usa `--local` in ogni comando della sessione.
+2. Prenota un dispositivo libero con `lease SERIAL --why TASK`. Indica lo scopo di ogni lettura o azione con `--why`. Il limite è 80 caratteri per la prenotazione e 200 per gli altri comandi.
+3. Leggi `state` per conoscere l’app in primo piano, lo schermo e la tastiera. Usa `snapshot` per ottenere testo, descrizione, ID, coordinate e stato di focus dei controlli.
+4. Scegli un’azione coerente con la richiesta, anche quando il controllo invia, pubblica o elimina qualcosa. Invia l’azione una volta. Verifica l’effetto con una nuova lettura o con `wait`.
+5. Libera il dispositivo con `release SERIAL` quando hai finito, anche se il task si interrompe.
 
-```bash
-uv sync                         # install the package and the dev tools
-uv run pytest                   # every test, including the architecture and no-sleep gates
-uv run ruff check               # lint
-uv run ruff format --check .    # formatting
-uv run agent-phone devices      # the CLI; `agent-phone --help` lists every command, from `snapshot` and `find` to `click` and `open-url`
-probes/android/server_lifetime.sh                         # re-run a platform probe against the phone
-uv run python -I probes/android/unit2_probe.py <check>    # facts, watchdog, bench, idle, concurrent, stop, foreign
-uv run python -I probes/android/unit3_probe.py <check>    # windows, freshness, bench, commands (reading the screen)
-uv run python -I probes/android/compare_backends.py <label>   # compare the old dump with the server dump
-sh probes/remote/ssh_options_probe.sh                         # the ssh key options and the shared connection, against a throwaway sshd
-python3 -I probes/remote/adb_facts_probe.py client            # the adb client against a server on another computer; needs no device
-```
+## Selezionare un controllo
 
-The probes in `probes/android/` touch the real phone. Read the phone safety rules below before you run one. The probes in `probes/remote/` need no phone.
+- `find` e `tap` accettano il testo esatto o `--id ID`. Usa un ID letto dalla schermata quando più controlli hanno la stessa etichetta. `not_found` indica zero corrispondenze, `ambiguous` più di una. In entrambi i casi, rileggi la schermata.
+- `set-text SERIAL TESTO --id ID` sostituisce il contenuto di un campo. Senza ID usa il campo di testo a fuoco. Se il testo inizia con un trattino, metti prima le opzioni e poi `--` seguito dal testo.
+- `wait` attende fino a dieci secondi che compaia almeno un elemento con il testo o l’ID richiesto. Per esempio, dopo una ricerca attendi un’etichetta dei risultati.
+- Se l’app disegna un controllo che manca da `snapshot`, salva un JPEG con `screenshot SERIAL FILE.jpg`. Usa l’immagine corrente per scegliere le coordinate di `tap SERIAL X Y` o `swipe SERIAL X1 Y1 X2 Y2`.
 
-Before you call a change to device behavior done, prove it on a connected phone with `.claude/skills/verify-agent-phone/SKILL.md`. It drives this checkout's CLI the way an agent does and keeps the evidence under `~/.agent-phone/verify/`, outside git, because that evidence holds what the screen showed.
+La CLI scrive i risultati JSON su stdout e gli errori su stderr. Un codice di uscita 0 conferma che il comando ha ricevuto una risposta positiva. Se perdi la risposta a un tap o a una scrittura, osserva lo stato del dispositivo prima di decidere l’azione successiva.
 
-## Where the truth lives
+## Collegamento e prenotazioni
 
-- **Shipped behavior** is the code and its tests. A doc that contradicts the code is a defect. Fix it in the same change.
-- **Platform evidence** is `probes/android/FINDINGS.md`, and `probes/remote/FINDINGS.md` for ssh and for adb across two computers. A row id such as `A2-1` or `R2-4` is the citation form for a measurement. Code and docs may cite row ids.
-- **The build plan** is `docs/plan.md`. When the plan contradicts the code, the code says what shipped. Correct the plan in place and cite the row or the source line that disproved it.
-- **The decision trail** is `decisions.tsv`, one row per decision, append-only. Its format belongs to pstack's `show-me-your-work` skill.
+**Raspberry Pi.** Agent Phone avvia `wp.py` dalla skill `driving-phones-via-walkie-api`. Il client gestisce il tunnel SSH, il token, la prenotazione e il registro delle azioni. Per usare una copia diversa, imposta `AGENT_PHONE_WP` al percorso di `wp.py`. Walkie-porkie riutilizza il servizio UIAutomator2 sul telefono tra comandi successivi. Per i tap per nome o ID e le scritture per ID, la CLI verifica l’unicità prima dell’invio. Il Pi rilegge il controllo quando agisce. La schermata può cambiare tra le due letture.
 
-## Architecture
+**Mac.** La CLI cerca `adb` nel PATH o in `~/Library/Android/sdk/platform-tools/adb` e contatta il server su `127.0.0.1:5037`. Al primo uso, `uv` prepara le dipendenze Python. Se il telefono USB compare come `unauthorized`, sbloccalo e accetta la richiesta di Debug USB. Scegli un seriale con stato `device`.
 
-```
-src/agent_phone/core/       platform-neutral domain types and command logic, one folder per concept
-src/agent_phone/adapters/   backends; each one translates one automation stack into core types
-                            (`remote/` is not a backend: it wraps one to drive the phones of a phone host)
-src/agent_phone/cli/        argument parsing and the Driver; the only place an adapter is wired to core
-src/agent_phone/policy/     the built-in policy rules, shipped as package data
-src/agent_phone/skills/     the usage guides for agents, shipped as package data; `agent-phone skills get` prints them
-.claude/skills/             project skills; verify-agent-phone proves a change on a real phone
-host/                       the one script that runs on a phone host, and its install guide; not part of the package
-examples/                   consumers built on the public API, with their own policy files
-probes/android/             phone measurements, their captures, and FINDINGS.md
-probes/remote/              ssh and adb measurements for a phone on another computer, and their FINDINGS.md
-docs/                       the plan, the JSON contract, and lessons from past bugs
-tests/                      behavior tests and redacted golden fixtures
-```
+UIAutomator2 legge la gerarchia dei controlli, esegue i tap per testo o ID e scrive nei campi. ADB gestisce apertura delle app, screenshot, tap per coordinate, swipe e tasti. Quando un comando avvia il servizio UIAutomator2, lo arresta prima di terminare. Nei test di velocità locali, considera anche il tempo di avvio del servizio.
 
-**Dependency direction.** Core never imports an adapter, the CLI, `uiautomator2`, `adbutils` or `subprocess`. Adapters never import the CLI. `tests/test_architecture.py` enforces both rules and plants violations first, so a rule that stops detecting fails the suite.
+La prenotazione locale dura dieci minuti. Ripeti `lease` per rinnovarla. I processi Agent Phone dello stesso utente macOS condividono la prenotazione e serializzano i comandi per dispositivo. Altri client ADB possono agire sullo stesso telefono.
 
-**Boundaries.** An adapter parses everything it reads from the phone into core types before returning. Core never sees XML, a uiautomator2 object or an adb string. Core trusts the types it receives and does not validate them again.
+## Modificare la CLI
 
-**Commands.** A command lives in `core/commands/<name>.py`, named after the command. The CLI dispatches with one `match` over the parsed command. There is no command registry.
-
-**Design.** `docs/design/core-types.md` explains the types and the reasons behind them. Read it before you change a type in `core/`.
-
-**Phone host.** With `AGENT_PHONE_REMOTE`, the phones are plugged into another computer. `adapters/remote` exports one function, `remote_hub`, and `cli/hub.py` is the one caller. `host/phone_host.py` runs where agent-phone is not installed, so it imports the standard library only. `docs/design/remote.md` explains both, and `tests/test_remote_wire.py` keeps their JSON equal.
-
-**Backends.** The adapter interface is the `Phone` protocol in `core/phone.py`. A second backend, such as a custom `app_process` server, is a new folder under `adapters/` and changes no command. It adds a rig to `tests/test_phone_contract.py`, the suite every `Phone` passes, the test fake included.
-
-## Coding standards
-
-- **No fixed sleeps.** `time.sleep` is banned by ruff's `TID251` everywhere except `core/wait/` and `probes/`. Wait on a screen condition instead. `tests/test_no_sleep_rule.py` proves the rule catches every import form.
-- **400 lines at most per source file.** Split by responsibility. `tests/test_architecture.py` enforces it.
-- **Domain types are frozen dataclasses. Closed vocabularies are enums.** A role, an error code and a delivery state each come from one enum, never from loose strings.
-- **One concept per module.** Name a module after the concept it owns, not after the step it runs in.
-- **Comments explain a non-obvious why.** The code says what. Delete a comment that restates the code.
-- **Errors carry a code and a delivery disposition.** Nothing raises a bare exception across the CLI boundary. `main()` turns every error into the JSON envelope and an exit code.
-
-## Device safety
-
-agent-phone drives real phones with real accounts. A wrong tap can post, send or delete, and that cannot be undone.
-
-**Core knows no app.** App names, labels and package lists never appear in `core/`. They live in policy files, device profiles, fixtures and `examples/`. A rule that only makes sense for one app is data, not code.
-
-The framework enforces these on every device:
-
-- Never send a commit action without the caller's explicit `--commit`, unless the person who launched the agent set `AGENT_PHONE_PERMISSION_MODE=dangerously-skip`. The policy engine decides what counts as a commit action from its rules. Tests never pass `--commit`. Tests never set the variable except to test the mode, and the verify skill's `evidence.py` drops it unless a journey passes it with `--env`. An agent never sets it. A deny rule and a protected package hold in both modes.
-- Never stop a package that the device profile marks as protected.
-- Install nothing on the device. The only footprint is `/data/local/tmp/u2.jar` (`A3-1`) and the empty file `/data/local/tmp/ap-lastuse` that the idle watchdog reads (`A3-8`). `agent-phone server stop` removes the second.
-- Only one process drives a device at a time (`A3-4`). On a phone host, only one holder does, and the host's lease says who.
-- To try what the CLI does with its arguments, such as whether a flag parses, cut it off from the phone: `ADB=false uv run agent-phone ...` stops at `TRANSPORT` before it reaches any device. With `AGENT_PHONE_REMOTE` set, the same command still reaches the phone host and takes a lease there before it stops, so unset that variable first. Every call that may reach a phone goes through the verify skill's `evidence.py`, which records it. A unit 6 experiment ran `batch --commit` against the connected J7 to see whether the flag was refused, and only the parser stood between it and an unrecorded input.
-- Never send a live input to see whether the gate refuses it. If the gate lets it through, it has gone out: a unit 7 set-text meant to be refused typed a draft into a live chat (`A6-6`). Judge it first with `probes/android/gate_check.py` on a raw dump, with the same action kind.
-- Raw dumps contain private screen content. Keep them in `probes/android/raw/`, which git ignores. Commit only fixtures that pass `tests/test_fixtures_are_redacted.py`.
-
-The development phone, Lorenzo's Samsung J7, adds these:
-
-- SocksTun (`hev.sockstun`) is protected. Never stop it or change VPN settings. With always-on lockdown VPN, a dead tunnel takes the phone offline.
-- It runs live Instagram and Business Suite accounts. Write every app a run opened on it, and every input it sent, to `decisions.tsv`.
-
-The second device, Lorenzo's AYN Thor (`examples/devices/thor.toml`), adds these:
-
-- It has two screens. agent-phone reads and taps only the top one, display 0 (`A6-1`).
-- Both Eden emulators are protected. Never stop one, because a game may be running in it.
-- It is signed in to Lorenzo's Discord, Grok, YouTube, Netflix and Chess accounts. Write every app a run opened on it, and every input it sent, to `decisions.tsv`.
-
-## Commits
-
-- Use Conventional Commits: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `perf:`, `chore:`. Write `type: imperative summary` in lowercase, and say why in the body.
-- One unit of `docs/plan.md` per commit, or one coherent step inside a unit. Every commit passes `uv run pytest`, `uv run ruff check` and `uv run ruff format --check .`.
-- Order commits so the history reads as an argument: the measurement before the design, the failing test before the fix.
+- Mantieni sintassi, validazione e testo di `--help` in [src/cli.ts](src/cli.ts).
+- Seleziona il client in [src/transport.ts](src/transport.ts). Passa gli argomenti come array. Implementa le operazioni Android locali in [src/local.py](src/local.py).
+- Esegui `bun install --frozen-lockfile` per preparare l’ambiente di sviluppo. Prima del commit esegui `bun run check`. I [test della CLI](tests/cli.test.ts) usano client simulati e devono restare indipendenti da telefoni, credenziali e account reali.
