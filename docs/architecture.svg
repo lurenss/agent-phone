@@ -1,80 +1,50 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 642" width="1040" height="642" xml:lang="en" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 340" width="1080" height="340" xml:lang="en" role="img" aria-labelledby="title desc">
   <title id="title">Agent Phone architecture</title>
-  <desc id="desc">On the Mac, Codex or Claude Code calls the Bun CLI. By default, wp.py reaches the walkie-porkie API through an SSH tunnel. The Raspberry Pi controls an Android phone over USB. With --local, src/local.py uses the Mac’s ADB server to control a USB phone or an emulator. UIAutomator2 reads screen elements and enters text on Android. The CLI returns the result as JSON.</desc>
+  <desc id="desc">A coding agent runs the Bun CLI on the Mac. The CLI starts the bundled Python driver with uv. The driver uses the local ADB server to reach a USB phone or Android emulator by serial number. UIAutomator2 reads screen elements on Android. The CLI returns the result as JSON.</desc>
   <defs>
-    <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
       <path d="M0 0 10 5 0 10Z" fill="#424c57"/>
     </marker>
     <style>
       text { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; fill: #1f2328; }
-      .title { font-size: 36px; font-weight: 700; }
+      .title { font-size: 34px; font-weight: 700; }
       .subtitle { font-size: 18px; fill: #465160; }
       .label { font-size: 19px; font-weight: 650; }
-      .detail { font-size: 16px; fill: #384452; }
-      .group { font-size: 18px; font-weight: 700; }
-      .edge { fill: none; stroke: #424c57; stroke-width: 1.8; stroke-linejoin: round; marker-end: url(#head); }
-      .lane { fill: #f6f8fa; stroke: #c9d1d9; }
+      .detail { font-size: 15px; fill: #384452; }
+      .edge { fill: none; stroke: #424c57; stroke-width: 1.8; marker-end: url(#arrow); }
       .code { fill: #dcebfb; stroke: #7fa7d9; }
       .device { fill: #ddf2e3; stroke: #7dbf93; }
       rect { stroke-width: 1.4; }
     </style>
   </defs>
-
-  <rect width="1040" height="642" fill="white"/>
-  <text x="34" y="52" class="title">Agent Phone</text>
-  <text x="35" y="83" class="subtitle">The agent runs a command on the Mac and reads the JSON response.</text>
-
-  <rect x="34" y="112" width="238" height="72" rx="10" fill="white" stroke="#9aa3ad"/>
-  <rect x="320" y="112" width="300" height="72" rx="10" class="code"/>
-  <rect x="668" y="112" width="338" height="72" rx="10" fill="#ffd3e2" stroke="#e07aa2"/>
-  <g text-anchor="middle">
-    <text x="153" y="143" class="label">Coding agent</text>
-    <text x="153" y="166" class="detail">Codex or Claude Code</text>
-    <text x="470" y="143" class="label">./agent-phone</text>
-    <text x="470" y="166" class="detail">src/cli.ts validates the command</text>
-    <text x="837" y="143" class="label">src/transport.ts</text>
-    <text x="837" y="166" class="detail">Selects the client</text>
-  </g>
-  <path class="edge" d="M272 148 H316"/>
-  <path class="edge" d="M620 148 H664"/>
-
-  <path class="edge" d="M837 184 V207 H270 V231"/>
-  <path class="edge" d="M837 207 H770 V231"/>
-  <rect x="34" y="235" width="472" height="378" rx="13" class="lane"/>
-  <rect x="534" y="235" width="472" height="378" rx="13" class="lane"/>
+  <rect width="1080" height="340" fill="white"/>
+  <text x="28" y="48" class="title">Agent Phone</text>
+  <text x="28" y="82" class="subtitle">The agent runs a command on the Mac and reads the JSON response.</text>
 
   <g text-anchor="middle">
-    <text x="270" y="271" class="group">Raspberry Pi · default</text>
-    <text x="770" y="271" class="group">Mac · --local</text>
-
-    <rect x="64" y="290" width="412" height="63" rx="9" class="code"/>
-    <text x="270" y="317" class="label">wp.py</text>
-    <text x="270" y="340" class="detail">walkie-porkie client on the Mac</text>
-    <rect x="564" y="290" width="412" height="63" rx="9" class="code"/>
-    <text x="770" y="317" class="label">src/local.py</text>
-    <text x="770" y="340" class="detail">uv runs the Python client</text>
-
-    <path class="edge" d="M270 353 V397"/>
-    <text x="284" y="381" text-anchor="start" class="detail">SSH tunnel</text>
-    <path class="edge" d="M770 353 V397"/>
-    <text x="784" y="381" text-anchor="start" class="detail">127.0.0.1:5037</text>
-
-    <rect x="64" y="401" width="412" height="63" rx="9" class="code"/>
-    <text x="270" y="428" class="label">walkie-porkie API</text>
-    <text x="270" y="451" class="detail">The Pi sends commands to Android over ADB.</text>
-    <rect x="564" y="401" width="412" height="63" rx="9" class="code"/>
-    <text x="770" y="428" class="label">ADB server on the Mac</text>
-    <text x="770" y="451" class="detail">Connects to the device by serial number.</text>
-
-    <path class="edge" d="M270 464 V497"/>
-    <path class="edge" d="M770 464 V497"/>
-    <rect x="64" y="501" width="412" height="91" rx="9" class="device"/>
-    <text x="270" y="530" class="label">USB phone connected to the Pi</text>
-    <text x="270" y="555" class="detail">UIAutomator2 reads and taps screen elements.</text>
-    <text x="270" y="577" class="detail">The Pi reuses the service between commands.</text>
-    <rect x="564" y="501" width="412" height="91" rx="9" class="device"/>
-    <text x="770" y="530" class="label">USB phone or emulator on the Mac</text>
-    <text x="770" y="555" class="detail">UIAutomator2 reads and taps screen elements.</text>
-    <text x="770" y="577" class="detail">Each command stops the service it starts.</text>
+    <rect x="28" y="159" width="162" height="78" rx="10" fill="white" stroke="#9aa3ad"/>
+    <text x="109" y="193" class="label">Coding agent</text>
+    <text x="109" y="216" class="detail">Codex or Claude Code</text>
+    <rect x="218" y="159" width="166" height="78" rx="10" class="code"/>
+    <text x="301" y="193" class="label">./agent-phone</text>
+    <text x="301" y="216" class="detail">Bun CLI · src/cli.ts</text>
+    <rect x="412" y="159" width="166" height="78" rx="10" class="code"/>
+    <text x="495" y="193" class="label">src/local.py</text>
+    <text x="495" y="216" class="detail">Python driver · uv</text>
+    <rect x="606" y="159" width="176" height="78" rx="10" class="code"/>
+    <text x="694" y="193" class="label">Local ADB server</text>
+    <text x="694" y="216" class="detail">127.0.0.1:5037</text>
+    <rect x="834" y="110" width="218" height="72" rx="10" class="device"/>
+    <text x="943" y="140" class="label">Android phone</text>
+    <text x="943" y="162" class="detail">Connected via USB</text>
+    <rect x="834" y="214" width="218" height="72" rx="10" class="device"/>
+    <text x="943" y="244" class="label">Android emulator</text>
+    <text x="943" y="266" class="detail">Running on the Mac</text>
   </g>
+  <path class="edge" d="M190 198 H215"/>
+  <path class="edge" d="M384 198 H409"/>
+  <path class="edge" d="M578 198 H603"/>
+  <path class="edge" d="M782 198 H808 V146 H831"/>
+  <path class="edge" d="M808 198 V250 H831"/>
+  <text x="28" y="310" class="detail">ADB selects the device by serial number. UIAutomator2 reads controls, taps elements, and enters text on Android.</text>
 </svg>
