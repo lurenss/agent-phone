@@ -115,16 +115,16 @@ test("one transport call for each direct command", async () => {
       ["swipe", ...phone, "--", "1", "20", "3", "4"],
     ],
     [
-      ["set-text", "emu", ...why, "--", "--Caffè ☕"],
-      ["set-text", ...phone, "--", "--Caffè ☕"],
+      ["set-text", "emu", ...why, "--", "--Café menu ☕"],
+      ["set-text", ...phone, "--", "--Café menu ☕"],
     ],
     [
       ["set-text", "emu", "", ...why],
       ["set-text", ...phone, "--", ""],
     ],
     [
-      ["wait", "emu", "Fatto 🌅", ...why],
-      ["wait", ...phone, "--until", JSON.stringify({ see: { text: "Fatto 🌅" } })],
+      ["wait", "emu", "Done 🌅", ...why],
+      ["wait", ...phone, "--until", JSON.stringify({ see: { text: "Done 🌅" } })],
     ],
     [
       ["wait", "emu", "--id", "done", ...why],
@@ -140,8 +140,8 @@ test("one transport call for each direct command", async () => {
 
 test("named tap and targeted text check uniqueness before sending", async () => {
   for (const [args, on, command] of [
-    [["tap", "emu", "Conferma"], { text: "Conferma" }, "tap"],
-    [["set-text", "emu", "Caffè 🌅", "--id", "name"], { id: "name" }, "set-text"],
+    [["tap", "emu", "Confirm"], { text: "Confirm" }, "tap"],
+    [["set-text", "emu", "Café menu 🌅", "--id", "name"], { id: "name" }, "set-text"],
     [["tap", "emu", "--id", "finish"], { id: "finish" }, "tap"],
   ] as const) {
     const result = await call([...args, "--why", "review"]);
@@ -200,7 +200,7 @@ test("--local selects the bundled adapter and sends each input once", async () =
     ["tap", "R58M1234"],
     ["set-text", "emulator-5554"],
   ] as const) {
-    const words = command === "set-text" ? ["--", "--caffè"] : [];
+    const words = command === "set-text" ? ["--", "--café menu"] : [];
     const result = await call(
       [command, serial, "--id", "query", "--why", "test", "--local", ...words],
       command,

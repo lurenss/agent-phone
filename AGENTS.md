@@ -1,36 +1,36 @@
-# Istruzioni per Agent Phone
+# Agent Phone instructions
 
-Usa pstack per progettare, modificare e verificare Agent Phone. Il [README](README.md) contiene i prerequisiti e un esempio completo.
+Use pstack to design, change, and verify Agent Phone. Write documentation, examples, code comments, CLI messages, and tests in English. See the [README](README.md) for setup and a complete example.
 
-## Guidare Android
+## Control an Android device
 
-1. Esegui `devices` e scegli il seriale del dispositivo richiesto. Il Raspberry Pi è la destinazione predefinita. Per USB ed emulatori sul Mac, usa `--local` in ogni comando della sessione.
-2. Prenota un dispositivo libero con `lease SERIAL --why TASK`. Indica lo scopo di ogni lettura o azione con `--why`. Il limite è 80 caratteri per la prenotazione e 200 per gli altri comandi.
-3. Leggi `state` per conoscere l’app in primo piano, lo schermo e la tastiera. Usa `snapshot` per ottenere testo, descrizione, ID, coordinate e stato di focus dei controlli.
-4. Scegli un’azione coerente con la richiesta, anche quando il controllo invia, pubblica o elimina qualcosa. Invia l’azione una volta. Verifica l’effetto con una nuova lettura o con `wait`.
-5. Libera il dispositivo con `release SERIAL` quando hai finito, anche se il task si interrompe.
+1. Run `devices` and select the requested device by serial number. The CLI uses the Raspberry Pi by default. For a USB phone or emulator on the Mac, include `--local` in every command.
+2. Reserve an available device with `lease SERIAL --why TASK`. Give a reason for each read or action with `--why`. The limit is 80 characters for a lease and 200 for other commands.
+3. Use `state` to check the foreground app, screen, and keyboard. Use `snapshot` to read each control’s text, description, ID, coordinates, and focus state.
+4. Choose an action that serves the user’s request, including when a control sends, publishes, or deletes content. Send the input once. Read the screen again or use `wait` to verify its effect.
+5. Release the device with `release SERIAL` when you finish or the task stops early.
 
-## Selezionare un controllo
+## Select a control
 
-- `find` e `tap` accettano il testo esatto o `--id ID`. Usa un ID letto dalla schermata quando più controlli hanno la stessa etichetta. `not_found` indica zero corrispondenze, `ambiguous` più di una. In entrambi i casi, rileggi la schermata.
-- `set-text SERIAL TESTO --id ID` sostituisce il contenuto di un campo. Senza ID usa il campo di testo a fuoco. Se il testo inizia con un trattino, metti prima le opzioni e poi `--` seguito dal testo.
-- `wait` attende fino a dieci secondi che compaia almeno un elemento con il testo o l’ID richiesto. Per esempio, dopo una ricerca attendi un’etichetta dei risultati.
-- Se l’app disegna un controllo che manca da `snapshot`, salva un JPEG con `screenshot SERIAL FILE.jpg`. Usa l’immagine corrente per scegliere le coordinate di `tap SERIAL X Y` o `swipe SERIAL X1 Y1 X2 Y2`.
+- `find` and `tap` accept an exact label or `--id ID`. When several controls share a label, use an ID from the screen. The CLI reports `not_found` for zero matches and `ambiguous` for multiple matches. Read the screen again in either case.
+- `set-text SERIAL TEXT --id ID` replaces the contents of a field. Without an ID, it uses the focused text field. For text that starts with a dash, put the options first, then `--`, then the text.
+- `wait` waits up to ten seconds for at least one control with the given text or ID. After a search, for example, wait for a label on the results screen.
+- If a custom control is missing from `snapshot`, save a JPEG with `screenshot SERIAL FILE.jpg`. Use the current image to choose coordinates for `tap SERIAL X Y` or `swipe SERIAL X1 Y1 X2 Y2`.
 
-La CLI scrive i risultati JSON su stdout e gli errori su stderr. Un codice di uscita 0 conferma che il comando ha ricevuto una risposta positiva. Se perdi la risposta a un tap o a una scrittura, osserva lo stato del dispositivo prima di decidere l’azione successiva.
+The CLI writes JSON results to stdout and errors to stderr. Exit code 0 means the command received a successful response. If a tap or text input loses its response, check the device before deciding what to do next.
 
-## Collegamento e prenotazioni
+## Connections and leases
 
-**Raspberry Pi.** Agent Phone avvia `wp.py` dalla skill `driving-phones-via-walkie-api`. Il client gestisce il tunnel SSH, il token, la prenotazione e il registro delle azioni. Per usare una copia diversa, imposta `AGENT_PHONE_WP` al percorso di `wp.py`. Walkie-porkie riutilizza il servizio UIAutomator2 sul telefono tra comandi successivi. Per i tap per nome o ID e le scritture per ID, la CLI verifica l’unicità prima dell’invio. Il Pi rilegge il controllo quando agisce. La schermata può cambiare tra le due letture.
+**Raspberry Pi.** Agent Phone runs `wp.py` from the `driving-phones-via-walkie-api` skill. The client handles the SSH tunnel, token, lease, and action log. Set `AGENT_PHONE_WP` to the path of another copy of `wp.py` if needed. Walkie-porkie reuses the UIAutomator2 service on the phone between commands. Before a tap by label or ID, or a text input by ID, the CLI checks for a single match. The Pi reads the control again when it acts. The screen can change between those reads.
 
-**Mac.** La CLI cerca `adb` nel PATH o in `~/Library/Android/sdk/platform-tools/adb` e contatta il server su `127.0.0.1:5037`. Al primo uso, `uv` prepara le dipendenze Python. Se il telefono USB compare come `unauthorized`, sbloccalo e accetta la richiesta di Debug USB. Scegli un seriale con stato `device`.
+**Mac.** The CLI looks for `adb` on PATH or at `~/Library/Android/sdk/platform-tools/adb`. It connects to the local ADB server at `127.0.0.1:5037`. On first use, `uv` sets up the Python dependencies. If a USB phone appears as `unauthorized`, unlock it and accept the USB debugging prompt. Select a serial number whose state is `device`.
 
-UIAutomator2 legge la gerarchia dei controlli, esegue i tap per testo o ID e scrive nei campi. ADB gestisce apertura delle app, screenshot, tap per coordinate, swipe e tasti. Quando un comando avvia il servizio UIAutomator2, lo arresta prima di terminare. Nei test di velocità locali, considera anche il tempo di avvio del servizio.
+UIAutomator2 reads the screen hierarchy, taps controls by label or ID, and fills in text fields. ADB opens apps, takes screenshots, taps coordinates, swipes, and sends key events. A command stops any UIAutomator2 service it started before it exits. Include that startup time when measuring local command latency.
 
-La prenotazione locale dura dieci minuti. Ripeti `lease` per rinnovarla. I processi Agent Phone dello stesso utente macOS condividono la prenotazione e serializzano i comandi per dispositivo. Altri client ADB possono agire sullo stesso telefono.
+A local lease lasts ten minutes. Run `lease` again to renew it. Agent Phone processes running as the same macOS user share the lease and run one command at a time per device. Other ADB clients can still interact with that device.
 
-## Modificare la CLI
+## Change the CLI
 
-- Mantieni sintassi, validazione e testo di `--help` in [src/cli.ts](src/cli.ts).
-- Seleziona il client in [src/transport.ts](src/transport.ts). Passa gli argomenti come array. Implementa le operazioni Android locali in [src/local.py](src/local.py).
-- Esegui `bun install --frozen-lockfile` per preparare l’ambiente di sviluppo. Prima del commit esegui `bun run check`. I [test della CLI](tests/cli.test.ts) usano client simulati e devono restare indipendenti da telefoni, credenziali e account reali.
+- Keep command syntax, validation, and `--help` in [src/cli.ts](src/cli.ts).
+- Select the client in [src/transport.ts](src/transport.ts). Pass arguments as an array. Implement local Android operations in [src/local.py](src/local.py).
+- Run `bun install --frozen-lockfile` to set up development dependencies. Run `bun run check` before committing. The [CLI tests](tests/cli.test.ts) use simulated clients and run independently of real phones, credentials, and accounts.
