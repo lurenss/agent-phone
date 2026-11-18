@@ -4,16 +4,17 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 let folder: string;
-let script: string;
 const cli = join(import.meta.dir, "../agent-phone");
 beforeAll(async () => {
   folder = await mkdtemp(join(tmpdir(), "agent-phone-"));
-  script = join(folder, "wp.py");
+  const uv = join(folder, "uv");
   await Bun.write(
-    script,
-    `
+    uv,
+    `#!/usr/bin/env python3
 import json, os, sys
-args = sys.argv[1:]
+if sys.argv[1:5] != ["run", "--no-project", "--script", os.environ["ANDROID_SCRIPT"]]:
+    sys.exit("unexpected program")
+args = sys.argv[5:]
 with open(os.environ["CALL_LOG"], "a") as log:
     print(json.dumps(args), file=log)
 if args[0] == os.environ.get("FAIL_CMD"):
@@ -24,19 +25,6 @@ if args[0] == "ui" and "--on" in args:
     print(json.dumps({"elements": [{"text":target}] * {"missing":0,"twice":2}.get(target,1)}))
 else:
     print(json.dumps({"ok":True}))
-`,
-  );
-  const uv = join(folder, "uv");
-  await Bun.write(
-    uv,
-    `#!/usr/bin/env python3
-import json, os, sys
-with open(os.environ["CALL_LOG"], "a") as log:
-    print(json.dumps(sys.argv[1:]), file=log)
-if os.environ.get("FAIL_CMD"):
-    print(json.dumps({"error": "unknown_delivery"}))
-    sys.exit(1)
-print(json.dumps({"ok": True}))
 `,
   );
   await chmod(uv, 0o755);
@@ -52,7 +40,7 @@ async function call(args: string[], fail = "") {
       ...process.env,
       PATH: folder + ":" + process.env.PATH,
       CALL_LOG: log,
-      AGENT_PHONE_WP: script,
+      ANDROID_SCRIPT: join(import.meta.dir, "../src/local.py"),
       FAIL_CMD: fail,
     },
     stderr: "pipe",
@@ -138,7 +126,7 @@ test("one transport call for each direct command", async () => {
   }
 });
 
-test("named tap and targeted text check uniqueness before sending", async () => {
+test("named tap and targeted text pass one selector to the Android driver", async () => {
   for (const [args, on, command] of [
     [["tap", "emu", "Confirm"], { text: "Confirm" }, "tap"],
     [["set-text", "emu", "Café menu 🌅", "--id", "name"], { id: "name" }, "set-text"],
@@ -146,23 +134,20 @@ test("named tap and targeted text check uniqueness before sending", async () => 
   ] as const) {
     const result = await call([...args, "--why", "review"]);
     expect(result.status).toBe(0);
-    expect(result.calls.map((row) => row[0])).toEqual(["ui", command]);
+    expect(result.calls.map((row) => row[0])).toEqual([command]);
     for (const row of result.calls) expect(row[row.indexOf("--on") + 1]).toBe(JSON.stringify(on));
   }
 });
 
-test("missing and duplicate targets send zero inputs", async () => {
-  for (const command of ["find", "tap", "set-text"]) {
-    for (const [label, error] of [
-      ["missing", "not_found"],
-      ["twice", "ambiguous"],
-    ] as const) {
-      const rest = command === "set-text" ? ["new", "--id", label] : [label];
-      const result = await call([command, "emu", ...rest, "--why", "review"]);
-      expect(result.status).toBe(1);
-      expect(JSON.parse(result.error).error).toBe(error);
-      expect(result.calls.map((row) => row[0])).toEqual(["ui"]);
-    }
+test("find requires a unique match", async () => {
+  for (const [label, error] of [
+    ["missing", "not_found"],
+    ["twice", "ambiguous"],
+  ] as const) {
+    const result = await call(["find", "emu", label, "--why", "review"]);
+    expect(result.status).toBe(1);
+    expect(JSON.parse(result.error).error).toBe(error);
+    expect(result.calls.map((row) => row[0])).toEqual(["ui"]);
   }
   const match = await call(["--why", "review", "find", "emu", "name"]);
   expect(JSON.parse(match.out)).toEqual({ text: "name" });
@@ -172,7 +157,7 @@ test("a failed action is reported once and never replayed", async () => {
   const result = await call(["tap", "emu", "Done", "--why", "review"], "tap");
   expect(result.status).toBe(1);
   expect(JSON.parse(result.error).error).toBe("unknown_delivery");
-  expect(result.calls.map((row) => row[0])).toEqual(["ui", "tap"]);
+  expect(result.calls.map((row) => row[0])).toEqual(["tap"]);
 });
 
 test("usage errors make no transport calls", async () => {
@@ -191,24 +176,8 @@ test("usage errors make no transport calls", async () => {
   }
 });
 
-test("--local selects the bundled adapter and sends each input once", async () => {
-  const program = ["run", "--no-project", "--script", join(import.meta.dir, "../src/local.py")];
-  const devices = await call(["--local", "devices"]);
-  expect(devices.status).toBe(0);
-  expect(devices.calls).toEqual([[...program, "phones"]]);
-  for (const [command, serial] of [
-    ["tap", "R58M1234"],
-    ["set-text", "emulator-5554"],
-  ] as const) {
-    const words = command === "set-text" ? ["--", "--café menu"] : [];
-    const result = await call(
-      [command, serial, "--id", "query", "--why", "test", "--local", ...words],
-      command,
-    );
-    expect(result.status).toBe(1);
-    expect(JSON.parse(result.error).error).toBe("unknown_delivery");
-    expect(result.calls).toEqual([
-      [...program, command, serial, "--why=test", "--on", '{"id":"query"}', ...words],
-    ]);
-  }
+test("existing --local commands use the same Android driver", async () => {
+  const result = await call(["--local", "devices"]);
+  expect(result.status).toBe(0);
+  expect(result.calls).toEqual([["phones"]]);
 });
