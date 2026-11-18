@@ -1,33 +1,33 @@
 # Agent Phone
 
-Agent Phone permette a un coding agent di usare Android passo per passo. Con UIAutomator2 legge il testo e i controlli sullo schermo. Può aprire un’app, toccare un pulsante, scrivere in un campo e verificare il risultato.
+Agent Phone lets a coding agent control Android one step at a time. It uses UIAutomator2 to read text and controls on the screen. The agent can open an app, tap a button, fill in a field, and check what changed.
 
 ![Agent Phone architecture. The CLI controls an Android phone through walkie-porkie on the Raspberry Pi, or uses the Mac’s ADB server to reach a USB phone or an emulator.](docs/architecture.svg)
 
-## Scegli il dispositivo
+## Choose a device
 
-Esegui la CLI con Bun dalla cartella del progetto.
+Run the CLI with Bun from the project directory.
 
-| Dove si trova Android | Cosa serve sul Mac | Per elencare i dispositivi |
+| Device | What you need on the Mac | List devices |
 | --- | --- | --- |
-| Telefono collegato al Raspberry Pi | Python 3 e client `wp.py` configurato per walkie-porkie | `./agent-phone devices` |
-| Telefono USB o emulatore sul Mac | `uv` e Android SDK Platform-Tools, che include `adb` | `./agent-phone --local devices` |
+| Phone connected to the Raspberry Pi | Python 3 and the `wp.py` client configured for walkie-porkie | `./agent-phone devices` |
+| USB phone or Android emulator on the Mac | `uv` and Android SDK Platform-Tools, which includes `adb` | `./agent-phone --local devices` |
 
-Per un telefono USB, abilita **Debug USB** e autorizza il Mac sul telefono. Per un emulatore, avvialo dal **Device Manager** di Android Studio.
+For a USB phone, turn on **USB debugging** and authorize the Mac on the phone. For an emulator, start it in Android Studio’s **Device Manager**.
 
-## Apri le Impostazioni e verifica il risultato
+## Open Settings and check the result
 
-Per un dispositivo sul Mac, copia il seriale da `devices` e sostituisci `emulator-5554` nell’esempio. Per un telefono sul Pi, usa il suo seriale e togli `--local` da ogni comando.
+For a local device, replace `emulator-5554` with the serial number from `./agent-phone --local devices`. For a phone on the Pi, use its serial number and omit `--local` from each command.
 
 ```sh
 SERIAL=emulator-5554
-./agent-phone --local lease "$SERIAL" --why "Esplorare le impostazioni"
-./agent-phone --local open "$SERIAL" com.android.settings --why "Aprire le impostazioni"
-./agent-phone --local state "$SERIAL" --why "Verificare l’app in primo piano"
-./agent-phone --local snapshot "$SERIAL" --why "Leggere i controlli visibili"
+./agent-phone --local lease "$SERIAL" --why "Explore Android settings"
+./agent-phone --local open "$SERIAL" com.android.settings --why "Open Settings"
+./agent-phone --local state "$SERIAL" --why "Check which app is in the foreground"
+./agent-phone --local snapshot "$SERIAL" --why "Read the controls on screen"
 ./agent-phone --local release "$SERIAL"
 ```
 
-Quando le Impostazioni sono in primo piano, `state` mostra `com.android.settings` nel campo `answer.app`. Con `snapshot` leggi etichette e ID da usare per il prossimo tap.
+When Settings is in the foreground, `state` reports `com.android.settings` in `answer.app`. Use the labels and IDs from `snapshot` to choose what to tap next.
 
-Per vedere tutti i comandi, esegui `./agent-phone --help`. Le istruzioni operative per Codex e Claude Code sono in [AGENTS.md](AGENTS.md).
+Run `./agent-phone --help` for the full command list. Codex and Claude Code use the [agent instructions](AGENTS.md).
