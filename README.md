@@ -2,7 +2,7 @@
 
 Agent Phone permette a un coding agent di usare Android passo per passo. Con UIAutomator2 legge il testo e i controlli sullo schermo. Può aprire un’app, toccare un pulsante, scrivere in un campo e verificare il risultato.
 
-![Architettura di Agent Phone. Sul Mac la CLI usa wp.py per raggiungere il Raspberry Pi via SSH, oppure usa ADB locale per guidare un telefono USB o un emulatore.](docs/architecture.svg)
+![Agent Phone architecture. The CLI controls an Android phone through walkie-porkie on the Raspberry Pi, or uses the Mac’s ADB server to reach a USB phone or an emulator.](docs/architecture.svg)
 
 ## Scegli il dispositivo
 

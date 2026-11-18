@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 642" width="1040" height="642" role="img" aria-labelledby="title desc">
-  <title id="title">Architettura di Agent Phone</title>
-  <desc id="desc">Sul Mac, Codex o Claude Code invoca la CLI Bun. src/transport.ts sceglie tra due percorsi. Per il Raspberry Pi, wp.py raggiunge walkie-porkie via tunnel SSH e il Pi controlla un telefono USB. Con --local, src/local.py usa il server ADB del Mac per controllare un telefono USB o un emulatore. Su Android, UIAutomator2 legge i controlli e inserisce testo. La CLI restituisce il risultato all’agente in JSON.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1040 642" width="1040" height="642" xml:lang="en" role="img" aria-labelledby="title desc">
+  <title id="title">Agent Phone architecture</title>
+  <desc id="desc">On the Mac, Codex or Claude Code calls the Bun CLI. By default, wp.py reaches the walkie-porkie API through an SSH tunnel. The Raspberry Pi controls an Android phone over USB. With --local, src/local.py uses the Mac’s ADB server to control a USB phone or an emulator. UIAutomator2 reads screen elements and enters text on Android. The CLI returns the result as JSON.</desc>
   <defs>
     <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
       <path d="M0 0 10 5 0 10Z" fill="#424c57"/>
@@ -22,18 +22,18 @@
 
   <rect width="1040" height="642" fill="white"/>
   <text x="34" y="52" class="title">Agent Phone</text>
-  <text x="35" y="83" class="subtitle">L’agente invia un comando dal Mac e legge la risposta in JSON.</text>
+  <text x="35" y="83" class="subtitle">The agent runs a command on the Mac and reads the JSON response.</text>
 
   <rect x="34" y="112" width="238" height="72" rx="10" fill="white" stroke="#9aa3ad"/>
   <rect x="320" y="112" width="300" height="72" rx="10" class="code"/>
   <rect x="668" y="112" width="338" height="72" rx="10" fill="#ffd3e2" stroke="#e07aa2"/>
   <g text-anchor="middle">
     <text x="153" y="143" class="label">Coding agent</text>
-    <text x="153" y="166" class="detail">Codex o Claude Code</text>
+    <text x="153" y="166" class="detail">Codex or Claude Code</text>
     <text x="470" y="143" class="label">./agent-phone</text>
-    <text x="470" y="166" class="detail">src/cli.ts · valida il comando</text>
+    <text x="470" y="166" class="detail">src/cli.ts validates the command</text>
     <text x="837" y="143" class="label">src/transport.ts</text>
-    <text x="837" y="166" class="detail">Seleziona il client</text>
+    <text x="837" y="166" class="detail">Selects the client</text>
   </g>
   <path class="edge" d="M272 148 H316"/>
   <path class="edge" d="M620 148 H664"/>
@@ -44,37 +44,37 @@
   <rect x="534" y="235" width="472" height="378" rx="13" class="lane"/>
 
   <g text-anchor="middle">
-    <text x="270" y="271" class="group">Raspberry Pi · predefinito</text>
+    <text x="270" y="271" class="group">Raspberry Pi · default</text>
     <text x="770" y="271" class="group">Mac · --local</text>
 
     <rect x="64" y="290" width="412" height="63" rx="9" class="code"/>
     <text x="270" y="317" class="label">wp.py</text>
-    <text x="270" y="340" class="detail">Client walkie-porkie sul Mac</text>
+    <text x="270" y="340" class="detail">walkie-porkie client on the Mac</text>
     <rect x="564" y="290" width="412" height="63" rx="9" class="code"/>
     <text x="770" y="317" class="label">src/local.py</text>
-    <text x="770" y="340" class="detail">Client Python avviato con uv</text>
+    <text x="770" y="340" class="detail">uv runs the Python client</text>
 
     <path class="edge" d="M270 353 V397"/>
-    <text x="284" y="381" text-anchor="start" class="detail">Tunnel SSH</text>
+    <text x="284" y="381" text-anchor="start" class="detail">SSH tunnel</text>
     <path class="edge" d="M770 353 V397"/>
     <text x="784" y="381" text-anchor="start" class="detail">127.0.0.1:5037</text>
 
     <rect x="64" y="401" width="412" height="63" rx="9" class="code"/>
-    <text x="270" y="428" class="label">API walkie-porkie</text>
-    <text x="270" y="451" class="detail">Il Raspberry Pi comunica con Android via ADB</text>
+    <text x="270" y="428" class="label">walkie-porkie API</text>
+    <text x="270" y="451" class="detail">The Pi sends commands to Android over ADB.</text>
     <rect x="564" y="401" width="412" height="63" rx="9" class="code"/>
-    <text x="770" y="428" class="label">Server ADB del Mac</text>
-    <text x="770" y="451" class="detail">Raggiunge il dispositivo scelto per seriale</text>
+    <text x="770" y="428" class="label">ADB server on the Mac</text>
+    <text x="770" y="451" class="detail">Connects to the device by serial number.</text>
 
     <path class="edge" d="M270 464 V497"/>
     <path class="edge" d="M770 464 V497"/>
     <rect x="64" y="501" width="412" height="91" rx="9" class="device"/>
-    <text x="270" y="530" class="label">Telefono USB sul Pi</text>
-    <text x="270" y="555" class="detail">UIAutomator2 legge e usa i controlli.</text>
-    <text x="270" y="577" class="detail">Il Pi riusa il servizio tra i comandi.</text>
+    <text x="270" y="530" class="label">USB phone connected to the Pi</text>
+    <text x="270" y="555" class="detail">UIAutomator2 reads and taps screen elements.</text>
+    <text x="270" y="577" class="detail">The Pi reuses the service between commands.</text>
     <rect x="564" y="501" width="412" height="91" rx="9" class="device"/>
-    <text x="770" y="530" class="label">Telefono USB o emulatore sul Mac</text>
-    <text x="770" y="555" class="detail">UIAutomator2 legge e usa i controlli.</text>
-    <text x="770" y="577" class="detail">Ogni comando arresta il servizio che avvia.</text>
+    <text x="770" y="530" class="label">USB phone or emulator on the Mac</text>
+    <text x="770" y="555" class="detail">UIAutomator2 reads and taps screen elements.</text>
+    <text x="770" y="577" class="detail">Each command stops the service it starts.</text>
   </g>
 </svg>
