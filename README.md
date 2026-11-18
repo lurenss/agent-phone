@@ -1,79 +1,42 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/media/logo-dark.svg">
-    <img src="docs/media/logo-light.svg" alt="agent-phone logo: a phone drawn as two brackets around one tap target" width="96">
-  </picture>
-</p>
-
 # agent-phone
 
-https://github.com/user-attachments/assets/53370492-cd75-47dc-a98f-ae2e49a225b4
+Una CLI per guidare un telefono Android collegato al Raspberry Pi. L’agente legge la schermata, sceglie una mossa e verifica il risultato. Il Pi parla con Android tramite l’API di walkie-porkie.
 
-*A 2-minute intro: what agent-phone does, why, and how it was tested (made 1 November 2026).*
+## Primo utilizzo
 
-agent-phone lets an AI agent see and operate an Android phone through its accessibility tree, over adb. It applies the design of [vercel-labs/agent-desktop](https://github.com/vercel-labs/agent-desktop) to a phone: a snapshot returns compact JSON with a ref for every element the agent can act on, the agent acts on a ref, and it snapshots again to check. The loop stays in the agent.
+Sul Mac servono Bun, Python 3 e il client `wp.py` della skill `driving-phones-via-walkie-api`, con tunnel SSH e token già configurati. La CLI trova lo script nella posizione installata da Claude Code. Per usare un’altra copia, imposta `AGENT_PHONE_WP` al percorso dello script.
 
-It is in development. It is built for any app on any Android phone. App knowledge lives in policy data and examples, never in core. `docs/plan.md` lists the units and the check each one must pass.
+Dalla radice del checkout esegui `./agent-phone devices`. Scegli un telefono libero e assegna a `SERIAL` il suo seriale. Questo esempio apre le impostazioni Android, legge l’app in primo piano e torna indietro.
 
-## Why it is built this way
-
-Measured on a Samsung J7 (Android 9), reading the screen with `adb shell uiautomator dump` takes about 2.4 seconds and fails while a screen animates. The same read through a uiautomator2 server that stays running takes about 160 ms. Sending a key takes 902 ms through `adb shell input` and 34 ms through the server. The rows behind these numbers are in `probes/android/FINDINGS.md`.
-
-## Use
-
-```bash
-agent-phone devices                      # every device, with its facts
-agent-phone snapshot                     # the active window as compact lines with refs
-agent-phone snapshot --skeleton          # the outline: collections fold their rows into a count
-agent-phone snapshot --root @k3x9q:e3    # one subtree, as a new snapshot, with the same ref numbers
-agent-phone snapshot --settle            # read until the reads agree for 800 ms, and say whether they did
-agent-phone snapshot --surface dialog    # a dialog, the keyboard, the shade, or every window
-agent-phone find --name Wi-Fi --role button   # every match, with its ref
-agent-phone get @k3x9q:e4 --property bounds   # one property of a ref, read live
-agent-phone is @k3x9q:e4 --property enabled   # one boolean of a ref, read live
-agent-phone server stop                  # free the phone for another tool, such as an old uiautomator dump
-agent-phone skills get phone             # the short usage guide for agents, as Markdown in data.content
-agent-phone skills get reference         # the full guide
-agent-phone click @k3x9q:e4 --wait-for 'name*=Brightness'   # tap a ref and verify the tap by its effect
-agent-phone set-text @k3x9q:e2 display   # write a field, then read it back
-agent-phone scroll down @k3x9q:e3        # swipe a list along the way it runs
-agent-phone press back                   # back, home, recents or enter
-agent-phone launch com.android.settings  # also stop, open-url, rotate, clipboard get|set, screenshot
-agent-phone wait --for name=Brightness   # read until a condition holds, with no sleep
-agent-phone click @k3x9q:e9 --commit send   # a commit action is sent only with the effect granted
-agent-phone click name=Display           # a target is a ref or a query that must match one element
-agent-phone batch steps.json             # several steps in one call, with one trace of what each did
-agent-phone flow run flow.toml          # a job written once as a file, replayed in one call
-agent-phone flow record TRACE --out flow.toml   # draft that file from the trace of a day
+```sh
+./agent-phone lease "$SERIAL" --why "Esplorare le impostazioni Android"
+./agent-phone open "$SERIAL" com.android.settings --why "Aprire le impostazioni"
+./agent-phone state "$SERIAL" --why "Verificare quale app è aperta"
+./agent-phone snapshot "$SERIAL" --why "Leggere i controlli disponibili"
+./agent-phone key "$SERIAL" BACK --why "Uscire dalle impostazioni"
+./agent-phone release "$SERIAL"
 ```
 
-Each command prints one JSON object, described in `docs/json-output.md`. `-d <serial>` picks a device when several are ready, and a ref names its own device. The server on the phone starts when a command needs it and stops after 15 idle minutes. Every input goes through one pipeline. The ref must come from a snapshot taken after the last input, its element is found again on a fresh read, and the policy engine judges what the touch lands on. An input that would post, send, delete, pay, give a consent or change the system is refused unless the caller grants that effect with `--commit`, and a deny rule or a package the device profile protects refuses it whatever the grant. That is the `ask` permission mode. The person who launches the agent can set `AGENT_PHONE_PERMISSION_MODE=dangerously-skip`, and a commit then goes out with no grant while every denial still holds. The agent never sets it, and every result names the mode in `permission_mode`. Each result says whether the input was delivered, and a retry is safe only after `not_delivered`. `AGENT_PHONE_HOME`, `AGENT_PHONE_IDLE_S`, `AGENT_PHONE_LOCK_WAIT_S` and `ADB` configure the state folder, the idle limit, how long a command waits for another process to let go of the device, and the adb binary. `AGENT_PHONE_PERMISSION_MODE` is `ask` or `dangerously-skip`.
+## Trovare e usare un controllo
 
-### Phones on another computer
+`snapshot` restituisce testo, descrizione, ID e coordinate degli elementi visibili. Un agente può cercare un’etichetta esatta oppure usare l’ID quando due pulsanti hanno lo stesso testo. Questi esempi si riferiscono a una schermata di ricerca con il campo `query` e l’etichetta «Risultati».
 
-The phones can be plugged into one small computer, the phone host, and driven from any other. The host runs adb, sshd and one script, [`host/phone_host.py`](host/README.md). On your own computer, name the host by its ssh alias:
-
-```bash
-export AGENT_PHONE_REMOTE=farm                # every command now drives the host's phones
-export AGENT_PHONE_TASK="schedule reel 12"    # optional: what other people read next to your name
-agent-phone devices                           # each phone, with who holds it and for what
-ssh farm                                      # the same, with plain ssh and no agent-phone
+```sh
+./agent-phone find "$SERIAL" --id query --why "Individuare il campo di ricerca"
+./agent-phone tap "$SERIAL" --id query --why "Selezionare il campo"
+./agent-phone set-text "$SERIAL" "Caffè ☕" --id query --why "Inserire la ricerca"
+./agent-phone key "$SERIAL" ENTER --why "Avviare la ricerca"
+./agent-phone wait "$SERIAL" "Risultati" --why "Verificare l'apertura dei risultati"
 ```
 
-A phone is yours from your first command until 120 seconds after your last one. A command for a phone that someone else drives fails with `DEVICE_BUSY`, which names them and their task. `docs/design/remote.md` explains how it works.
+Per un tap o una scrittura con selettore, la CLI verifica che ci sia una sola corrispondenza. Zero elementi danno `not_found`, più elementi danno `ambiguous`. Il Pi rilegge la schermata quando esegue l’azione. La UI può cambiare tra le due letture. `set-text` senza ID usa il campo a fuoco. Per un controllo disegnato dall’app, `screenshot` salva un JPEG, `tap SERIAL X Y` tocca un punto e `swipe SERIAL X1 Y1 X2 Y2` esegue un gesto.
 
-Right after something changes the screen, such as `adb shell am start`, take the next snapshot with `--settle`. A plain snapshot reads once and can show the middle of a transition (`A2-5`).
+Il chiamante decide se un tap è coerente con la richiesta dell’utente, anche per «Pubblica», «Invia» o «Elimina». Il Pi verifica token, diritti e prenotazione. Un exit code 0 conferma la risposta del comando. Per sapere se l’app ha raggiunto l’obiettivo, leggi di nuovo la schermata o usa `wait`. Se il trasporto perde la risposta, osserva lo stato prima di decidere come procedere.
 
-## Develop
+## Come leggere il codice
 
-```bash
-uv sync
-uv run pytest
-uv run ruff check && uv run ruff format --check .
-```
+1. [src/cli.ts](src/cli.ts) traduce i comandi dell’agente. Segui il ramo `tap` per vedere il controllo di unicità e l’invio.
+2. [src/walkie.ts](src/walkie.ts) avvia `wp.py` e riporta l’esito. Il client esistente gestisce il tunnel, il token, il lock locale e l’audit operativo.
+3. [tests/cli.test.ts](tests/cli.test.ts) esegue la CLI come processo e verifica quali comandi arrivano al trasporto.
 
-`AGENTS.md` has the architecture rules, the coding standards and the phone safety rules.
-
-## License
-
-Apache-2.0. See `LICENSE`.
+`./agent-phone --help` elenca tutti i comandi. Per sviluppare, esegui `bun install --frozen-lockfile` e `bun run check`. I test usano un telefono simulato a livello del client. Questa versione supporta Android sul Pi. La precedente CLI Python, con USB diretto, profili e flussi TOML, è disponibile nella cronologia Git al commit `b09e614`.
