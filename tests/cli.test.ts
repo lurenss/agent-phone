@@ -12,17 +12,20 @@ beforeAll(async () => {
     uv,
     `#!/usr/bin/env python3
 import json, os, sys
-if sys.argv[1:5] != ["run", "--no-project", "--script", os.environ["ANDROID_SCRIPT"]]:
+if sys.argv[7:9] != ["python", os.environ["ANDROID_SCRIPT"]]:
     sys.exit("unexpected program")
-args = sys.argv[5:]
+args = sys.argv[9:]
 with open(os.environ["CALL_LOG"], "a") as log:
     print(json.dumps(args), file=log)
 if args[0] == os.environ.get("FAIL_CMD"):
     print(json.dumps({"error":"unknown_delivery"}))
     sys.exit(1)
-if args[0] == "ui" and "--on" in args:
+if args[0] == "find":
     target = next(iter(json.loads(args[args.index("--on") + 1]).values()))
-    print(json.dumps({"elements": [{"text":target}] * {"missing":0,"twice":2}.get(target,1)}))
+    if target in ("missing","twice"):
+        print(json.dumps({"error":"not_found" if target=="missing" else "ambiguous"}))
+        sys.exit(1)
+    print(json.dumps({"text":target}))
 else:
     print(json.dumps({"ok":True}))
 `,
@@ -139,7 +142,7 @@ test("named tap and targeted text pass one selector to the Android driver", asyn
   }
 });
 
-test("find requires a unique match", async () => {
+test("find returns the driver match or lookup error", async () => {
   for (const [label, error] of [
     ["missing", "not_found"],
     ["twice", "ambiguous"],
@@ -147,7 +150,7 @@ test("find requires a unique match", async () => {
     const result = await call(["find", "emu", label, "--why", "review"]);
     expect(result.status).toBe(1);
     expect(JSON.parse(result.error).error).toBe(error);
-    expect(result.calls.map((row) => row[0])).toEqual(["ui"]);
+    expect(result.calls.map((row) => row[0])).toEqual(["find"]);
   }
   const match = await call(["--why", "review", "find", "emu", "name"]);
   expect(JSON.parse(match.out)).toEqual({ text: "name" });
@@ -180,4 +183,19 @@ test("existing --local commands use the same Android driver", async () => {
   const result = await call(["--local", "devices"]);
   expect(result.status).toBe(0);
   expect(result.calls).toEqual([["phones"]]);
+});
+
+test("a malformed later routine step prevents saving the whole file", async () => {
+  const path = join(folder, "invalid.json");
+  await Bun.write(
+    path,
+    JSON.stringify([
+      ["open", "com.android.settings"],
+      ["lease", "another-phone"],
+    ]),
+  );
+  const result = await call(["routine", "save", "example", path]);
+  expect(result.status).toBe(2);
+  expect(JSON.parse(result.error).error).toContain("Step 2");
+  expect(result.calls).toEqual([]);
 });

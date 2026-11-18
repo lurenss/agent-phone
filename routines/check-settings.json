@@ -1,0 +1,5 @@
+[
+  ["open", "com.android.settings"],
+  ["wait", "--id", "search_action_bar"],
+  ["state"]
+]
