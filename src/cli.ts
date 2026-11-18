@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 import { parseArgs } from "node:util";
-import { join } from "node:path";
+import { execute } from "./manager";
 
-const help = `Control an Android USB phone or emulator through ADB on this Mac.
+const help = `Control an Android USB phone or emulator through local ADB.
 agent-phone devices
 agent-phone lease SERIAL --why TASK
 agent-phone release SERIAL
@@ -26,48 +26,13 @@ Use -- before positional text starting with a dash.`;
 
 class UsageError extends Error {}
 
-class AndroidError extends Error {
-  constructor(
-    readonly output: string,
-    readonly status: number,
-  ) {
-    super(output);
-  }
-}
-
 async function call(args: string[], input?: string): Promise<string> {
-  if (!Bun.which("uv")) throw new Error("Install uv to run Agent Phone.");
-  const program = [
-    "uv",
-    "run",
-    "--no-project",
-    "--python",
-    ">=3.11,<3.15",
-    "--with-requirements",
-    join(import.meta.dir, "../requirements.txt"),
-    "python",
-    join(import.meta.dir, "local.py"),
-  ];
-  const child = Bun.spawn([...program, ...args], {
-    stdin: input === undefined ? "ignore" : new Blob([input]),
-    stdout: "pipe",
-    stderr: "pipe",
-  });
-  const [output, diagnostic, status] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
-  ]);
-  if (status !== 0) {
-    throw new AndroidError(
-      output.trim() || JSON.stringify({ error: diagnostic.trim() || "Android transport stopped" }),
-      status,
-    );
-  }
-  return output;
+  const value = await execute(args, input);
+  const result = args[0] === "find" ? value : Object.assign({ ok: true }, value);
+  return JSON.stringify(result) + "\n";
 }
 
-function plan(argv: string[], routine?: string): string[] {
+export function plan(argv: string[], routine?: string): string[] {
   let parsed;
   try {
     parsed = parseArgs({
@@ -200,16 +165,30 @@ async function run(argv: string[]): Promise<string> {
   return call(["routine-save", name], JSON.stringify({ steps, commands }));
 }
 
-try {
-  process.stdout.write(await run(process.argv.slice(2)));
-} catch (error) {
-  if (error instanceof AndroidError) {
-    console.error(error.output);
-    process.exitCode = error.status;
-  } else {
-    console.error(
-      JSON.stringify({ error: error instanceof Error ? error.message : String(error) }),
-    );
-    process.exitCode = error instanceof UsageError ? 2 : 1;
+if (import.meta.main) {
+  try {
+    process.stdout.write(await run(process.argv.slice(2)));
+  } catch (error) {
+    if (error instanceof UsageError) {
+      console.error(JSON.stringify({ error: error.message }));
+      process.exitCode = 2;
+    } else {
+      const fields =
+        error instanceof Error
+          ? Object.fromEntries(
+              ["matches", "runId", "failedStep", "completed"]
+                .filter((k) => Object.hasOwn(error, k))
+                .map((k) => [k, Reflect.get(error, k)]),
+            )
+          : {};
+      console.error(
+        JSON.stringify({
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+          ...fields,
+        }),
+      );
+      process.exitCode = 1;
+    }
   }
 }
